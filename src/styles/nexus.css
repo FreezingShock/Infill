@@ -184,3 +184,11 @@ select, .inp { font: 12.5px var(--body); border: 1.5px solid var(--ink); border-
   .areas { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .btn, .meter i, #app, .delta { transition: none; animation: none; } }
+
+/* Build palette: the picked item, small swatch shelves, the Advanced drawer label, hover readout in the hint */
+.kit.on { background: var(--ink); color: var(--paper); }
+.kits.small { grid-template-columns: repeat(5, 1fr); }
+.kits.small .kit { padding: 5px 3px 4px; font-size: 10.5px; }
+.kits.small .kit svg { width: 36px; height: 24px; }
+.barlabel { font: 700 12px var(--display); align-self: center; padding: 0 6px 0 4px; color: var(--ink-soft); }
+.hint .hov { color: var(--ink-soft); }

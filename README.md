@@ -30,9 +30,16 @@ Other scripts:
 
 ## Playing
 
-Select lots with the tools at the bottom left (or keys V, R, L, P, S), pick a template or tweak in the card on the right, and watch the scores at the top right. Draw streets with D, edit a street's cross-section with E, clear land for a new neighborhood with A, paint zones with Z. B shows the as-built city, C a before/after slider, N night. Ctrl+Z and Ctrl+Y undo and redo. Press ? in the game for the full key list.
+Four tools at the bottom left:
 
-Edits autosave to the browser per area. The edit log (in the view bar at the bottom left) can copy or open a save file.
+- **Look (V)**: click a lot for quick changes that fit it (with homes and cost shown before you click), Copy look, Save as my design, whole block and similar lots. Click a street for one-click street presets. "Customize every detail" opens the full template, tweak, lot and select controls.
+- **Build (P)**: pick anything on the palette (add or remove a floor, ADU, solar, trees, roofs, colours, every template, your copied look and saved designs), then click a lot or drag across lots to apply it, like painting tiles. Hover previews the result. Shift-drag applies to a rectangle, double-click to a whole block.
+- **Roads (D)**: click open ground to draw a new street, or click an existing street to change it.
+- **Bulldoze (X)**: click or drag across lots to clear them, or click a street piece to remove it.
+
+**Advanced** (in the view bar) opens the precise tools (box, lasso, brush, along a street, edit streets, new area, paint zones), lot lines and the edit log. B shows the as-built city, C a before/after slider, N night. Ctrl+Z and Ctrl+Y undo and redo. Press ? in the game for the full key list.
+
+Edits autosave to the browser per area. Saved designs are kept in the browser across areas.
 
 ## Branches
 

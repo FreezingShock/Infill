@@ -5,8 +5,9 @@ import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
 import { BASE, uid } from '../engine/commands.js';
 import { CAM_OFF, MAT, SUN_OFF, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
 import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
-import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
-import { areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
+import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
+import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
+import { itemById, preview, previewText, progAfter } from './palette.js';
 
 // =====================================================================
 // Tools and input
@@ -21,30 +22,43 @@ const ICONS = {
   edit: '<path d="M1 12h14M1 6h14" stroke="currentColor" stroke-width="2"/><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="11" cy="6" r="2" fill="currentColor"/>',
   area: '<path d="M2 2h12v12H2z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.2"/>',
   zone: '<path d="M2 14l3-1 8-8-2-2-8 8z" fill="currentColor"/><path d="M10 14h5" stroke="currentColor" stroke-width="2"/>',
+  build: '<path d="M2 14V7l5-4 5 4v7z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v6M9 5h6" stroke="currentColor" stroke-width="2"/>',
+  roads: '<path d="M4 15L7 1M12 15L9 1" stroke="currentColor" stroke-width="1.8"/><path d="M8 3v2M8 8v2M8 13v2" stroke="currentColor" stroke-width="1.6"/>',
+  doze: '<path d="M1 13h10v-4H6L4 6H1z" fill="currentColor"/><path d="M11 6l4 2v6h-3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="3.5" cy="14" r="1.5" fill="currentColor"/><circle cx="8.5" cy="14" r="1.5" fill="currentColor"/>',
 };
-const TOOLS = [['select', 'Select', 'V'], ['box', 'Box', 'R'], ['lasso', 'Lasso', 'L'], ['brush', 'Brush', 'P'], ['along', 'Along street', 'S'], ['draw', 'Draw street', 'D'], ['edit', 'Edit streets', 'E'], ['area', 'New area', 'A'], ['zone', 'Paint zones', 'Z']];
-const DRAG_TOOLS = new Set(['box', 'lasso', 'brush', 'along', 'zone']);
+// Five everyday tools; the precise selection tools live in the Advanced drawer
+const TOOLS = [['select', 'Look', 'V'], ['build', 'Build', 'P'], ['roads', 'Roads', 'D'], ['doze', 'Bulldoze', 'X']];
+const ADV_TOOLS = [['box', 'Box', 'R'], ['lasso', 'Lasso', 'L'], ['brush', 'Brush', ''], ['along', 'Along street', 'S'], ['edit', 'Edit streets', 'E'], ['area', 'New area', 'A'], ['zone', 'Paint zones', 'Z']];
+const DRAG_TOOLS = new Set(['box', 'lasso', 'brush', 'along', 'zone', 'build', 'doze']);
+const toolBtn = ([k, n, key]) => `<button class="tool" data-tool="${k}" aria-pressed="${ui.tool === k}" title="${n}${key ? ` (${key})` : ''}"><svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[k]}</svg>${n}${key ? `<kbd>${key}</kbd>` : ''}</button>`;
 function renderTools() {
-  $('tools').innerHTML = TOOLS.map(([k, n, key]) => `<button class="tool" data-tool="${k}" aria-pressed="${ui.tool === k}" title="${n} (${key})"><svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[k]}</svg>${n}<kbd>${key}</kbd></button>`).join('');
-  $('tools').querySelectorAll('[data-tool]').forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+  $('tools').innerHTML = TOOLS.map(toolBtn).join('');
+  $('advbar').hidden = !ui.adv;
+  $('advbar').innerHTML = `<span class="barlabel">Advanced</span>${ADV_TOOLS.map(toolBtn).join('')}<button class="tool" id="vLines" aria-pressed="${ui.lotsOn}" title="Show lot lines">Lot lines</button><button class="tool" id="vLog" title="Every edit, export and import">Edit log · ${CUR}</button><button class="tool" id="vCred">Credits</button>`;
+  for (const bar of ['tools', 'advbar']) $(bar).querySelectorAll('[data-tool]').forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+  $('vLines').onclick = () => toggleView('lines'); $('vLog').onclick = openLog; $('vCred').onclick = () => ($('credits').hidden = false);
 }
 function setTool(t, keepArea) {
   if (ui.tool === 'area' && t !== 'area' && !keepArea) { ui.area = null; setOv('area', null); }
-  if (t !== 'draw') ui.draw = null;
+  if (t !== 'draw' && t !== 'roads') ui.draw = null;
+  clearTimeout(pendingClick); ui.pick = []; ghostLots(null);
   ui.tool = t; ui.areaDraw = null;
   const drag = DRAG_TOOLS.has(t);
   controls.mouseButtons.LEFT = drag ? -1 : THREE.MOUSE.PAN; controls.mouseButtons.RIGHT = drag ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
   controls.touches.ONE = drag ? -1 : THREE.TOUCH.PAN;
-  if (t !== 'edit') { ui.edgeSel.clear(); buildEdgeSel(); }
-  setOv('brush', null); setOv('draw', null); setOv('along', null); setOv('zonepaint', null); setHover(null);
+  if (t !== 'edit' && t !== 'roads' && t !== 'select') { ui.edgeSel.clear(); buildEdgeSel(); }
+  setOv('brush', null); setOv('draw', null); setOv('along', null); setOv('zonepaint', null); setOv('pick', null); setHover(null); hoverLot = null;
   renderTools(); renderHint(); renderCard(); placeHandles();
   if (t === 'area' && ui.area) areaPreview();
-  canvas.style.cursor = t === 'select' ? '' : t === 'draw' || t === 'area' ? 'crosshair' : drag ? 'cell' : 'pointer';
+  canvas.style.cursor = t === 'select' ? '' : t === 'draw' || t === 'roads' || t === 'area' ? 'crosshair' : drag ? 'cell' : 'pointer';
 }
 function renderHint() {
   const h = $('hint'), t = ui.tool;
   const txt = {
     select: null,
+    build: `<b>Build · ${esc(itemById(ui.item)?.name || 'pick something')}</b> Click a lot, or drag across lots, to apply it. Shift-drag for a rectangle, double-click for a whole block. Right-drag pans. <span class="hov" id="hHover"></span>`,
+    doze: '<b>Bulldoze</b> Click or drag across lots to clear them to grass. Click a street piece to remove it. Shift-drag for a rectangle, double-click for a whole block. <span class="hov" id="hHover"></span>',
+    roads: ui.draw && ui.draw.pts.length ? '<b>Roads</b> Click to add points; double-click or Enter to finish, Backspace removes a point, Esc cancels.' : '<b>Roads</b> Click open ground to start a new street. Click an existing street to change it; Shift-click starts a new street from it.',
     box: '<b>Box</b> Drag a rectangle. Shift adds, Alt removes. Right-drag pans.',
     lasso: '<b>Lasso</b> Draw a loop around lots. Shift adds, Alt removes.',
     brush: `<b>Paint brush</b> Hold and sweep to add lots, Alt to remove. Wheel sets the size (${fmt(ui.brushR * FT)} ft).`,
@@ -84,7 +98,9 @@ canvas.addEventListener('pointerdown', (e) => {
   if (DRAG_TOOLS.has(t)) {
     canvas.setPointerCapture(e.pointerId);
     const r = canvas.getBoundingClientRect(), p = [e.clientX - r.left, e.clientY - r.top];
-    if (t === 'box') drag = { t, a: p, b: p, mode: modeOf(e) };
+    if ((t === 'build' || t === 'doze') && e.shiftKey) drag = { t: 'box', a: p, b: p, mode: 'add', apply: t };
+    else if (t === 'build' || t === 'doze') { const g = groundAt(e); drag = { t: 'lots', apply: t, got: new Set(), last: g, moved: false }; pickAt(g); }
+    else if (t === 'box') drag = { t, a: p, b: p, mode: modeOf(e) };
     else if (t === 'lasso') drag = { t, pts: [p], mode: modeOf(e) };
     else if (t === 'brush' || t === 'zone') { drag = { t, mode: e.altKey ? 'remove' : 'add', got: new Set() }; paintAt(e); }
     else if (t === 'along') { const g = groundAt(e), hit = edgeAt(g[0], g[1], 12); if (!hit) { toast('Press on a street, then drag along it.'); drag = null; return; } drag = { t, e: hit.e, path: [g], mode: modeOf(e), got: new Set() }; alongUpdate(); }
@@ -98,10 +114,14 @@ canvas.addEventListener('pointermove', (e) => {
     else if (drag.t === 'lasso') { const l = drag.pts[drag.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 4) drag.pts.push(p); drawSvg(); }
     else if (drag.t === 'brush' || drag.t === 'zone') paintAt(e);
     else if (drag.t === 'along') { drag.path.push(groundAt(e)); alongUpdate(); }
+    else if (drag.t === 'lots') { const g = groundAt(e), a = drag.last, n = Math.ceil(Math.hypot(g[0] - a[0], g[1] - a[1]) / 2); for (let k = 1; k <= n; k++) pickAt([a[0] + (g[0] - a[0]) * k / n, a[1] + (g[1] - a[1]) * k / n]); drag.last = g; if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) drag.moved = true; }
     return;
   }
   if (e.buttons) return;
   const g = groundAt(e);
+  if (t === 'build' || t === 'doze') { const l = IDX && IDX.at(g[0], g[1]); setHover(l ? l.id : null); hoverPreview(l); if (!l && t === 'doze') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'not-allowed' : 'cell'; } else canvas.style.cursor = 'cell'; return; }
+  if (t === 'roads' && !(ui.draw && ui.draw.pts.length) && !e.shiftKey) { const hit = edgeAt(g[0], g[1]); if (hit) { setOv('draw', null); canvas.style.cursor = 'pointer'; return; } canvas.style.cursor = 'crosshair'; }
+  if (t === 'roads') { hoverDraw(g, e); return; }
   if (t === 'brush' || t === 'zone') brushRing(g);
   if (t === 'draw' || (t === 'area' && !ui.area)) { hoverDraw(g, e); return; }
   if (t === 'edit') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'pointer' : ''; return; }
@@ -112,15 +132,22 @@ canvas.addEventListener('pointerup', (e) => {
   if (drag) { const d = drag; drag = null; finishDrag(d, e); return; }
   if (!down || down.b !== 0 || moved > 6) return;
   const g = groundAt(e), t = ui.tool;
-  if (t === 'select') { const l = IDX.at(g[0], g[1]); if (!l) { if (!e.shiftKey) setSel([]); return; } if (e.altKey) setSel([l.id], 'remove'); else if (e.shiftKey) { if (ui.sel.has(l.id)) setSel([l.id], 'remove'); else setSel([l.id], 'add'); } else setSel([l.id]); }
+  if (t === 'select') { const l = IDX.at(g[0], g[1]); if (!l) { const hit = edgeAt(g[0], g[1]); if (hit) { ui.sel.clear(); buildSel(); ui.edgeSel = e.shiftKey ? new Set([...ui.edgeSel, hit.e.id]) : new Set([hit.e.id]); clearProfDraft(); buildEdgeSel(); renderCard(); return; } if (!e.shiftKey) setSel([]); return; } if (e.altKey) setSel([l.id], 'remove'); else if (e.shiftKey) { if (ui.sel.has(l.id)) setSel([l.id], 'remove'); else setSel([l.id], 'add'); } else setSel([l.id]); }
   else if (t === 'edit') { const hit = edgeAt(g[0], g[1]); if (!hit) { ui.edgeSel.clear(); } else if (e.shiftKey) { if (ui.edgeSel.has(hit.e.id)) ui.edgeSel.delete(hit.e.id); else ui.edgeSel.add(hit.e.id); } else ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); ui.sel.clear(); buildSel(); buildEdgeSel(); renderCard(); }
   else if (t === 'draw') addDrawPoint(g, e);
+  else if (t === 'roads') {
+    const hit = !(ui.draw && ui.draw.pts.length) && !e.shiftKey ? edgeAt(g[0], g[1]) : null;
+    if (hit) { ui.draw = null; setOv('draw', null); ui.sel.clear(); buildSel(); ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); buildEdgeSel(); renderCard(); renderHint(); placeHandles(); return; }
+    if (ui.edgeSel.size) { ui.edgeSel.clear(); buildEdgeSel(); }
+    addDrawPoint(g, e); renderHint();
+  }
   else if (t === 'area' && !ui.area) addAreaPoint(g, e);
 });
 canvas.addEventListener('dblclick', (e) => {
   const g = groundAt(e);
   if (ui.tool === 'select') { const l = IDX.at(g[0], g[1]); if (!l || l.blk < 0) return; const ids = [...STATE.lots.values()].filter((x) => x.blk === l.blk).map((x) => x.id); setSel(ids, e.shiftKey ? 'add' : 'replace'); toast(`Whole block: ${ids.length} lots.`); }
-  else if (ui.tool === 'draw') { if (ui.draw) ui.draw.pts.pop(); finishDraw(); }
+  else if (ui.tool === 'build' || ui.tool === 'doze') { clearTimeout(pendingClick); const l = IDX.at(g[0], g[1]); if (!l || l.blk < 0) return; applyTo(ui.tool, [...STATE.lots.values()].filter((x) => x.blk === l.blk).map((x) => x.id), 'whole block'); }
+  else if (ui.tool === 'draw' || (ui.tool === 'roads' && ui.draw && ui.draw.pts.length)) { if (ui.draw) ui.draw.pts.pop(); finishDraw(); }
   else if (ui.tool === 'area' && ui.areaDraw) { ui.areaDraw.pts.pop(); closeArea(); }
 });
 canvas.addEventListener('wheel', (e) => {
@@ -136,7 +163,13 @@ function finishDrag(d, e) {
     else { if (d.pts.length < 3) return; poly = d.pts; }
     const ids = [];
     for (const l of STATE.lots.values()) { const [sx, sy] = screenOf(l.c[0], l.e, l.c[1]); if (inPoly(sx, sy, poly)) ids.push(l.id); }
+    if (d.apply) { applyTo(d.apply, ids); return; }
     setSel(ids, d.mode); if (ids.length) toast(`${d.mode === 'remove' ? 'Removed' : 'Picked'} ${fmt(ids.length)} lots.`);
+  } else if (d.t === 'lots') {
+    const ids = [...d.got];
+    if (!ids.length) { if (d.apply === 'doze' && !d.moved) { const g = groundAt(e), hit = edgeAt(g[0], g[1]); if (hit) { ui.edgeSel = new Set([hit.e.id]); deleteEdges(); } } setOv('pick', null); return; }
+    if (d.moved) applyTo(d.apply, ids);
+    else { clearTimeout(pendingClick); pendingClick = setTimeout(() => applyTo(d.apply, ids), 230); } // wait: a double-click means the whole block
   } else if (d.t === 'brush') { buildSel(); renderCard(); }
   else if (d.t === 'zone') {
     setOv('zonepaint', null);
@@ -145,6 +178,34 @@ function finishDrag(d, e) {
     if (ids.length) commit({ op: 'rezone', lots: ids, z: ui.zonePaint }, { label: `Painted ${fmt(ids.length)} lots ${ui.zonePaint}` }); else { buildSel(); renderCard(); }
   } else if (d.t === 'along') { setOv('along', null); setSel([...d.got], d.mode); toast(`${fmt(d.got.size)} lots front that stretch of ${d.e.n || 'the street'}.`); }
 }
+// ---------- Build and Bulldoze: lots under the pointer, like tiles ----------
+let pendingClick = 0, hoverLot = null;
+function pickAt(g) {
+  const l = IDX && IDX.at(g[0], g[1]); if (!l || drag.got.has(l.id)) return;
+  drag.got.add(l.id); ghostLots(null);
+  const acc = new Acc(), col = C(drag.apply === 'doze' ? 0xd04a32 : 0x3e9fdc);
+  for (const id of drag.got) decal(acc, STATE.lots.get(id).r, 0.7, col, 16);
+  setOv('pick', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45, depthWrite: false })));
+}
+function applyTo(tool, ids, how) {
+  setOv('pick', null); ghostLots(null); hoverLot = null;
+  if (!ids.length) return;
+  const lots = ids.map((id) => STATE.lots.get(id)).filter(Boolean);
+  if (tool === 'doze') { commit({ op: 'apply', lots: lots.map((l) => l.id), t: 'lot.clear', p: {}, vary: 0, sd: uid('s'), dr: 1 }, { anim: ids, label: `Bulldozed ${fmt(lots.length)} lot${lots.length === 1 ? '' : 's'}${how ? ' · ' + how : ''}` }); return; }
+  applyItem(itemById(ui.item), lots, how);
+}
+function hoverPreview(l) {
+  if ((l && l.id) === hoverLot) return; hoverLot = l ? l.id : null;
+  const h = $('hHover'); if (!l) { ghostLots(null); if (h) h.textContent = ''; return; }
+  if (ui.tool === 'doze') { ghostLots(null); if (h) h.textContent = `· ${lotLabel(l)}`; return; }
+  const it = itemById(ui.item); if (!it) return;
+  const why = it.fits(l);
+  if (why) { ghostLots(null); if (h) h.textContent = `· ${lotLabel(l)}: ${why}`; return; }
+  const p = progAfter(it, l); ghostLots(p ? [[l, p]] : null);
+  if (h) h.textContent = `· ${lotLabel(l)}: ${previewText(preview(it, [l]))}`;
+}
+const lotLabel = (l) => l.a || LT[l.lt].name;
+
 function drawSvg() {
   const svg = $('osvg'); if (!drag) { svg.innerHTML = ''; return; }
   const st = 'fill="rgba(62,159,220,.15)" stroke="#2b2420" stroke-width="2" stroke-dasharray="6 4"';
@@ -197,9 +258,9 @@ function snapPoint(g, e, prev, prev2) {
   return { p: [x, z], label };
 }
 function hoverDraw(g, e) {
-  const d = ui.tool === 'draw' ? ui.draw : ui.areaDraw, pts = d ? d.pts : [];
+  const isDraw = ui.tool === 'draw' || ui.tool === 'roads', d = isDraw ? ui.draw : ui.areaDraw, pts = d ? d.pts : [];
   const s = snapPoint(g, e, pts[pts.length - 1], pts[pts.length - 2]);
-  if (ui.tool === 'draw') { ui.draw = ui.draw || { pts: [] }; ui.draw.cursor = s.p; ui.draw.snap = s.label; drawPreview(); }
+  if (isDraw) { ui.draw = ui.draw || { pts: [] }; ui.draw.cursor = s.p; ui.draw.snap = s.label; drawPreview(); }
   else { ui.areaDraw = ui.areaDraw || { pts: [] }; ui.areaDraw.cursor = s.p; areaDrawPreview(); }
   const n = $('card').querySelector('.note:last-of-type'); void n;
 }
@@ -222,7 +283,7 @@ function finishDraw() {
   ui.draw = null; setOv('draw', null);
   commit({ op: 'street.add', id, pts: pts.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]), raw: d.pts, prof: { k: ui.drawProf, els: structuredClone(PRESETS[ui.drawProf].els) }, name }, { label: `${name} built` });
   ui.drawName = '';
-  setTool('edit'); ui.edgeSel = new Set([...STATE.edges.values()].filter((e) => e.grp === id).map((e) => e.id)); buildEdgeSel(); renderCard();
+  setTool(ui.tool === 'roads' ? 'roads' : 'edit'); ui.edgeSel = new Set([...STATE.edges.values()].filter((e) => e.grp === id).map((e) => e.id)); buildEdgeSel(); renderCard();
 }
 function addAreaPoint(g, e) {
   ui.areaDraw = ui.areaDraw || { pts: [] }; const pts = ui.areaDraw.pts, s = snapPoint(g, e, pts[pts.length - 1], pts[pts.length - 2]);
@@ -239,7 +300,7 @@ function closeArea() {
 // ---------- handles for reshaping drawn streets ----------
 function placeHandles() {
   const box = $('labels'); box.querySelectorAll('.handle-dot').forEach((h) => h.remove());
-  if (ui.tool !== 'edit' || !ui.edgeSel.size) return;
+  if ((ui.tool !== 'edit' && ui.tool !== 'roads') || !ui.edgeSel.size) return;
   const grp = STATE.edges.get([...ui.edgeSel][0])?.grp; if (!grp) return;
   const cmd = LOG.slice(0, CUR).find((c) => c.op === 'street.add' && c.id === grp); if (!cmd) return;
   const pts = (LOG.slice(0, CUR).filter((c) => c.op === 'street.move' && c.id === grp).pop()?.raw) || cmd.raw || cmd.pts;
@@ -262,11 +323,11 @@ window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Escape') { if (!$('areas').hidden || !$('credits').hidden || !$('logm').hidden || !$('keysm').hidden) { closeModals(); return; } if (ui.draw && ui.draw.pts.length) { ui.draw = null; setOv('draw', null); renderCard(); return; } if (ui.areaDraw || ui.area) { ui.areaDraw = null; ui.area = null; setOv('area', null); renderCard(); renderHint(); return; } if (ui.edgeSel.size) { ui.edgeSel.clear(); buildEdgeSel(); renderCard(); return; } setSel([]); return; }
-  if (e.key === 'Enter' && ui.tool === 'draw') { finishDraw(); return; }
+  if (e.key === 'Enter' && (ui.tool === 'draw' || ui.tool === 'roads') && ui.draw && ui.draw.pts.length) { finishDraw(); return; }
   if (e.key === 'Enter' && ui.tool === 'area' && ui.areaDraw) { closeArea(); return; }
-  if (e.key === 'Backspace' && ui.tool === 'draw' && ui.draw) { ui.draw.pts.pop(); drawPreview(); renderDraw(); e.preventDefault(); return; }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && ui.tool === 'edit' && ui.edgeSel.size) { e.preventDefault(); deleteEdges(); return; }
-  const tool = TOOLS.find((t) => t[2].toLowerCase() === k); if (tool) { setTool(tool[0]); return; }
+  if (e.key === 'Backspace' && (ui.tool === 'draw' || ui.tool === 'roads') && ui.draw && ui.draw.pts.length) { ui.draw.pts.pop(); drawPreview(); renderDraw(); e.preventDefault(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && (ui.tool === 'edit' || ui.tool === 'roads' || ui.tool === 'select') && ui.edgeSel.size) { e.preventDefault(); deleteEdges(); return; }
+  const tool = [...TOOLS, ...(ui.adv ? ADV_TOOLS : [])].find((t) => t[2] && t[2].toLowerCase() === k); if (tool) { setTool(tool[0]); return; }
   if (k === 'b') toggleView('asbuilt'); else if (k === 'c') toggleView('split'); else if (k === 't') toggleView('color'); else if (k === 'n') toggleView('night');
   else if (k === 'q' || k === 'w') { const off = cam.position.clone().sub(controls.target); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (k === 'q' ? 1 : -1) * Math.PI / 12); cam.position.copy(controls.target).add(off); }
   else if (e.key === '?') { $('keysm').hidden = false; }
@@ -276,19 +337,20 @@ window.addEventListener('keydown', (e) => {
 function renderViews() {
   const B = (id, label, on, title) => `<button class="tool" id="${id}" aria-pressed="${on}" title="${title}">${label}</button>`;
   $('views').innerHTML = B('vAsb', 'As-built <kbd>B</kbd>', ui.asbuilt, 'Show the neighbourhood as it is today') + B('vSplit', 'Compare <kbd>C</kbd>', ui.splitOn, 'Before / after slider') +
-    B('vColor', ['Colour lots', 'By lot type', 'By zone'][ui.color] + ' <kbd>T</kbd>', ui.color > 0, 'Colour lots by type or zone') + B('vLines', 'Lot lines', ui.lotsOn, 'Show lot lines') + B('vNight', 'Night <kbd>N</kbd>', ui.night, 'Night lighting') +
+    B('vColor', ['Colour lots', 'By lot type', 'By zone'][ui.color] + ' <kbd>T</kbd>', ui.color > 0, 'Colour lots by type or zone') + B('vNight', 'Night <kbd>N</kbd>', ui.night, 'Night lighting') +
     `<button class="tool" id="vUndo" ${CUR ? '' : 'disabled'} title="Undo (Ctrl+Z)">Undo</button><button class="tool" id="vRedo" ${CUR < LOG.length ? '' : 'disabled'} title="Redo (Ctrl+Y)">Redo</button>` +
-    `<button class="tool" id="vLog" title="Every edit, export and import">Edit log · ${CUR}</button><button class="tool" id="vKeys" title="Keys and mouse">?</button><button class="tool" id="vCred">Credits</button>`;
+    B('vAdv', 'Advanced', ui.adv, 'Precise selection tools, every lot setting, the edit log') + '<button class="tool" id="vKeys" title="Keys and mouse">?</button>';
   const on = (id, f) => ($(id).onclick = f);
-  on('vAsb', () => toggleView('asbuilt')); on('vSplit', () => toggleView('split')); on('vColor', () => toggleView('color')); on('vLines', () => toggleView('lines')); on('vNight', () => toggleView('night'));
-  on('vUndo', undo); on('vRedo', redo); on('vLog', openLog); on('vKeys', () => ($('keysm').hidden = false)); on('vCred', () => ($('credits').hidden = false));
+  on('vAsb', () => toggleView('asbuilt')); on('vSplit', () => toggleView('split')); on('vColor', () => toggleView('color')); on('vNight', () => toggleView('night'));
+  on('vUndo', undo); on('vRedo', redo); on('vAdv', () => { ui.adv = !ui.adv; if (!ui.adv && ADV_TOOLS.some((t) => t[0] === ui.tool)) setTool('select'); renderTools(); renderViews(); renderCard(); }); on('vKeys', () => ($('keysm').hidden = false));
+  if (!$('advbar').hidden) renderTools();
 }
 let lampMat = null;
 function toggleView(k) {
   if (k === 'asbuilt') { ui.asbuilt = !ui.asbuilt; if (ui.asbuilt) ui.splitOn = false; $('asbTag').hidden = !ui.asbuilt; }
   else if (k === 'split') { ui.splitOn = !ui.splitOn; if (ui.splitOn) ui.asbuilt = false; $('asbTag').hidden = true; placeSplit(); }
   else if (k === 'color') { ui.color = (ui.color + 1) % 3; buildColor(); }
-  else if (k === 'lines') { ui.lotsOn = !ui.lotsOn; if (ov.lines) ov.lines.visible = ui.lotsOn; }
+  else if (k === 'lines') { ui.lotsOn = !ui.lotsOn; if (ov.lines) ov.lines.visible = ui.lotsOn; renderTools(); }
   else if (k === 'night') {
     ui.night = !ui.night; $('app').classList.toggle('night', ui.night);
     hemi.intensity = ui.night ? 0.35 : 1.15; sun.intensity = ui.night ? 0.45 : 2.1; sun.color.set(ui.night ? 0x9fb4e8 : 0xfff1d6);
@@ -461,6 +523,8 @@ export {
   drawPreview,
   finishDraw,
   placeHandles,
+  renderHint,
+  renderTools,
   renderViews,
   setTool,
 };

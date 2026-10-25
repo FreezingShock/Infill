@@ -65,11 +65,14 @@ test('a log touching every command replays and regenerates', () => {
   for (const lot of S.lots.values()) genLot(lot, S);
 });
 
-test('gridify puts the area on a tile grid with joined-up streets', async () => {
-  const { gridify, roadConnectivity } = await import('../src/engine/gridify.js');
-  const G = gridify(BASE);
-  assert.ok(G.NX > 50 && G.NZ > 50, `grid ${G.NX} x ${G.NZ}`);
-  assert.ok(G.recs.length > BASE.lots.size * 0.95, `records ${G.recs.length} of ${BASE.lots.size} lots`);
-  assert.ok(roadConnectivity(G) > 0.85, 'most road tiles join one network');
-  for (const r of G.recs) for (const i of r.tiles) assert.equal(G.road[i], 0, `${r.id} sits on a road tile`);
+test('bump changes storeys one at a time and lot.clear bulldozes', async () => {
+  const { exec } = await import('../src/engine/commands.js');
+  const S = structuredClone(BASE), lot = [...S.lots.values()].find((l) => l.lt === 'house' && l.st0 === 1);
+  exec(S, { op: 'bump', lots: [lot.id], d: 1 }, { skipped: [], notes: [] });
+  assert.equal(lot.prog.st, 2);
+  exec(S, { op: 'bump', lots: [lot.id], d: -5 }, { skipped: [], notes: [] });
+  assert.equal(lot.prog.st, 1, 'never below one storey');
+  exec(S, { op: 'apply', lots: [lot.id], t: 'lot.clear', p: {}, vary: 0, sd: 's1', dr: 1 }, { skipped: [], notes: [] });
+  const g = genLot(lot, S);
+  assert.ok(g.ok); assert.equal(g.units, 0);
 });

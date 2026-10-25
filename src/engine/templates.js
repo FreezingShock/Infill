@@ -356,6 +356,9 @@ tpl('cv.court', { cat: 'civic', name: 'Sports court', blurb: 'A fenced court rin
 function alongStreet(ctx, f, n) { // street trees in front of shopfronts
   const F = f.F; for (let k = 0; k < n; k++) { const p = F.P(f.s0 + f.w * (k + 0.5) / n, -1.4); tree(ctx, p[0], p[1], 0.9, 0); }
 }
+// Bulldozed ground: grass and a couple of trees. Not on any shelf; the Bulldoze tool applies it.
+tpl('lot.clear', { cat: 'none', name: 'Cleared lot', blurb: 'Grass, ready for something new', icon: ICO.park('#cdb98f'), st: [1, 1, 1], anyZone: true,
+  build(ctx) { lotDecal(ctx, COL.lawn); yardTrees(ctx, Math.min(3, Math.round(ctx.lot.m2 / 400)), 1.5, [3]); return true; } });
 const CATS = ['house', 'multi', 'apts', 'main', 'parking', 'civic'];
 const TPL_BY_CAT = Object.fromEntries(CATS.map((c) => [c, Object.values(TPL).filter((t) => t.cat === c)]));
 

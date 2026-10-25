@@ -46,6 +46,7 @@
     <div class="plaque hint" id="hint" hidden></div>
     <div class="plaque bar" role="toolbar" aria-label="Tools" id="tools"></div>
     <div class="plaque bar" role="toolbar" aria-label="View" id="views"></div>
+    <div class="plaque bar" role="toolbar" aria-label="Advanced tools" id="advbar" hidden></div>
   </div>
 
   <div class="plaque br">
@@ -109,18 +110,16 @@
     <div class="plaque" role="dialog" aria-modal="true" aria-labelledby="keysT">
       <h2 id="keysT">Keys and mouse</h2>
       <div class="keys">
-        <div><kbd>V</kbd> Select · click, <kbd>Shift</kbd>+click adds</div>
-        <div>Double-click a lot · whole block</div>
-        <div><kbd>R</kbd> Box select</div><div><kbd>L</kbd> Lasso</div>
-        <div><kbd>P</kbd> Paint brush · wheel sets size</div><div><kbd>S</kbd> Along a street</div>
-        <div><kbd>D</kbd> Draw street</div><div><kbd>E</kbd> Edit streets</div>
-        <div><kbd>A</kbd> New area</div><div><kbd>Z</kbd> Paint zones</div>
-        <div><kbd>Alt</kbd> while selecting · remove</div><div><kbd>Esc</kbd> Clear or cancel</div>
+        <div><kbd>V</kbd> Look · click a lot or street</div><div><kbd>P</kbd> Build · click or drag across lots</div>
+        <div><kbd>D</kbd> Roads · draw or change streets</div><div><kbd>X</kbd> Bulldoze</div>
+        <div><kbd>Shift</kbd>-drag · a rectangle of lots</div><div>Double-click · the whole block</div>
+        <div><kbd>Shift</kbd>+click · add to the selection</div><div><kbd>Esc</kbd> Clear or cancel</div>
         <div><kbd>B</kbd> As-built view</div><div><kbd>C</kbd> Compare slider</div>
         <div><kbd>T</kbd> Colour lots by type / zone</div><div><kbd>N</kbd> Night</div>
         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo · <kbd>Ctrl</kbd>+<kbd>Y</kbd> Redo</div>
         <div>Right-drag · pan while a tool is on</div>
-        <div><kbd>Q</kbd> / <kbd>W</kbd> Turn the view</div><div><kbd>Delete</kbd> Remove selected street</div>
+        <div><kbd>Q</kbd> / <kbd>W</kbd> Turn the view</div><div><kbd>Delete</kbd> Remove the selected street</div>
+        <div>Advanced drawer: <kbd>R</kbd> Box <kbd>L</kbd> Lasso <kbd>S</kbd> Along a street</div><div><kbd>E</kbd> Edit streets <kbd>A</kbd> New area <kbd>Z</kbd> Paint zones</div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="keysClose">Close</button></div>
     </div>

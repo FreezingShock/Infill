@@ -21,6 +21,7 @@ function exec(S, cmd, info) {
   switch (cmd.op) {
     case 'apply': for (const id of cmd.lots) { const lot = L(id); if (!lot) continue; lot.prog = cmd.t === 'asb' ? inferProgram(lot) : { t: cmd.t, ...cmd.p, sd: cmd.vary ? hash32(cmd.sd + id) : hash32(cmd.sd), dr: cmd.dr ? 1 : 0 }; } break;
     case 'tweak': for (const id of cmd.lots) { const lot = L(id); if (!lot) continue; Object.assign(lot.prog, cmd.f); for (const k in cmd.f) if (cmd.f[k] === null) delete lot.prog[k]; } break;
+    case 'bump': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog.st = clamp(storeysOf(lot) + cmd.d, 1, 8); } break;
     case 'rezone': for (const id of cmd.lots) { const lot = L(id); if (lot) { lot.z = cmd.z; lot.zr = null; } } break;
     case 'restore': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog = inferProgram(lot); } break;
     case 'fill': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog = zoneFill(lot, hash32(cmd.sd + id), cmd.dr); } break;
@@ -33,6 +34,8 @@ function exec(S, cmd, info) {
     case 'area.new': areaNew(S, cmd, info); break;
   }
 }
+// storeys a lot's program builds now: the as-built height, or the template's default
+function storeysOf(lot) { const p = lot.prog; if (p.st) return p.st; if (p.t === 'asb') return lot.st0 || 1; return TPL[p.t]?.st[2] || 1; }
 function zoneFill(lot, seed, dream) {
   const list = ZONE_FILL[zfam(lot.z)] || ZONE_FILL.R1, r = rng(seed), off = Math.floor(r() * list.length);
   for (let k = 0; k < list.length; k++) { const t = TPL[list[(k + off) % list.length]]; if (availability(t, lot, dream).ok) return { t: t.id, sd: seed, dr: dream ? 1 : 0 }; }
@@ -322,5 +325,6 @@ export {
   areaNew,
   exec,
   replay,
+  storeysOf,
   uid,
 };
