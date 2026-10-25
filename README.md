@@ -6,12 +6,16 @@ The plan for where this is going is in [docs/PLAN.md](docs/PLAN.md).
 
 ## Run it locally
 
-You need Node 20 or newer.
+You need Node 20 or newer. Localhost runs the `integration` branch: every project thread's work is merged there first, so it is always the newest playable build.
 
 ```sh
+git clone https://github.com/FreezingShock/Infill.git && cd Infill
+git checkout integration
 npm install
 npm run dev
 ```
+
+To pick up new work later: `git pull` on `integration`, then `npm install` if `package.json` changed. Vite reloads the page by itself while `npm run dev` is running.
 
 Vite opens http://localhost:5173 with Woodland Hills (Topanga Canyon Blvd) loaded. Pick another area with **Change area**; areas marked "needs a pack" are planned and can be built with `tools/pack`.
 
@@ -29,6 +33,11 @@ Other scripts:
 Select lots with the tools at the bottom left (or keys V, R, L, P, S), pick a template or tweak in the card on the right, and watch the scores at the top right. Draw streets with D, edit a street's cross-section with E, clear land for a new neighborhood with A, paint zones with Z. B shows the as-built city, C a before/after slider, N night. Ctrl+Z and Ctrl+Y undo and redo. Press ? in the game for the full key list.
 
 Edits autosave to the browser per area. The edit log (in the view bar at the bottom left) can copy or open a save file.
+
+## Branches
+
+- `integration`: what runs on localhost. Feature branches open their pull requests against it and get merged here.
+- `main`: stable. `integration` is merged into `main` when a milestone is done.
 
 ## Layout
 
