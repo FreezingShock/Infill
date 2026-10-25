@@ -1,7 +1,7 @@
 # Renovated: plan v3
 
 **A playable city renovator for the San Fernando Valley, with traffic and parked cars.**
-25 Oct 2026. Replaces plan v2 (the builder plan) and builds on the builder preview, which is now this repo.
+25 Oct 2026. Replaces plan v2 (the builder plan) and builds on the builder preview, which is now this repo. Illustrated version: https://claude.ai/artifact/6hdd7XPEycSyFYDPH39TyJ
 
 ## What changed
 
