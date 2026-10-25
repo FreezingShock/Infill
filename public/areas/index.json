@@ -1,0 +1,183 @@
+{
+ "note": "Area packs the game can open. Planned areas have a rough bbox and no pack yet; tools/pack builds one. Coordinates are lon/lat (W, S, E, N).",
+ "region": {
+  "name": "San Fernando Valley",
+  "bbox": [
+   -118.68,
+   34.13,
+   -118.33,
+   34.31
+  ]
+ },
+ "default": "wh-topanga",
+ "areas": [
+  {
+   "id": "wh-topanga",
+   "name": "Woodland Hills",
+   "sub": "Topanga Canyon Blvd · Ventura Blvd to Lopez St",
+   "main": "Topanga Canyon",
+   "bbox": [
+    -118.6115,
+    34.159,
+    -118.599,
+    34.17
+   ],
+   "pack": "wh-topanga.json",
+   "status": "ready"
+  },
+  {
+   "id": "canoga-park",
+   "name": "Canoga Park",
+   "sub": "Owensmouth Ave and Sherman Way",
+   "main": "Sherman Way",
+   "bbox": [
+    -118.6082,
+    34.1955,
+    -118.5958,
+    34.2065
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "chatsworth",
+   "name": "Chatsworth",
+   "sub": "Devonshire St and Topanga Canyon Blvd",
+   "main": "Devonshire",
+   "bbox": [
+    -118.6072,
+    34.2515,
+    -118.5948,
+    34.2625
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "northridge",
+   "name": "Northridge",
+   "sub": "Reseda Blvd and Nordhoff St",
+   "main": "Reseda",
+   "bbox": [
+    -118.5422,
+    34.2305,
+    -118.5298,
+    34.2415
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "granada-hills",
+   "name": "Granada Hills",
+   "sub": "Chatsworth St and Zelzah Ave",
+   "main": "Chatsworth",
+   "bbox": [
+    -118.5292,
+    34.2595,
+    -118.5168,
+    34.2705
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "reseda",
+   "name": "Reseda",
+   "sub": "Reseda Blvd and Sherman Way",
+   "main": "Reseda",
+   "bbox": [
+    -118.5423,
+    34.1956,
+    -118.5299,
+    34.2066
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "encino",
+   "name": "Encino",
+   "sub": "Ventura Blvd and Balboa Blvd",
+   "main": "Ventura",
+   "bbox": [
+    -118.5072,
+    34.1535,
+    -118.4948,
+    34.1645
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "van-nuys",
+   "name": "Van Nuys",
+   "sub": "Van Nuys Blvd civic center",
+   "main": "Van Nuys",
+   "bbox": [
+    -118.4552,
+    34.1795,
+    -118.4428,
+    34.1905
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "panorama-city",
+   "name": "Panorama City",
+   "sub": "Van Nuys Blvd and Roscoe Blvd",
+   "main": "Van Nuys",
+   "bbox": [
+    -118.4552,
+    34.2155,
+    -118.4428,
+    34.2265
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "sherman-oaks",
+   "name": "Sherman Oaks",
+   "sub": "Ventura Blvd and Van Nuys Blvd",
+   "main": "Ventura",
+   "bbox": [
+    -118.4552,
+    34.1455,
+    -118.4428,
+    34.1565
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "studio-city",
+   "name": "Studio City",
+   "sub": "Ventura Blvd and Laurel Canyon Blvd",
+   "main": "Ventura",
+   "bbox": [
+    -118.4022,
+    34.1375,
+    -118.3898,
+    34.1485
+   ],
+   "pack": null,
+   "status": "planned"
+  },
+  {
+   "id": "north-hollywood",
+   "name": "North Hollywood",
+   "sub": "Lankershim Blvd and Magnolia Blvd",
+   "main": "Lankershim",
+   "bbox": [
+    -118.3832,
+    34.1595,
+    -118.3708,
+    34.1705
+   ],
+   "pack": null,
+   "status": "planned"
+  }
+ ]
+}
