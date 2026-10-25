@@ -64,3 +64,12 @@ test('a log touching every command replays and regenerates', () => {
   assert.ok([...S.edges.values()].some((e) => e.grp === 'S1'), 'drawn street exists');
   for (const lot of S.lots.values()) genLot(lot, S);
 });
+
+test('gridify puts the area on a tile grid with joined-up streets', async () => {
+  const { gridify, roadConnectivity } = await import('../src/engine/gridify.js');
+  const G = gridify(BASE);
+  assert.ok(G.NX > 50 && G.NZ > 50, `grid ${G.NX} x ${G.NZ}`);
+  assert.ok(G.recs.length > BASE.lots.size * 0.95, `records ${G.recs.length} of ${BASE.lots.size} lots`);
+  assert.ok(roadConnectivity(G) > 0.85, 'most road tiles join one network');
+  for (const r of G.recs) for (const i of r.tiles) assert.equal(G.road[i], 0, `${r.id} sits on a road tile`);
+});
