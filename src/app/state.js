@@ -15,7 +15,8 @@ import { buildLabels, renderViews } from './input.js';
 const SAVE_KEY = `renovated.builder.${AREA.id}.v2`;
 let STATE = structuredClone(BASE), LOG = [], CUR = 0, SNAPS = [BASE], IDX = null;
 const ui = { tool: 'select', sel: new Set(), filters: {}, groups: {}, dream: false, vary: true, tab: 'build', edgeSel: new Set(), splitOn: false, split: 0.5, asbuilt: false, color: 0, lotsOn: true, night: false,
-  brushR: 18, alongBoth: true, zonePaint: 'R3-1', draw: null, area: null, skipped: null, scope: 'area', showOther: false, nStep: 3, drawProf: 'local', drawName: '', smooth: true, lastInfo: null };
+  brushR: 18, alongBoth: true, zonePaint: 'R3-1', draw: null, area: null, skipped: null, scope: 'area', showOther: false, nStep: 3, drawProf: 'local', drawName: '', smooth: true, lastInfo: null,
+  item: 'up.floor', copied: null, adv: false, custom: false, pick: [] };
 const world = new World(), beforeW = new World();
 const overlays = new THREE.Group(), helpers = new THREE.Group();
 const C_SEL = C(0x3e9fdc), C_WARN = C(0xd04a32), C_HOVER = C(0xf5f2ea);
@@ -58,7 +59,8 @@ function redo() { if (CUR >= LOG.length) return toast('Nothing to redo.'); const
 function describe(c) {
   const n = (c.lots || []).length, L = (k) => `${fmt(k)} lot${k === 1 ? '' : 's'}`;
   switch (c.op) {
-    case 'apply': return c.t === 'asb' ? `Restored ${L(n)}` : `${TPL[c.t]?.name || c.t} on ${L(n)}`;
+    case 'apply': return c.t === 'lot.clear' ? `Bulldozed ${L(n)}` : c.t === 'asb' ? `Restored ${L(n)}` : `${TPL[c.t]?.name || c.t} on ${L(n)}`;
+    case 'bump': return `${c.d > 0 ? 'Added' : 'Removed'} a floor on ${L(n)}`;
     case 'tweak': return `Tweaked ${Object.keys(c.f).map((k) => ({ st: 'storeys', rf: 'roof', pl: 'palette', sb: 'setback', adu: 'ADU', trees: 'trees', solar: 'solar', fence: 'fence' }[k] || k)).join(', ')} on ${L(n)}`;
     case 'rezone': return `Rezoned ${L(n)} to ${c.z}`;
     case 'restore': return `Restored ${L(n)} as-built`;
@@ -138,12 +140,18 @@ function buildEdgeSel() {
 }
 let hoverId = null;
 function setHover(id) { if (id === hoverId) return; hoverId = id; const l = id && STATE.lots.get(id); setOv('hover', l ? outlineMesh([l.r], C_HOVER, 0.3, 0.78) : null); }
-function ghost(tid) {
+function ghost(tid) { // a template over the whole selection (the Build tab's hover)
   if (!tid) { setOv('ghost', null); return; }
-  const t = TPL[tid], s = new Acc(); let n = 0;
-  for (const id of selIds()) {
-    if (n >= 260) break; const lot = STATE.lots.get(id); if (!availability(t, lot, ui.dream).ok) continue;
-    const g = genLot({ ...lot, prog: { t: tid, sd: ui.vary ? hash32('ghost' + id) : 7, dr: ui.dream ? 1 : 0 } }, STATE); n++;
+  const t = TPL[tid], list = [];
+  for (const id of selIds()) { if (list.length >= 260) break; const lot = STATE.lots.get(id); if (availability(t, lot, ui.dream).ok) list.push([lot, { t: tid, sd: ui.vary ? hash32('ghost' + id) : 7, dr: ui.dream ? 1 : 0 }]); }
+  ghostLots(list);
+}
+// see-through preview of lots with new programs: [[lot, prog], ...]
+function ghostLots(list) {
+  if (!list || !list.length) { setOv('ghost', null); return; }
+  const s = new Acc();
+  for (const [lot, prog] of list.slice(0, 260)) {
+    const g = genLot({ ...lot, prog }, STATE);
     for (let k = 0; k < g.s.p.length; k++) s.p.push(g.s.p[k]); for (let k = 0; k < g.g.p.length; k++) s.p.push(g.g.p[k]); for (let k = 0; k < g.s.l.length; k++) s.l.push(g.s.l[k]);
   }
   const grp = new THREE.Group(); if (s.p.length) { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(s.p, 3)); const m = new THREE.Mesh(geo, MAT.ghost); m.renderOrder = 5; grp.add(m); grp.add(new THREE.LineSegments(lineGeo(s.l), MAT.ghostLine)); }
@@ -226,6 +234,7 @@ export {
   commit,
   describe,
   ghost,
+  ghostLots,
   helpers,
   load,
   loadEdits,

@@ -64,3 +64,15 @@ test('a log touching every command replays and regenerates', () => {
   assert.ok([...S.edges.values()].some((e) => e.grp === 'S1'), 'drawn street exists');
   for (const lot of S.lots.values()) genLot(lot, S);
 });
+
+test('bump changes storeys one at a time and lot.clear bulldozes', async () => {
+  const { exec } = await import('../src/engine/commands.js');
+  const S = structuredClone(BASE), lot = [...S.lots.values()].find((l) => l.lt === 'house' && l.st0 === 1);
+  exec(S, { op: 'bump', lots: [lot.id], d: 1 }, { skipped: [], notes: [] });
+  assert.equal(lot.prog.st, 2);
+  exec(S, { op: 'bump', lots: [lot.id], d: -5 }, { skipped: [], notes: [] });
+  assert.equal(lot.prog.st, 1, 'never below one storey');
+  exec(S, { op: 'apply', lots: [lot.id], t: 'lot.clear', p: {}, vary: 0, sd: 's1', dr: 1 }, { skipped: [], notes: [] });
+  const g = genLot(lot, S);
+  assert.ok(g.ok); assert.equal(g.units, 0);
+});

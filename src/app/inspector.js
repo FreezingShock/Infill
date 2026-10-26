@@ -5,8 +5,9 @@ import { BLD, EL, ERA, ERA_NAME, LT, PAL, PRESETS, ZONES, ZONE_CODES, liveBuildi
 import { CATS, TPL, TPL_BY_CAT, availability } from '../engine/templates.js';
 import { areaNew, uid } from '../engine/commands.js';
 import { cam } from './render.js';
-import { CUR, LOG, STATE, anyFilter, buildEdgeSel, buildSel, commit, ghost, lotStories, outlineMesh, save, scores, selIds, setOv, setSel, startRise, toast, ui, world } from './state.js';
-import { drawPreview, finishDraw, placeHandles, setTool } from './input.js';
+import { CUR, LOG, STATE, anyFilter, buildEdgeSel, buildSel, commit, ghost, ghostLots, lotStories, outlineMesh, save, scores, selIds, setOv, setSel, startRise, toast, ui, world } from './state.js';
+import { drawPreview, finishDraw, placeHandles, renderHint, setTool } from './input.js';
+import { addDesign, copyLook, designs, itemById, plan, preview, previewText, progAfter, removeDesign, shelves, suggestions } from './palette.js';
 
 // =====================================================================
 // Inspector
@@ -19,6 +20,9 @@ function breakdown(lots) { const m = {}; for (const l of lots) m[l.lt] = (m[l.lt
 function mixed(vals, fmtv = (v) => v) { const u = [...new Set(vals.map((v) => v ?? 'auto'))]; if (u.length === 1) return fmtv(u[0]); const nums = u.filter((v) => typeof v === 'number'); if (nums.length === u.length) return `${Math.min(...nums)}–${Math.max(...nums)}`; return 'mixed'; }
 
 function renderCard() {
+  if (ui.tool === 'build') return renderPalette();
+  if (ui.tool === 'doze') return renderDoze();
+  if (ui.tool === 'roads') return ui.edgeSel.size && !(ui.draw && ui.draw.pts.length) ? renderEdge() : renderDraw();
   if (ui.tool === 'draw') return renderDraw();
   if (ui.tool === 'area' && ui.area) return renderArea();
   if (ui.edgeSel.size) return renderEdge();
@@ -37,10 +41,14 @@ function renderCard() {
   else if (ui.tab === 'lot') body = tabLot(lots, one);
   else body = tabSelect(lots, one);
   const skips = ui.skipped && ui.skipped.length ? `<div class="skips"><b>${ui.skipped.length} lot${ui.skipped.length === 1 ? '' : 's'} skipped</b><ul>${groupWhy(ui.skipped).map(([w, n]) => `<li>${esc(w)}${n > 1 ? ` <small>(${n})</small>` : ''}</li>`).join('')}</ul></div>` : '';
-  card.innerHTML = `${head}${filt}<div class="row" style="justify-content:space-between"><div class="tabs" role="tablist" style="flex:1">${['build', 'tweak', 'lot', 'select'].map((t) => `<button class="tab ${ui.tab === t ? 'on' : ''}" data-tab="${t}" role="tab" aria-selected="${ui.tab === t}">${{ build: 'Build', tweak: 'Tweak', lot: 'Lot', select: 'Select' }[t]}</button>`).join('')}</div><button class="btn ghost small" id="clrSel" title="Esc">Clear</button></div>${skips}${body}
+  const full = ui.custom || ui.adv;
+  card.innerHTML = `${head}${filt}${quickBlock(lots, one)}${skips}
+  <div class="row" style="justify-content:space-between"><button class="btn ghost small" id="cust" aria-expanded="${full}">${full ? 'Hide the details' : 'Customize every detail'}</button><button class="btn ghost small" id="clrSel" title="Esc">Clear</button></div>
+  ${full ? `<div class="tabs" role="tablist">${['build', 'tweak', 'lot', 'select'].map((t) => `<button class="tab ${ui.tab === t ? 'on' : ''}" data-tab="${t}" role="tab" aria-selected="${ui.tab === t}">${{ build: 'Templates', tweak: 'Tweak', lot: 'Lot', select: 'Select' }[t]}</button>`).join('')}</div>${body}` : ''}
   <div class="src">Lot lines and zones are real (City of LA); years and units are mostly estimates. ${ui.dream ? '<b>Dream mode:</b> no setbacks, up to 8 storeys.' : '<b>Real rules:</b> simplified setbacks, height caps and uses per zone.'}</div>`;
-  bindCard(lots, one);
-  if (ui.tab === 'build') fillCounts(lots);
+  bindCard(lots, one); bindQuick(lots, one);
+  fillQuick(lots);
+  if (full && ui.tab === 'build') fillCounts(lots);
 }
 const groupWhy = (sk) => { const m = new Map(); for (const s of sk) m.set(s.why, (m.get(s.why) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6); };
 function tabBuild(lots) {
@@ -126,10 +134,73 @@ function tabSelect(lots, one) {
   <div class="row"><input class="inp" id="gName" placeholder="e.g. ${esc(AREA.main || 'Main street')} frontage" style="flex:1"><button class="btn small" id="gSave">Save</button></div>
   ${gnames.length ? `<div class="chips">${gnames.map((g) => `<button class="chipb" data-group="${esc(g)}">${esc(g)} · ${ui.groups[g].length}</button>`).join('')}</div>` : '<div class="note">Name this selection to recall it later.</div>'}`;
 }
+// ---------- quick changes on the Look card ----------
+function quickBlock(lots, one) {
+  const sug = suggestions(lots);
+  return `<h3>Quick changes <small>${lots.length > 1 ? `for all ${fmt(lots.length)}` : 'for this lot'}</small></h3>
+  <div class="kits">${sug.map((it) => `<button class="kit" data-q="${esc(it.id)}" title="${esc(it.blurb)}">${it.icon}${esc(it.name)}<span class="fit" data-qfit="${esc(it.id)}">…</span></button>`).join('')}</div>
+  <div class="row">${one ? '<button class="btn ghost small" id="qCopy" title="Pick up this lot\'s look, then click or drag it onto other lots">Copy look</button><button class="btn ghost small" id="qSave" title="Keep this look as your own one-click design">Save as my design</button>' : ''}<button class="btn ghost small" id="qBlock" title="Double-click a lot does the same">Whole block</button><button class="btn ghost small" id="qSim" title="Every lot of this type in view">Similar nearby</button><button class="btn ghost small" id="qBuild" title="All upgrades, roofs, colours and templates">More in Build</button></div>
+  ${ui.naming ? `<div class="row"><input class="inp" id="dsName" style="flex:1" placeholder="Name, e.g. Celes St ranch refresh" value="${esc(one ? (one.a || '') : '')}" aria-label="Design name"><button class="btn small" id="dsSave">Save</button></div>` : ''}`;
+}
+function fillQuick(lots) {
+  const els = [...card.querySelectorAll('[data-qfit]')]; let i = 0;
+  const step = () => {
+    if (!els.length || !card.contains(els[0]) || i >= els.length) return;
+    const el = els[i++], it = itemById(el.dataset.qfit), pv = preview(it, lots);
+    el.textContent = pv.fits ? previewText(pv) : 'doesn\'t fit';
+    el.parentElement.classList.toggle('off', !pv.fits);
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+}
+function bindQuick(lots, one) {
+  const q = (s) => card.querySelector(s);
+  card.querySelectorAll('[data-q]').forEach((b) => {
+    const it = itemById(b.dataset.q);
+    b.onmouseenter = () => ghostLots(lots.slice(0, 120).filter((l) => !it.fits(l)).map((l) => [l, progAfter(it, l)]).filter((x) => x[1]));
+    b.onmouseleave = () => ghostLots(null);
+    b.onclick = () => { ghostLots(null); applyItem(it, lots); };
+  });
+  q('#cust').onclick = () => { ui.custom = !(ui.custom || ui.adv); if (!ui.custom && ui.adv) toast('The Advanced drawer keeps every detail open. Close it to hide them.'); renderCard(); };
+  const cp = q('#qCopy'); if (cp) cp.onclick = () => { copyLook(one); setTool('build'); toast(`Copied. Click or drag across lots to paint this look onto them.`); };
+  const sv = q('#qSave'); if (sv) sv.onclick = () => { ui.naming = !ui.naming; renderCard(); const n = q('#dsName'); if (n) n.focus(); };
+  const ds = q('#dsSave'); if (ds) ds.onclick = () => { const name = q('#dsName').value.trim() || `My design ${designs.length + 1}`; ui.item = addDesign(one, name); ui.naming = false; renderCard(); toast(`Saved "${name}". It is on the Build palette under My designs.`); };
+  q('#qBlock').onclick = () => { const blks = new Set(lots.map((l) => l.blk).filter((b) => b >= 0)); setSel([...STATE.lots.values()].filter((l) => blks.has(l.blk)).map((l) => l.id)); };
+  q('#qSim').onclick = () => { ui.scope = 'view'; selectSimilar('lt', lots[0]); };
+  q('#qBuild').onclick = () => setTool('build');
+}
+// Apply one palette item to lots: the fitting ones change, the rest are listed with the reason.
+function applyItem(it, lots, how) {
+  if (!it) return toast('Pick something on the Build palette first.');
+  const { ok, skipped, cmd } = plan(it, lots);
+  if (!cmd) { ui.skipped = skipped; renderCard(); toast(`${it.name} doesn't fit ${lots.length === 1 ? 'this lot' : 'any of these lots'}${skipped[0] ? ': ' + skipped[0].why : ''}.`); return; }
+  commit(cmd, { anim: ok, skipped, label: `${it.name} on ${fmt(ok.length)} lot${ok.length === 1 ? '' : 's'}${how ? ' · ' + how : ''}` });
+  if (skipped.length && ui.tool !== 'select') toast(`${fmt(skipped.length)} lot${skipped.length === 1 ? '' : 's'} skipped: ${skipped[0].why}.`);
+}
+
+// ---------- Build palette and Bulldoze card ----------
+function renderPalette() {
+  const cur = itemById(ui.item);
+  card.innerHTML = `<div><div class="eyebrow">Build</div><h2>${esc(cur ? cur.name : 'Pick something to build')}</h2>${cur ? `<div class="alt">${esc(cur.blurb)}</div>` : ''}</div>
+  <p>Pick an item, then click a lot or drag across lots, like painting tiles. Hover a lot to preview it.</p>
+  ${shelves().map((sh) => `<div class="catlabel">${sh.col != null ? `<i style="background:#${sh.col.toString(16).padStart(6, '0')}"></i>` : ''}${esc(sh.name)}</div>
+  <div class="kits ${sh.k === 'pal' || sh.k === 'roof' ? 'small' : ''}">${sh.items.map((it) => `<button class="kit ${ui.item === it.id ? 'on' : ''}" data-item="${esc(it.id)}" title="${esc(it.blurb)}" aria-pressed="${ui.item === it.id}">${it.icon}${esc(it.name)}</button>`).join('')}</div>`).join('')}
+  <div class="row"><label class="check"><input type="checkbox" id="vary" ${ui.vary ? 'checked' : ''}> Vary each lot a little</label>${ui.item && ui.item.startsWith('my:') ? '<button class="btn ghost small" id="dsDel">Delete this design</button>' : ''}</div>
+  <div class="src">Tip: with Look (V), click any lot and press <b>Copy look</b> to paint its style onto others, or <b>Save as my design</b> to keep it here.</div>`;
+  card.querySelectorAll('[data-item]').forEach((b) => (b.onclick = () => { ui.item = b.dataset.item; renderPalette(); renderHint(); }));
+  card.querySelector('#vary').onchange = (e) => { ui.vary = e.target.checked; };
+  const dd = card.querySelector('#dsDel'); if (dd) dd.onclick = () => { removeDesign(+ui.item.slice(3)); ui.item = 'up.floor'; renderPalette(); renderHint(); };
+}
+function renderDoze() {
+  card.innerHTML = `<div><div class="eyebrow">Bulldoze</div><h2>Clear lots and streets</h2></div>
+  <p>Click a lot or drag across lots to clear them to grass, ready for something new. Click a street piece to remove it. Undo (Ctrl+Z) brings anything back.</p>
+  <div class="src">Removing a street flags the lots that lose access and turns its land into new ground.</div>`;
+}
+
 function renderEmpty() {
   const s = scores();
-  card.innerHTML = `<div><div class="eyebrow">Builder</div><h2>Pick lots to renovate</h2></div>
-  <p>Click a lot, drag a box or lasso, paint with the brush, sweep along a street, or double-click for a whole block. Then apply a template or tweak the whole selection at once.</p>
+  card.innerHTML = `<div><div class="eyebrow">Look</div><h2>Click a lot or a street</h2></div>
+  <p>Click a lot to see quick changes for it, double-click for its whole block. Or press <b>Build</b> and click or drag across lots to change them directly.</p>
   <div class="row"><button class="btn small" id="qPark">Every parking lot</button><button class="btn ghost small" id="qTop">${esc(AREA.main || 'Main street')} frontage</button><button class="btn ghost small" id="qRanch">All 1945–65 ranch houses</button></div>
   <dl class="facts">
     <div><dt>Lots</dt><dd>${fmt(STATE.lots.size)}</dd></div><div><dt>Streets</dt><dd>${fmt([...STATE.edges.values()].filter((e) => e.g).length)} pieces</dd></div>
@@ -205,7 +276,11 @@ function renderEdge() {
   const row = rowWidth(profDraft), cur = rowWidth(e.prof), fronting = [...STATE.lots.values()].filter((l) => ui.edgeSel.has(l.rd)).length;
   const strip = profDraft.els.map(([k, w], i) => `<button class="${i === profPick ? 'on' : ''}" data-el="${i}" style="flex:${w};background:#${(EL[k]?.c ?? 0x8a837c).toString(16).padStart(6, '0')}" title="${EL[k]?.name || k} ${w.toFixed(1)} m">${w >= 2.4 ? (EL[k]?.name || k).split(' ')[0] : ''}</button>`).join('');
   card.innerHTML = `<div><div class="eyebrow">Street · ${es.length} piece${es.length === 1 ? '' : 's'}</div><h2>${esc(names.slice(0, 2).join(', '))}${names.length > 2 ? '…' : ''}</h2><div class="alt">${fmt(len * FT)} ft long · ${fmt(fronting)} lots front it · right-of-way ${cur.toFixed(1)} m (${fmt(cur * FT)} ft)</div></div>
-  <h3>Cross-section <small>left to right</small></h3>
+  <h3>Quick changes <small>one click, whole selection</small></h3>
+  <div class="row">${Object.entries(PRESETS).map(([k, p]) => `<button class="chipb ${e.prof.k === k ? 'on' : ''}" data-quick="${k}" title="${rowWidth(p).toFixed(0)} m wide">${p.name}</button>`).join('')}</div>
+  <div class="row" style="justify-content:space-between"><button class="btn ghost small" id="corr" ${e.n ? '' : 'disabled'}>Select all of ${esc(e.n || 'this street')}</button><button class="btn ghost small" id="eDel">Delete street</button></div>
+  <button class="btn ghost small" id="cust" aria-expanded="${!!(ui.custom || ui.adv)}">${ui.custom || ui.adv ? 'Hide the cross-section' : 'Customize the cross-section'}</button>
+  ${ui.custom || ui.adv ? `  <h3>Cross-section <small>left to right</small></h3>
   <div class="strip" role="group" aria-label="Street elements">${strip}</div>
   <div class="row" style="justify-content:space-between"><span class="note">New width ${row.toFixed(1)} m${row > cur + 0.3 ? ` · widens by ${(row - cur).toFixed(1)} m and clips the lots beside it` : row < cur - 0.3 ? ' · the spare width becomes planting' : ''}</span></div>
   ${profPick >= 0 ? `<div class="row"><b style="font:700 13px var(--display)">${EL[profDraft.els[profPick][0]]?.name || profDraft.els[profPick][0]}</b><span class="stepper"><button data-w="-0.2" aria-label="Narrower">−</button><b>${profDraft.els[profPick][1].toFixed(1)} m</b><button data-w="0.2" aria-label="Wider">+</button></span><button class="btn ghost small" id="elDel">Remove</button></div>` : '<div class="note">Click an element to resize or remove it.</div>'}
@@ -213,20 +288,22 @@ function renderEdge() {
   <h3>Presets</h3>
   <div class="row">${Object.entries(PRESETS).map(([k, p]) => `<button class="chipb ${profDraft.k === k ? 'on' : ''}" data-pre="${k}">${p.name}</button>`).join('')}</div>
   <div class="row"><button class="btn small" id="profApply">Apply to ${es.length} piece${es.length === 1 ? '' : 's'}</button><button class="btn ghost small" id="profReset">Reset</button></div>
-  <h3>Street</h3>
-  <div class="row"><button class="btn ghost small" id="corr" ${e.n ? '' : 'disabled'}>Select all of ${esc(e.n || 'this street')}</button><button class="btn ghost small" id="eDel">Delete street</button></div>
+` : ''}
   ${e.grp ? '<div class="note">Drag the round handles to reshape this drawn street.</div>' : ''}
   <div class="src">Delete flags lots that lose street access and turns the freed right-of-way into land. Widening clips lots; buildings inside the new right-of-way come down.</div>`;
   const q = (s) => card.querySelector(s), qa = (s) => card.querySelectorAll(s), ids = es.map((x) => x.id);
   qa('[data-el]').forEach((b) => (b.onclick = () => { profPick = +b.dataset.el; renderEdge(); }));
   qa('[data-w]').forEach((b) => (b.onclick = () => { const el = profDraft.els[profPick]; el[1] = clamp(Math.round((el[1] + +b.dataset.w) * 10) / 10, 0.6, 12); profDraft.k = 'custom'; renderEdge(); }));
   const ed = q('#elDel'); if (ed) ed.onclick = () => { profDraft.els.splice(profPick, 1); profPick = -1; profDraft.k = 'custom'; renderEdge(); };
+  qa('[data-quick]').forEach((b) => (b.onclick = () => { const k = b.dataset.quick; commit({ op: 'street.prof', ids, prof: { k, els: structuredClone(PRESETS[k].els) } }, { label: `${PRESETS[k].name} on ${ids.length} piece${ids.length === 1 ? '' : 's'}` }); profDraft = null; }));
+  q('#cust').onclick = () => { ui.custom = !(ui.custom || ui.adv); renderEdge(); };
+  q('#corr').onclick = () => { ui.edgeSel = new Set([...STATE.edges.values()].filter((x) => x.n === e.n && x.g).map((x) => x.id)); profDraft = null; buildEdgeSel(); renderEdge(); };
+  q('#eDel').onclick = () => deleteEdges();
+  if (!q('#elAdd')) { placeHandles(); return; }
   q('#elAdd').onchange = (ev) => { const k = ev.target.value; if (!k) return; const mid = Math.floor(profDraft.els.length / 2); profDraft.els.splice(mid, 0, [k, { walk: 2.2, trees: 1.5, median: 2.5, park: 2.4, lane: 3.3, turn: 3.2, bike: 1.8, bus: 3.4, shared: 3, plaza: 4 }[k]]); profDraft.k = 'custom'; profPick = mid; renderEdge(); };
   qa('[data-pre]').forEach((b) => (b.onclick = () => { profDraft.k = b.dataset.pre; profDraft.els = structuredClone(PRESETS[b.dataset.pre].els); profPick = -1; renderEdge(); }));
   q('#profApply').onclick = () => { if (!profDraft.els.length) return toast('A street needs at least one element.'); commit({ op: 'street.prof', ids, prof: { k: profDraft.k, els: structuredClone(profDraft.els) } }, { label: `${PRESETS[profDraft.k]?.name || 'Custom street'} on ${ids.length} piece${ids.length === 1 ? '' : 's'}` }); profDraft = null; };
   q('#profReset').onclick = () => { profDraft = null; renderEdge(); };
-  q('#corr').onclick = () => { ui.edgeSel = new Set([...STATE.edges.values()].filter((x) => x.n === e.n && x.g).map((x) => x.id)); profDraft = null; buildEdgeSel(); renderEdge(); };
-  q('#eDel').onclick = () => deleteEdges();
   placeHandles();
 }
 function deleteEdges() {
@@ -242,7 +319,7 @@ function deleteEdges() {
 function renderDraw() {
   const d = ui.draw, n = d ? d.pts.length : 0, L = d && n > 1 ? polyLen(d.pts) : 0;
   card.innerHTML = `<div><div class="eyebrow">Draw street</div><h2>${n ? `${n} point${n === 1 ? '' : 's'} · ${fmt(L * FT)} ft` : 'Click to start a street'}</h2></div>
-  <p>Click points on the ground. It snaps to intersections, onto existing streets, to right angles and to parallel streets (hold Shift for 15° steps). Double-click or Enter to finish, Backspace removes a point, Esc cancels.</p>
+  <p>${ui.tool === 'roads' ? 'Click an existing street to change it, or click open ground to start a new one. ' : ''}Click points on the ground. It snaps to intersections, onto existing streets, to right angles and to parallel streets (hold Shift for 15° steps). Double-click or Enter to finish, Backspace removes a point, Esc cancels.</p>
   <div class="ctrl"><label for="dProf">Profile</label><select id="dProf">${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${ui.drawProf === k ? 'selected' : ''}>${p.name} · ${rowWidth(p).toFixed(0)} m</option>`).join('')}</select><span></span></div>
   <div class="ctrl"><label for="dName">Name</label><input class="inp" id="dName" placeholder="New street" value="${esc(ui.drawName)}"><span></span></div>
   <label class="check"><input type="checkbox" id="dSmooth" ${ui.smooth ? 'checked' : ''}> Smooth curve through the points</label>
@@ -304,6 +381,7 @@ function areaPreview() {
 }
 
 export {
+  applyItem,
   areaPreview,
   clearProfDraft,
   deleteEdges,
