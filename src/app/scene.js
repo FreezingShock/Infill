@@ -241,13 +241,13 @@ function lampPools(lampMat) {
 }
 function buildProps() {
   const acc = new Acc(), glow = new Acc(), R = (x, z, a = 0, hw = 0.12, hd = 0.12) => ({ x, z, ux: Math.cos(a), uz: Math.sin(a), vx: -Math.sin(a), vz: Math.cos(a), hw, hd });
-  const POLE = C(0x5d5148), BOX = C(0x2b2420), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
+  const POLE = C(0x5d5148), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
   const RW = roadwayIndex([...BASE.edges.values()]);
   for (const [k, x0, z0] of PACK.props) {
-    const [x, z] = k === 'signal' ? [x0, z0] : RW.nudge(x0, z0); // street furniture stands on the sidewalk, never in a lane
+    if (k === 'signal') continue; // signals stand on corner mast arms built from the junctions (views/signals.js); the mapped points stay in the pack for the scan view
+    const [x, z] = RW.nudge(x0, z0); // street furniture stands on the sidewalk, never in a lane
     const y = elev(x, z);
-    if (k === 'signal') { obox(acc, R(x, z), y, 6, POLE); obox(acc, R(x, z, 0, 0.35, 0.3), y + 4.4, 1.2, BOX); obox(glow, R(x, z, 0, 0.12, 0.33), y + 5.1, 0.25, C(0x6fd36f), false); }
-    else if (k === 'lamp') { obox(acc, R(x, z), y, 7.5, POLE); obox(glow, R(x, z, 0, 0.45, 0.25), y + 7.2, 0.3, LAMP, false); }
+    if (k === 'lamp') { obox(acc, R(x, z), y, 7.5, POLE); obox(glow, R(x, z, 0, 0.45, 0.25), y + 7.2, 0.3, LAMP, false); }
     else if (k === 'bus') { obox(acc, R(x, z, 0, 1.6, 0.7), y + 2.4, 0.15, POLE); obox(glow, R(x - 0.0, z, 0, 1.5, 0.05), y, 2.3, SHEL, false); obox(acc, R(x, z + 0.4, 0, 0.08, 0.08), y, 2.4, POLE); }
     else if (k === 'bench') obox(acc, R(x, z, 0.3, 0.9, 0.3), y, 0.5, C(0xa8774d));
     else if (k === 'pole') obox(acc, R(x, z, 0, 0.14, 0.14), y, 9, C(0x8a6a4a));
