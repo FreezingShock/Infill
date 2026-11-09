@@ -5,6 +5,8 @@ import './look.js'; // camino.css is linked from index.html so it applies before
 import { PACK } from '../engine/pack.js';
 import { X0, X1, Z0, Z1 } from '../engine/core.js';
 import { scene } from '../app/render.js';
+import { BASE } from '../engine/commands.js';
+import { roadwayIndex } from '../tools/roads/roadway.js';
 import { buildInfra } from './infra.js';
 import { infraTotals, layoutInfra } from './infra-data.js';
 import { initScan, onScan, scanOn, setScan, tick } from './scan.js';
@@ -19,7 +21,7 @@ const AREA = globalThis.__RENOVATED_AREA__ || {};
 let D = null;
 if (AREA.infra) { try { const r = await fetch(`areas/${AREA.infra}`); if (r.ok) D = await r.json(); } catch { /* sidecar is optional */ } }
 const lamps = PACK.props.filter((p) => p[0] === 'lamp').map(([, x, z]) => [x, z]);
-const I = layoutInfra(D, lamps, [X0 - 60, Z0 - 60, X1 + 60, Z1 + 60], { buildings: PACK.buildings, edges: PACK.edges });
+const I = layoutInfra(D, lamps, [X0 - 60, Z0 - 60, X1 + 60, Z1 + 60], { buildings: PACK.buildings, edges: PACK.edges, roadway: roadwayIndex([...BASE.edges.values()]), cuts: PACK.driveCuts });
 const infra = buildInfra(I); scene.add(infra.group);
 initScan({ infra, I });
 
