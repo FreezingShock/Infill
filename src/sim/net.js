@@ -91,7 +91,7 @@ function buildNet(edges, opts = {}) {
     }
     n.phases = groups.length;
     const sig = signals.some((s) => Math.hypot(s[0] - n.x, s[1] - n.z) < 30);
-    const major = n.legs.filter((l) => l.item.rank >= 3).length;
+    const major = new Set(n.legs.filter((l) => l.item.rank >= 3).map((l) => l.group)).size; // crossing roads, not carriageways of one divided road
     const set = control[n.id];
     if (nlegs >= 3 && set) {
       if (set === 'signal') n.control = 'signal';

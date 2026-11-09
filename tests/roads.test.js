@@ -99,32 +99,83 @@ test('divided boulevards import as one-way carriageways with a median, never ove
 });
 function nearestOnLineOf(p, m) { let b = 1e9; for (let i = 1; i < p.length; i++) { const [ax, az] = p[i - 1], [bx, bz] = p[i], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((m[0] - ax) * dx + (m[1] - az) * dz) / (dx * dx + dz * dz || 1))); b = Math.min(b, Math.hypot(m[0] - ax - dx * t, m[1] - az - dz * t)); } return b; }
 
-test('where a divided road meets the undivided one, the taper has lanes only (no median across the V)', () => {
+const lat = (p, q) => { let b = 1e9; for (let i = 1; i < q.length; i++) { const [ax, az] = q[i - 1], [bx, bz] = q[i], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz || 1))); b = Math.min(b, Math.hypot(p[0] - ax - dx * t, p[1] - az - dz * t)); } return b; };
+const rowOf = (e) => e.prof.els.reduce((s, x) => s + x[1], 0);
+
+test('road classes: Topanga is an arterial, Avenue San Luis a collector or local, and both read from the map class', async () => {
+  const { roadClassOf, rankOf } = await import('../src/tools/roads/classes.js');
+  const g = (id) => BASE.edges.get(id);
+  assert.equal(roadClassOf(g('E118')), 'arterial');
+  assert.ok(['collector', 'local'].includes(roadClassOf(g('E103'))));
+  assert.ok(rankOf(g('E118')) > rankOf(g('E103')));
+  assert.equal(roadClassOf({ c: 'residential', w: 9 }), 'local');
+  assert.equal(roadClassOf({ c: 'tertiary', w: 11 }), 'collector');
+  for (const e of BASE.edges.values()) if (e.g) assert.ok(['arterial', 'collector', 'local', 'freeway'].includes(e.rc), `${e.id} has a class`);
+});
+
+test('a divided road is two carriageways exactly one row apart, so their medians meet and make one', () => {
+  const a = BASE.edges.get('E113'), b = BASE.edges.get('E114'), T = (rowOf(a) + rowOf(b)) / 2;
+  for (const q of a.p) assert.ok(Math.abs(lat(q, b.p) - T) < 0.6, `E113 vertex ${q} is ${lat(q, b.p).toFixed(2)} from E114, wanted ${T}`);
+  // the median is one narrow strip, the same width as the centre turn lane it replaces
+  const med = a.prof.els.filter((x) => x[0] === 'median').reduce((s, x) => s + x[1], 0) * 2;
+  assert.ok(med >= 2.5 && med <= 4, `median ${med} m`);
+  const two = BASE.edges.get('E118').prof.els.reduce((s, x) => s + x[1], 0);
+  assert.ok(Math.abs(rowOf(a) + rowOf(b) - two) < 0.8, `divided ${rowOf(a) + rowOf(b)} m vs undivided ${two} m: same total width`);
+});
+
+test('where the divided road meets the undivided one the carriageways stay parallel, the median narrows to a nose and the pavement never widens into a V', async () => {
+  const { drawPath, medianKeep } = await import('../src/tools/roads/divided.js');
   const tapers = [...BASE.edges.values()].filter((e) => e.taper);
   assert.ok(tapers.length >= 2);
-  for (const e of tapers) { assert.equal(e.oneway, 1); assert.ok(e.prof.els.every((x) => x[0] === 'lane'), `${e.id} lanes only`); }
-});
-
-test('each taper pair gets a median wedge polygon', async () => {
-  const { taperMedians } = await import('../src/tools/roads/divided.js');
-  const w = taperMedians(BASE);
-  assert.ok(w.length >= 1 && w.every((r) => r.length >= 4));
-});
-
-test('taper pairs run parallel at the median gap and only close up near the merge node', () => {
-  const tapers = [...BASE.edges.values()].filter((e) => e.taper);
   for (const e of tapers) {
-    const far = e.p.length ? (BASE.nodes[e.a] === e.p[0] || (e.p[0][0] === BASE.nodes[e.a][0] && e.p[0][1] === BASE.nodes[e.a][1]) ? e.p : e.p) : e.p;
-    assert.ok(polyLen(far) > 20);
+    assert.equal(e.oneway, 1);
+    assert.ok(e.prof.els.some((x) => x[0] === 'median') && e.prof.els.some((x) => x[0] === 'walk'), `${e.id} keeps its full cross-section`);
+    assert.ok(e.nose && e.nose.to > e.nose.from, `${e.id} has a nose`);
+    const P = drawPath(e); assert.ok(P !== e.p, 'drawn along the axis, not the traffic path');
   }
-  const pair = tapers.filter((e) => e.id === 'E116' || e.id === 'E117');
-  if (pair.length === 2) {
-    const [a, b] = pair, mid = (p) => p[Math.floor(p.length * 0.2)];
-    // near the far end the two carriageways are still a full median apart (not already closing)
-    const ga = Math.hypot(a.p[0][0] - b.p.at(-1)[0], a.p[0][1] - b.p.at(-1)[1]);
-    assert.ok(ga > 12, `far ends ${ga}`);
-    void mid;
+  const [a, b] = tapers.filter((e) => e.id === 'E116' || e.id === 'E117');
+  assert.ok(a && b);
+  const T = (rowOf(a) + rowOf(b)) / 2, A = drawPath(a), B = drawPath(b);
+  for (const q of A) assert.ok(Math.abs(lat(q, B) - T) < 0.4, `separation ${lat(q, B).toFixed(2)} stays ${T.toFixed(2)} all the way: no wedge`);
+  // the median only ever narrows towards the merge, and ends in a point
+  const L = a.nose.len; let prev = 1;
+  for (let d = 0; d <= L; d += L / 20) { const k = medianKeep(a, a.nose.rev ? L - d : d); const s = a.nose.rev ? L - d : d; void s; assert.ok(k <= prev + 1e-9 || a.nose.rev, 'monotonic'); prev = k; }
+  assert.equal(medianKeep(a, a.nose.rev ? 0 : L), 0);
+  assert.equal(medianKeep(a, a.nose.rev ? L : 0), 1);
+  // the traffic polyline still ends on the merge node, so cars flow from the two-way road into each carriageway
+  const m = a.a === b.a || a.a === b.b ? a.a : a.b, M = BASE.nodes[m];
+  for (const e of [a, b]) { const end = e.a === m ? e.p[0] : e.p.at(-1); assert.ok(Math.hypot(end[0] - M[0], end[1] - M[1]) < 0.01); }
+});
+
+test('streets bend smoothly and the lane polyline never leaves the paved width at a merge', async () => {
+  const { drawPath } = await import('../src/tools/roads/divided.js');
+  for (const e of BASE.edges.values()) if (e.nose) {
+    const P = drawPath(e); let worst = 0;
+    for (const q of e.p) worst = Math.max(worst, lat(q, P));
+    assert.ok(worst <= rowOf(e) / 2 + 1, `${e.id} traffic path strays ${worst.toFixed(1)} m from the drawn road`);
   }
+});
+
+test('the roadway test knows lanes from sidewalks, and furniture is moved off the pavement', async () => {
+  const { roadwayIndex } = await import('../src/tools/roads/roadway.js');
+  const e = { id: 'T', g: 1, p: [[0, 0], [100, 0]], prof: { k: 'asbuilt', els: [['walk', 2], ['lane', 3], ['lane', 3], ['walk', 2]] } };
+  const R = roadwayIndex([e]);
+  assert.ok(R.hit(50, 0)); assert.ok(R.hit(50, 2.5), 'a lane');
+  assert.ok(!R.hit(50, 4.5), 'the sidewalk is not roadway'); assert.ok(!R.hit(150, 0), 'beyond the end');
+  const [x, z] = R.nudge(50, 1); assert.ok(!R.hit(x, z, 0) && Math.abs(z) >= 3);
+});
+
+test('no street tree, prop or lane is placed on the Topanga roadway', async () => {
+  const { roadwayIndex } = await import('../src/tools/roads/roadway.js');
+  const R = roadwayIndex([...BASE.edges.values()]);
+  for (const [k, x, z] of globalThis.__RENOVATED_PACK__.props) { if (k === 'signal') continue; const [nx, nz] = R.nudge(x, z); assert.ok(!R.hit(nx, nz, -0.3), `${k} at ${x},${z}`); }
+});
+
+test('junction control follows road class: side streets stop, a divided road is not two signals', async () => {
+  const E103 = BASE.edges.get('E103'), n = E103.a; // Avenue San Luis meets a Topanga carriageway here
+  assert.notEqual(graph.nodeControl(BASE, n), 'signal');
+  assert.ok(graph.givesWay(BASE, n, E103), 'the side street gives way');
+  assert.ok(!graph.givesWay(BASE, n, BASE.edges.get('E114')), 'the arterial flows through');
 });
 
 test('junction details: ladders and stop bars set back from the box, markings and medians trimmed', async () => {
@@ -148,4 +199,14 @@ test('a main road meeting only minor streets keeps its lines and has no crosswal
   for (const id of ['E113', 'E114']) { const r = P.info.get(id); assert.ok(r && r.t0 === 0 && r.t1 === 0, `${id} lines run through the Avenue San Luis junction`); }
   assert.ok(P.ladders.every((l) => !l.e || !['E113', 'E114'].includes(l.e.id)), 'no ladder across Topanga at Avenue San Luis');
   assert.ok(topanga.every((e) => e.speed >= 45), 'boulevard is 45 mph');
+});
+
+test('swerves: sharp corners on arterials round off, endpoints stay on their nodes, local streets keep theirs', async () => {
+  const { round } = await import('../src/tools/roads/swerves.js');
+  const kinked = [[0, 0], [50, 0], [50, 50]], r = round(kinked, 30);
+  assert.deepEqual(r[0], [0, 0]); assert.deepEqual(r.at(-1), [50, 50]);
+  assert.ok(r.length > 4, 'corner became a curve');
+  const turn = (a, b, c) => Math.abs(Math.atan2((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]), (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1])));
+  for (let i = 1; i < r.length - 1; i++) assert.ok(turn(r[i - 1], r[i], r[i + 1]) < 0.6, 'no sharp turn left');
+  for (const e of BASE.edges.values()) { if (!e.g) continue; assert.ok(e.p.every((q) => q.every(Number.isFinite))); assert.deepEqual(e.p[0], BASE.nodes[e.a]); assert.deepEqual(e.p.at(-1), BASE.nodes[e.b]); }
 });

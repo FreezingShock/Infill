@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
 import { hasCanopy, streetTreesAll } from '../engine/streettrees.js';
 import { addBulbs } from '../engine/bulbs.js';
-import { taperMedians } from '../tools/roads/divided.js';
+import { drawPath, medianKeep } from '../tools/roads/divided.js';
+import { roadwayIndex } from '../tools/roads/roadway.js';
 import { plan as roadPlan, trimPath } from '../tools/roads/markings.js';
-import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
+import { Acc, C, HG, T, UP, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { BASE } from '../engine/commands.js';
@@ -87,25 +88,36 @@ function instCars(list) {
   a.castShadow = true; grp.add(a, b); return grp;
 }
 
+// A median half that narrows to a point along the drawn path (e.nose). The axis side stays put, the lane side closes in.
+function noseMedian(acc, path, o, w, first, e, y, col, d0 = 0) {
+  const P = densify(path, 2), N = offsetLine(P, 1); let d = d0;
+  const at = (i, off) => { const x = P[i][0] + (N[i][0] - P[i][0]) * off, z = P[i][1] + (N[i][1] - P[i][1]) * off; return [x, elev(x, z) + y, z]; };
+  const span = () => { const k = w * medianKeep(e, d); return first ? [o, o + k] : [o + w - k, o + w]; };
+  const ranges = P.map((_, i) => { if (i) d += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); return span(); });
+  for (let i = 0; i < P.length - 1; i++) { const a = ranges[i], b = ranges[i + 1]; if (a[1] - a[0] < 0.02 && b[1] - b[0] < 0.02) continue; acc.quad(at(i, a[0]), at(i, a[1]), at(i + 1, b[1]), at(i + 1, b[0]), col, UP); }
+}
 // ---------- streets from cross-section profiles ----------
 const ROAD_ORDER = { service: 0, unknown: 0, unclassified: 1, residential: 1, tertiary: 2, secondary: 3, primary: 4, motorway: 5 };
 function buildRoads(S) {
   const acc = new Acc(), marks = new Acc(), trees = [];
   const YEL = C(0xe9c24a), WHITE = C(0xf5f2ea), DRIVE = C(0xcbc1b0), ASPH = { motorway: C(0x5f5a57), primary: C(0x66615d), secondary: C(0x6c6662), tertiary: C(0x75706a), residential: C(0x7d7771), unclassified: C(0x7d7771), service: C(0x8a837c), unknown: C(0x8a837c) };
   const E = [...S.edges.values()].sort((a, b) => (ROAD_ORDER[a.c] ?? 0) - (ROAD_ORDER[b.c] ?? 0));
-  const RP = roadPlan(S, PACK.walks);
+  const RP = roadPlan(S, PACK.walks), RW = roadwayIndex(E);
   for (const pass of [0, 1]) for (const e of E) {
-    const els = e.prof.els, row = rowWidth(e.prof), base = 0.26 + (ROAD_ORDER[e.c] ?? 0) * 0.02;
-    if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, e.p, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : ASPH[e.c] || ASPH.service); continue; }
+    const P = drawPath(e), els = e.prof.els, row = rowWidth(e.prof), base = 0.26 + (ROAD_ORDER[e.c] ?? 0) * 0.02;
+    if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, P, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : ASPH[e.c] || ASPH.service); continue; }
     let o = -row / 2;
+    let i0 = -1;
     for (const [k, w] of els) {
-      const d = EL[k] || EL.lane, curb = !!d.curb;
+      i0++; const d = EL[k] || EL.lane, curb = !!d.curb;
       if ((pass === 0) === curb) {
         const col = (k === 'lane' || k === 'turn' || k === 'park') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : ASPH[e.c]) : C(d.c);
-        const mpath = k === 'median' && RP.info.get(e.id) ? trimPath(e.p, RP.info.get(e.id).mt0, RP.info.get(e.id).mt1) : e.p; // medians stop short of each junction
-        if (mpath !== e.p) ribbon(acc, e.p, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the part where the median stops
-        ribbon(acc, mpath, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col);
-        if ((k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) || k === 'median') alongPts(offsetLine(mpath, o + w / 2), k === 'median' ? 12 : 9, (x, z) => trees.push([x, elev(x, z), z, k === 'median' ? 0.85 : 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
+        const mpath = k === 'median' && RP.info.get(e.id) ? trimPath(P, RP.info.get(e.id).mt0, RP.info.get(e.id).mt1) : P; // medians stop short of each junction
+        if (mpath !== P || (k === 'median' && e.nose)) ribbon(acc, P, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the part where the median stops or narrows
+        if (k === 'median' && e.nose) noseMedian(acc, mpath, o, w, i0 === 0, e, base + 0.06, C(EL.median.c), RP.info.get(e.id)?.mt0 || 0); // narrows to a point, pavement stays one width
+        else ribbon(acc, mpath, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col);
+        if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(mpath, o + w / 2), 9, (x, z) => trees.push([x, elev(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
+        if (k === 'median' && i0 === 0 && !e.nose) alongPts(offsetLine(mpath, o), 14, (x, z) => trees.push([x, elev(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median, not in the nose
       }
       o += w;
     }
@@ -113,7 +125,7 @@ function buildRoads(S) {
       let o2 = -row / 2; const pos = [];
       for (const [k, w] of els) { pos.push([k, o2, o2 + w]); o2 += w; }
       const hasTurn = pos.some((p) => p[0] === 'turn');
-      const R = RP.info.get(e.id), mp = R && (R.t0 || R.t1) ? trimPath(e.p, R.t0, R.t1) : e.p, mm = R && (R.mt0 || R.mt1) ? trimPath(e.p, R.mt0, R.mt1) : e.p; // no lane or centre lines inside the junction box
+      const R = RP.info.get(e.id), mp = R && (R.t0 || R.t1) ? trimPath(P, R.t0, R.t1) : P, mm = R && (R.mt0 || R.mt1) ? trimPath(P, R.mt0, R.mt1) : P; // no lane or centre lines inside the junction box
       for (let i = 0; i < pos.length; i++) {
         const [k, a, b] = pos[i], nk = pos[i + 1]?.[0];
         if (k === 'turn') { ribbon(marks, mp, a + 0.1, a + 0.28, base + 0.16, YEL, 2); ribbon(marks, mp, b - 0.28, b - 0.1, base + 0.16, YEL, 2); }
@@ -129,7 +141,7 @@ function buildRoads(S) {
       }
     }
   }
-  for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
+  for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2), (x, z) => !!RW.hit(x, z, 0.4))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
   addBulbs(acc, S, ASPH.residential, C(EL.walk.c)); // cul-de-sac turnarounds (src/engine/bulbs.js)
   for (const l of RP.ladders) ribbon(marks, l.p, l.o1, l.o2, 0.5, WHITE, 2); // ladder crosswalks, set back from the box
   for (const b of RP.bars) ribbon(marks, b.p, b.o1, b.o2, 0.5, WHITE, 2); // stop bars
@@ -137,7 +149,6 @@ function buildRoads(S) {
     const poly = [n.c.slice()]; for (let k = 0; k <= 6; k++) { const t = k / 6 * Math.PI / 2; poly.push([n.c[0] + n.r * (Math.cos(t) * n.v[0] + Math.sin(t) * n.u[0]), n.c[1] + n.r * (Math.cos(t) * n.v[1] + Math.sin(t) * n.u[1])]); }
     decal(acc, poly, 0.4, C(EL.median.c), 6);
   }
-  for (const w of taperMedians(S)) decal(acc, w, 0.25, ASPH.primary, 6); // paved wedge where the two ways close up, not an island
   const grp = new THREE.Group();
   const m1 = new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); m1.receiveShadow = true;
   const m2 = new THREE.Mesh(marks.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
@@ -231,7 +242,9 @@ function lampPools(lampMat) {
 function buildProps() {
   const acc = new Acc(), glow = new Acc(), R = (x, z, a = 0, hw = 0.12, hd = 0.12) => ({ x, z, ux: Math.cos(a), uz: Math.sin(a), vx: -Math.sin(a), vz: Math.cos(a), hw, hd });
   const POLE = C(0x5d5148), BOX = C(0x2b2420), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
-  for (const [k, x, z] of PACK.props) {
+  const RW = roadwayIndex([...BASE.edges.values()]);
+  for (const [k, x0, z0] of PACK.props) {
+    const [x, z] = k === 'signal' ? [x0, z0] : RW.nudge(x0, z0); // street furniture stands on the sidewalk, never in a lane
     const y = elev(x, z);
     if (k === 'signal') { obox(acc, R(x, z), y, 6, POLE); obox(acc, R(x, z, 0, 0.35, 0.3), y + 4.4, 1.2, BOX); obox(glow, R(x, z, 0, 0.12, 0.33), y + 5.1, 0.25, C(0x6fd36f), false); }
     else if (k === 'lamp') { obox(acc, R(x, z), y, 7.5, POLE); obox(glow, R(x, z, 0, 0.45, 0.25), y + 7.2, 0.3, LAMP, false); }

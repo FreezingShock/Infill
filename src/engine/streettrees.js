@@ -57,10 +57,10 @@ function yardCanopy(lot) {
   return near(lot.bb, 0).filter((t) => t.lot && t.x >= lot.bb[0] && t.x <= lot.bb[2] && t.z >= lot.bb[1] && t.z <= lot.bb[3] && inPoly(t.x, t.z, lot.r)).map((t) => crown(t, 1));
 }
 // street trees for all edges: each street crown goes to its nearest edge within the corridor
-function streetCanopy(edges, rowOf) {
+function streetCanopy(edges, rowOf, blocked) {
   const out = [], list = [...edges];
   for (const t of CAN) {
-    if (t.lot) continue;
+    if (t.lot || (blocked && blocked(t.x, t.z))) continue; // crowns on the pavement are misreads (shadow, vehicles): never draw them there
     let best = null, bd = 1e9;
     for (const e of list) {
       if (!e.bb || t.x < e.bb[0] - 20 || t.x > e.bb[2] + 20 || t.z < e.bb[1] - 20 || t.z > e.bb[3] + 20) continue;
@@ -71,9 +71,9 @@ function streetCanopy(edges, rowOf) {
   return out;
 }
 // everything the road builder needs: imagery crowns where we have them, else the inventory density per named street
-function streetTreesAll(edges, rowOf, walkOf) {
-  if (CAN) return streetCanopy(edges.filter((e) => e.c !== 'motorway'), rowOf);
-  const out = []; for (const e of edges) for (const t of streetTrees(e, walkOf(e), rowOf(e))) out.push(t);
+function streetTreesAll(edges, rowOf, walkOf, blocked) {
+  if (CAN) return streetCanopy(edges.filter((e) => e.c !== 'motorway'), rowOf, blocked);
+  const out = []; for (const e of edges) for (const t of streetTrees(e, walkOf(e), rowOf(e))) if (!blocked || !blocked(t[0], t[2])) out.push(t);
   return out;
 }
 export { setStreetTrees, streetTrees, norm, setCanopy, hasCanopy, yardCanopy, streetTreesAll };

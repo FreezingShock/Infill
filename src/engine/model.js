@@ -1,6 +1,8 @@
 import PC from 'polygon-clipping';
 import { PACK } from './pack.js';
 import { markDivided } from '../tools/roads/divided.js';
+import { classify } from '../tools/roads/classes.js';
+import { smoothSwerves } from '../tools/roads/swerves.js';
 import { area, bbox, centroid, elev, inPoly, nearestOnLine, pcSafe, pick, ringDistToLine, rng, segDist2, toPC } from './core.js';
 
 // =====================================================================
@@ -105,7 +107,9 @@ function buildBase() {
   const S = { lots: new Map(), edges: new Map(), nodes: PACK.nodes.map((n) => n.slice()), blocks: PACK.blocks.map((r) => r), demo: new Set(), ctrl: {}, rounds: {}, seq: 0, notes: [] };
   for (const l of PACK.lots) S.lots.set(l.id, mkLot(l));
   for (const e of PACK.edges) S.edges.set(e.id, mkEdge(e));
+  smoothSwerves(S); // arterial and collector corners become curves before divided pairs are matched
   markDivided(S);
+  classify(S);
   // as-built paving: Overture parking polygons clipped to each lot
   const PK = PACK.parking.concat(PACK.parkingInf || []).map((r) => ({ r, bb: bbox(r) })); // mapped lots + lots recognised from open ground (tools/pack/recognize.py)
   for (const lot of S.lots.values()) {
