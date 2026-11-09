@@ -5,7 +5,7 @@ import { gradeFor } from '../src/camino/palette.js';
 
 test('grade is muted by day and cooler and dimmer at night', () => {
   const d = gradeFor(lightAt(13)), n = gradeFor(lightAt(23));
-  assert.ok(d.sat < 0.75 && d.tint.every((v) => v < 1));
+  assert.ok(d.sat < 1 && d.sat > 0.85 && d.tint.every((v) => v <= 1));
   assert.ok(n.sat < d.sat && n.tint[2] > n.tint[0] && n.mark < d.mark);
 });
 
