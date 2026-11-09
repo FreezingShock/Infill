@@ -64,6 +64,7 @@ function describe(c) {
     case 'tweak': return `Tweaked ${Object.keys(c.f).map((k) => ({ st: 'storeys', rf: 'roof', pl: 'palette', sb: 'setback', adu: 'ADU', trees: 'trees', solar: 'solar', fence: 'fence' }[k] || k)).join(', ')} on ${L(n)}`;
     case 'rezone': return `Rezoned ${L(n)} to ${c.z}`;
     case 'restore': return `Restored ${L(n)} as-built`;
+    case 'grow': return `The city grew: ${L((c.fill || []).length + (c.up || []).length)}`;
     case 'fill': return `Filled ${L(n)} by zone`;
     case 'merge': return `Merged ${L(n)}`;
     case 'split': return c.mode === 'sb9' ? `SB 9 split of ${L(n)}` : `Split ${L(n)} into ${c.n}`;
