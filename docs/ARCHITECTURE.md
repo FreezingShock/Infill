@@ -56,3 +56,6 @@ Use `src/workers/pool.js`; send typed arrays as transferables; keep the page-thr
 
 ## Tests
 `npm test` runs `node --test tests/*.test.js`. Engine, sim, views, roads, camino and areas tests all run in plain node (DOM stubbed where needed). `npm run check` adds eslint and a production build; CI (`.github/workflows/check.yml`) runs it on every PR to `integration` and `main`.
+
+## Frontage rule (driveways, curb cuts, front yards)
+`engine/driveways.js` plans one driveway per house lot (`lot.dw`) from the lot ring, its live buildings and the street it fronts: it picks a clear strip on the real front boundary, a curb cut depth from the street profile, a front yard and a walkway. `model.js` runs it on load and in `lotMeta`, `templates.js` paints it (`paintFrontage`), and `sim/net.js` leaves the kerb at each driveway unparked, filling the free runs between driveways evenly (islands). No per-area data; every area and every later lot gets it.

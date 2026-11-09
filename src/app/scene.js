@@ -23,7 +23,7 @@ class LotIndex {
 }
 const BASE_LOT_GRID = new LotIndex([...BASE.lots.values()]);
 const GEN = new Map(); // lot hash -> generated lot, shared by the before and after worlds
-function lotHash(lot, S) { return JSON.stringify([lot.id, lot.r, lot.prog, liveBuildings(lot, S), lot.z, lot.fd, lot.flags.noaccess ? 1 : 0, lot.pk.length, lot.lt]); }
+function lotHash(lot, S) { return JSON.stringify([lot.id, lot.r, lot.prog, liveBuildings(lot, S), lot.z, lot.fd, lot.flags.noaccess ? 1 : 0, lot.pk.length, lot.lt, lot.dw]); }
 function genCached(lot, S) {
   const h = lotHash(lot, S); let g = GEN.get(h);
   if (!g) { g = genLot(lot, S); g.h = h; if (GEN.size > 30000) GEN.clear(); GEN.set(h, g); }

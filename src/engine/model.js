@@ -3,6 +3,7 @@ import { PACK } from './pack.js';
 import { markDivided } from '../tools/roads/divided.js';
 import { ARTERIAL, classify } from '../tools/roads/classes.js';
 import { smoothSwerves } from '../tools/roads/swerves.js';
+import { planDriveway } from './driveways.js';
 import { area, bbox, centroid, elev, inPoly, nearestOnLine, pcSafe, pick, ringDistToLine, rng, segDist2, toPC } from './core.js';
 
 // =====================================================================
@@ -113,6 +114,7 @@ function buildBase() {
   smoothSwerves(S); // arterial and collector corners become curves before divided pairs are matched
   markDivided(S);
   classify(S);
+  for (const lot of S.lots.values()) lot.dw = lotDriveway(lot, S);
   // as-built paving: Overture parking polygons clipped to each lot
   const PK = PACK.parking.concat(PACK.parkingInf || []).map((r) => ({ r, bb: bbox(r) })); // mapped lots + lots recognised from open ground (tools/pack/recognize.py)
   for (const lot of S.lots.values()) {
@@ -138,7 +140,29 @@ function interiorPoint(r) {
   return best ? [best[1], best[2]] : c;
 }
 function graphEdges(S) { const out = []; for (const e of S.edges.values()) if (e.g && e.c !== 'motorway') out.push(e); return out; }
+// Frontage rule (src/engine/driveways.js): the street edge the lot fronts gives the curb cut depth and where along it the cut sits.
+function lotDriveway(lot, S) {
+  const e = lot.rd != null && S.edges.get(lot.rd);
+  if (!e || !e.g) return null;
+  const q = nearestOnLine(e.p, lot.c[0], lot.c[1]), seg = e.p[q.i], nx = e.p[q.i + 1];
+  let es = 0; for (let i = 0; i < q.i; i++) es += Math.hypot(e.p[i + 1][0] - e.p[i][0], e.p[i + 1][1] - e.p[i][1]);
+  es += q.t * Math.hypot(nx[0] - seg[0], nx[1] - seg[1]);
+  const dx = nx[0] - seg[0], dz = nx[1] - seg[1], L = Math.hypot(dx, dz) || 1;
+  const side = ((lot.c[0] - q.x) * (-dz / L) + (lot.c[1] - q.z) * (dx / L)) >= 0 ? 1 : -1;
+  const rings = liveBuildings(lot, S).map((i) => BLD[i]).filter((b) => b.t !== 'outbuilding').map((b) => b.r);
+  const gap = Math.max(0, ringDistToLine(lot.r, e.p) - curbHalf(e));
+  const F = frameOf(lot);
+  // plan on the true frontage point of the driveway, not the lot centroid: es is re-read from the chosen s
+  const dw = planDriveway(lot, F, rings, { prof: e.prof, side, gap, es, rd: e.id });
+  if (!dw) return null;
+  const pt = F.P(dw.s, 0), h = nearestOnLine(e.p, pt[0], pt[1]), a0 = e.p[h.i], b0 = e.p[h.i + 1];
+  let at = 0; for (let i = 0; i < h.i; i++) at += Math.hypot(e.p[i + 1][0] - e.p[i][0], e.p[i + 1][1] - e.p[i][1]);
+  dw.es = Math.round((at + h.t * Math.hypot(b0[0] - a0[0], b0[1] - a0[1])) * 10) / 10;
+  dw.sd = ((pt[0] - h.x) * (-(b0[1] - a0[1])) + (pt[1] - h.z) * (b0[0] - a0[0])) >= 0 ? 1 : -1;
+  return dw;
+}
 function lotMeta(lot, S) {
+  lot.dw = null;
   lot.m2 = Math.round(Math.abs(area(lot.r))); lot.bb = bbox(lot.r);
   const c = interiorPoint(lot.r); lot.c = [c[0], c[1]]; lot.e = elev(c[0], c[1]);
   let best = null;
@@ -157,6 +181,7 @@ function lotMeta(lot, S) {
   for (const [x, z] of lot.r) { const p = x * lot.fd[0] + z * lot.fd[1], w = -x * lot.fd[1] + z * lot.fd[0]; p0 = Math.min(p0, p); p1 = Math.max(p1, p); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
   lot.dp = Math.round((p1 - p0) * 10) / 10; lot.wd = Math.round((w1 - w0) * 10) / 10;
   lot.blk = blockOf(S, lot.c);
+  lot.dw = lotDriveway(lot, S);
 }
 function blockOf(S, c) { for (let i = 0; i < S.blocks.length; i++) { const r = S.blocks[i]; if (r && inPoly(c[0], c[1], r)) return i; } return -1; }
 function liveBuildings(lot, S) { return lot.b.filter((i) => !S.demo.has(i)); }
