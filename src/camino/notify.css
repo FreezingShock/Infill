@@ -1,0 +1,27 @@
+/* sfvOS Camino notifications: the advisor as a system alert, and the toast as a mono notice.
+   Loaded only with the Camino theme (src/camino/index.js). Markup and copy live in src/ui/index.js and src/app/state.js. */
+
+/* advisor card: frosted plate with a severity rule across the top */
+[data-theme=camino] #app .advisor { border: 1px solid var(--hair); border-top: 3px solid var(--sev); border-radius: 2px; color: var(--ink); padding: 11px 12px 12px; gap: 9px; }
+[data-theme=camino] #app .advisor .adv-head { padding-bottom: 7px; }
+
+/* severity tag: solid plate with a notch, mono caps, no border (the cm-tag callout) */
+[data-theme=camino] #app .adv-tag { position: relative; gap: 6px; padding: 5px 8px 5px 7px; border: 0; border-radius: 0; background: var(--sev); color: #050607; font: 500 10px/1 var(--mono); letter-spacing: .14em; }
+[data-theme=camino] #app .advisor[data-sev=alert] .adv-tag { color: #fff; }
+[data-theme=camino] #app .adv-tag::after { content: ""; position: absolute; left: 0; top: 100%; border-left: 7px solid var(--sev); border-bottom: 7px solid transparent; }
+[data-theme=camino] #app .adv-tag svg { width: 10px; height: 10px; }
+
+/* place and topic: mono caps, topic in cyan, the street in ink */
+[data-theme=camino] #app .adv-loc { font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+[data-theme=camino] #app .adv-loc b { font: inherit; color: var(--cyan); }
+
+/* copy: one tight line in the body face */
+[data-theme=camino] #app .advisor p { font: 400 13px/1.42 var(--body); color: var(--ink); }
+
+/* action: a solid white square button, the cm-btn solid */
+[data-theme=camino] #app .adv-act .btn.ghost { background: var(--white); color: #050607; border: 1px solid var(--white); border-radius: 0; box-shadow: none; padding: 7px 11px; font: 500 10.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+[data-theme=camino] #app .adv-act .btn.ghost:hover { background: #ffffff; border-color: var(--cyan); }
+[data-theme=camino] #app .adv-act .btn.ghost:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* toast: a mono notice with a cyan rule, no shadow stack, text wraps instead of clipping */
+[data-theme=camino] #app .toast { font: 500 11.5px/1.5 var(--mono); letter-spacing: .02em; color: var(--ink); background: rgba(9, 12, 14, .82); border: 1px solid var(--hair); border-left: 2px solid var(--cyan); border-radius: 0; padding: 9px 14px 9px 12px; white-space: normal; max-width: min(540px, calc(100% - 32px)); }
