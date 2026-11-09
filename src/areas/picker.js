@@ -4,6 +4,7 @@
 // The same panel refreshes the loaded area from the latest data; saved edits carry over (see rebase.js).
 import './picker.css';
 import { bboxAround, bboxFromCorners, bboxProblem, bboxSizeM, frameFrom, slugify } from './geo.js';
+import { CAMINO } from '../camino/theme.js';
 
 const $ = (id) => document.getElementById(id);
 const SIZES = [['Block · 0.8 km', 800], ['Neighborhood · 1.2 km', 1200], ['Large · 1.8 km', 1800]];
@@ -70,9 +71,10 @@ export function drawDraft(g, LL) {
   frame = frameFrom(LL, rb);
   if (!draft) return;
   const p = LL(draft[0], draft[3]), q = LL(draft[2], draft[1]);
-  g.save(); g.setLineDash([6, 4]); g.lineWidth = 2.5; g.strokeStyle = '#2f7fb8'; g.fillStyle = 'rgba(62,159,220,.25)';
+  const C = CAMINO ? { stroke: '#2fd8e8', fill: 'rgba(47,216,232,.2)', text: '#e9eff1', font: 'Arimo, Helvetica, Arial, sans-serif' } : { stroke: '#2f7fb8', fill: 'rgba(62,159,220,.25)', text: '#1d5a85', font: 'Fraunces, Georgia, serif' };
+  g.save(); g.setLineDash([6, 4]); g.lineWidth = 2.5; g.strokeStyle = C.stroke; g.fillStyle = C.fill;
   g.fillRect(p[0], p[1], q[0] - p[0], q[1] - p[1]); g.strokeRect(p[0], p[1], q[0] - p[0], q[1] - p[1]);
-  g.setLineDash([]); g.fillStyle = '#1d5a85'; g.font = '700 12px Fraunces, Georgia, serif'; g.fillText($('laName')?.value.trim() || 'New area', p[0], p[1] - 4); g.restore();
+  g.setLineDash([]); g.fillStyle = C.text; g.font = `700 12px ${C.font}`; g.fillText($('laName')?.value.trim() || 'New area', p[0], p[1] - 4); g.restore();
 }
 
 async function find() {
