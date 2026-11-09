@@ -15,7 +15,7 @@ import { exportSignals } from '../sim/signals.js';
 import { setSignals, tickSignals } from './signals.js';
 
 const COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
-const MODES = [['Calm', 0.2], ['Normal', 0.4], ['Rush', 0.8]];
+const MODES = [['Calm', 0.5], ['Normal', 1], ['Rush', 1.8]]; // multiplies the car count the lots and the hour call for (sim/demand.js)
 const MOVING_CAP = 1400, PARKED_CAP = 6000;
 
 // ---------- vehicle models: chunky toon boxes, painted body plus a dark trim mesh (glass, wheels) ----------
@@ -60,7 +60,7 @@ function startBackend() {
   try {
     const w = new Worker(new URL('../sim/worker.js', import.meta.url), { type: 'module' });
     w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); else if (e.data.type === 'sigs') setSignals(e.data.list); };
-    w.onerror = () => { backend = localBackend(); if (st.netMsg) backend.post(st.netMsg); sendCfg(true); }; // fall back, and hand the new backend the street network it missed
+    w.onerror = () => { backend = localBackend(); if (st.zonesMsg) backend.post(st.zonesMsg); if (st.netMsg) backend.post(st.netMsg); sendCfg(true); }; // fall back, and hand the new backend the street network it missed
     return { post: (m) => w.postMessage(m) };
   } catch (err) { return localBackend(); }
 }
@@ -123,22 +123,39 @@ function edgeKey(S) {
 }
 function syncTraffic(S) {
   const key = edgeKey(S);
-  if (key === st.key) return;
+  if (key === st.key) { sendZones(S); return; }
   st.key = key;
   const control = {};
   for (const e of S.edges.values()) if (e.g) for (const n of [e.a, e.b]) { if (n == null || !S.nodes[n]) continue; const k = keyOf(S.nodes[n]); if (control[k] === undefined) control[k] = nodeControl(S, n); }
   if (!backend) backend = startBackend();
+  if (!st.zonesMsg) { st.zonesKey = null; sendZones(S); }
   st.netMsg = { type: 'net', edges: JSON.parse(JSON.stringify(drivableEdges(S.edges, drivewaysByEdge(S.lots.values())))), control, bounds: [X0, Z0, X1, Z1] };
   backend.post(st.netMsg);
   sendCfg(true);
 }
-// quieter streets at night, busy at the morning and evening peaks
-function hourFactor(h) { const bump = (c, w) => Math.exp(-((h - c) ** 2) / (2 * w * w)); return Math.min(1.25, 0.28 + 0.7 * bump(8, 1.6) + 0.85 * bump(17.3, 2) + 0.45 * bump(12.5, 2.5)); }
+// what the lots ask of the roads: [x, z, homes, jobs] at each lot's frontage (the sim snaps them to intersections)
+function lotZones(S) {
+  const out = [];
+  for (const lot of S.lots.values()) {
+    const at = lot.fp || lot.c; if (!at) continue;
+    const m2 = lot.m2 || 0, t = lot.lt;
+    const homes = t === 'house' || t === 'multi' || t === 'apts' ? Math.max(lot.u0 || 0, t === 'house' && lot.b.length ? 1 : 0) : 0;
+    const jobs = t === 'main' ? m2 / 55 : t === 'civic' ? m2 / 220 : t === 'parking' ? m2 / 260 : 0;
+    if (homes > 0 || jobs > 0.2) out.push([Math.round(at[0]), Math.round(at[1]), homes, Math.round(jobs * 10) / 10]);
+  }
+  return out;
+}
+function zonesKey(zs) { let h = zs.length; for (const z of zs) h = (Math.imul(h, 31) + z[0] * 7 + z[1] * 13 + z[2] * 101 + z[3] * 17) | 0; return h; }
 function sendCfg(force) {
   if (!backend) return;
-  const d = +(MODES[st.mode][1] * hourFactor(clock.hour)).toFixed(2), key = d + '|' + st.on;
+  const hr = Math.round(clock.hour * 4) / 4, key = MODES[st.mode][1] + '|' + hr + '|' + st.on;
   if (!force && key === st.cfgKey) return;
-  st.cfgKey = key; backend.post({ type: 'cfg', density: d, running: st.on });
+  st.cfgKey = key; backend.post({ type: 'cfg', density: MODES[st.mode][1], hour: clock.hour, running: st.on });
+}
+function sendZones(S) {
+  const zs = lotZones(S), k = zonesKey(zs);
+  if (k === st.zonesKey || !backend) return;
+  st.zonesKey = k; st.zonesMsg = { type: 'zones', zones: zs }; backend.post(st.zonesMsg);
 }
 
 // ---------- per frame: place every car from the newest snapshot plus its velocity ----------

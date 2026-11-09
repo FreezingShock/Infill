@@ -6,11 +6,13 @@ const DT = 0.05;
 
 // 'net' swaps the lane graph (with the node controls the road tools set); 'cfg' tunes the running sim.
 function applyMessage(sim, m) {
-  if (m.type === 'net') sim.setNet(buildNet(m.edges, { signals: m.signals, control: m.control, bounds: m.bounds }));
+  if (m.type === 'zones') sim.setZones(m.zones);
+  else if (m.type === 'net') sim.setNet(buildNet(m.edges, { signals: m.signals, control: m.control, bounds: m.bounds }));
   else if (m.type === 'cfg') {
     if (m.density != null) sim.density = m.density;
     if (m.running != null) sim.running = m.running;
     if (m.speed != null) sim.timeScale = m.speed;
+    if (m.hour != null) sim.hour = m.hour;
     if (m.max != null) sim.maxCars = m.max;
   }
 }
