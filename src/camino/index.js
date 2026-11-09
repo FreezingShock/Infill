@@ -2,6 +2,7 @@
 // Loaded by main.js after the app and the HUD.
 import './notify.css';
 import './look.js'; // camino.css is linked from index.html so it applies before first paint
+import { mountControls } from './controls.js';
 import { PACK } from '../engine/pack.js';
 import { X0, X1, Z0, Z1 } from '../engine/core.js';
 import { scene } from '../app/render.js';
@@ -35,6 +36,7 @@ showDossier(AREA, infraTotals(I));
 const fps = mountFps();
 mountCommandBar(); // "/" or Ctrl+K: views, tools, areas, Street/Scan and addresses
 mountHud2();
+mountControls(); // on-theme dropdowns for every select
 
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;

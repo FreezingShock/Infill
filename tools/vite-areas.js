@@ -1,10 +1,14 @@
 // Dev-server endpoints that let the game build or refresh an area pack from open data.
 //   GET  /api/areas/ping   -> { ok, python }          (the picker shows its build controls only when this answers)
-//   POST /api/areas/build  -> streams JSON lines      body: { id, name?, sub?, bbox?, refresh? }
+//   POST /api/areas/build  -> streams JSON lines      body: { id, name?, sub?, bbox?, refresh?, custom? }
+//   GET  /api/areas/export?id=<id>  -> one JSON bundle of the area (pack and sidecars) as a download
+//   POST /api/areas/install -> body: a bundle from export; adds it to the custom areas   -> { area }
+//   POST /api/areas/remove  -> body: { id }; deletes a custom area                       -> { ok }
 // It runs tools/pack/build_area.py on this machine. Only `npm run dev` has it; a production build does not.
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bundleFor, installBundle, removeCustom } from './areas-store.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(ROOT, 'tools', 'pack', 'build_area.py');
@@ -24,6 +28,7 @@ export function buildArgs(b) {
   if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(b.id || '')) throw new Error('Area id must be letters, digits and dashes.');
   const args = ['--id', b.id];
   if (b.refresh) args.push('--refresh');
+  if (b.custom) args.push('--custom');
   if (b.bbox !== undefined) {
     if (!Array.isArray(b.bbox) || b.bbox.length !== 4 || b.bbox.some((v) => typeof v !== 'number' || !Number.isFinite(v))) throw new Error('Bad area box.');
     const [W, S, E, N] = b.bbox;
@@ -44,6 +49,28 @@ export default function areasPlugin() {
         if (req.method === 'GET' && req.url.startsWith('/ping')) {
           const py = findPython();
           return json(200, { ok: !!py, python: py ? py.join(' ') : null, busy });
+        }
+        if (req.method === 'GET' && req.url.startsWith('/export')) {
+          try {
+            const id = new URL(req.url, 'http://x').searchParams.get('id') || '';
+            const b = bundleFor(ROOT, id);
+            res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename="${id}.sfvos-area.json"`); return res.end(JSON.stringify(b));
+          } catch (e) { return json(400, { error: e.message }); }
+        }
+        if (req.method === 'POST' && (req.url.startsWith('/install') || req.url.startsWith('/remove'))) {
+          const install = req.url.startsWith('/install'), limit = install ? 200e6 : 4096;
+          const chunks = []; let n = 0, tooBig = false;
+          req.on('data', (c) => { n += c.length; if (n > limit) { tooBig = true; req.destroy(); } else chunks.push(c); });
+          req.on('end', () => {
+            if (tooBig) return json(413, { error: 'That file is too large.' });
+            try {
+              const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+              if (install) return json(200, { area: installBundle(ROOT, body) });
+              removeCustom(ROOT, body.id); return json(200, { ok: true });
+            } catch (e) { return json(400, { error: e instanceof SyntaxError ? 'That file is not valid JSON.' : e.message }); }
+          });
+          return;
         }
         if (req.method !== 'POST' || !req.url.startsWith('/build')) return json(404, { error: 'Not found' });
         let raw = '';

@@ -32,3 +32,7 @@ Seeded 9 Nov 2026 from the sfvOS project chat and from nate's Deepstack notes. T
 
 ## Boot screen (2026-11-09)
 - nate likes the boot readout layout as is. He wants it pushed toward the surveillance-OS look: faint grid only in scattered patches that drift and fade (decorative, not the city map), scanlines, a slow scan band, corner brackets, numbered steps. Keep the reduce-motion path still.
+
+## Area picker and loading (2026-11-09)
+- Loading a new area was too slow and the picker felt janky. He wants a real map of the Valley (satellite or an on-theme render), address suggestions like the in-game search, a better progress bar, and custom areas he can install and remove.
+- Every scrollbar and every dropdown must be on theme, like the View and Layers menus (done app-wide in `src/camino/controls.js`).

@@ -1,0 +1,35 @@
+/* Camino form controls: scrollbars everywhere and the dropdown that replaces every native <select>.
+   The popup matches the dock's View and Layers menus (frosted panel, white top rule, mono header, cyan marker). */
+html[data-theme=camino] { scrollbar-width: thin; scrollbar-color: rgba(233, 239, 241, .28) transparent; }
+html[data-theme=camino] * { scrollbar-width: thin; scrollbar-color: rgba(233, 239, 241, .28) transparent; }
+html[data-theme=camino] ::-webkit-scrollbar { width: 9px; height: 9px; background: transparent; }
+html[data-theme=camino] ::-webkit-scrollbar-track { background: rgba(233, 239, 241, .03); border-left: 1px solid var(--hair); }
+html[data-theme=camino] ::-webkit-scrollbar-track:horizontal { border-left: 0; border-top: 1px solid var(--hair); }
+html[data-theme=camino] ::-webkit-scrollbar-thumb { background: rgba(233, 239, 241, .26); border: 0; border-radius: 0; min-height: 28px; min-width: 28px; }
+html[data-theme=camino] ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+html[data-theme=camino] ::-webkit-scrollbar-thumb:active { background: var(--white); }
+html[data-theme=camino] ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+html[data-theme=camino] ::-webkit-scrollbar-corner { background: transparent; }
+
+select.cs-native { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; clip-path: inset(50%); }
+.cs { position: relative; display: inline-flex; min-width: 0; vertical-align: middle; flex: 0 1 auto; max-width: 100%; }
+.cs.block { display: flex; width: 100%; flex: 1 1 auto; }
+.cs-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; height: 30px; padding: 0 8px 0 10px; font: 500 12px var(--display); color: var(--ink); text-align: left; cursor: pointer; background: rgba(233, 239, 241, .05); border: 1px solid var(--hair); border-radius: 2px; transition: border-color .15s, background .15s; }
+.cs-btn:hover { background: rgba(233, 239, 241, .09); border-color: var(--hair-hi); }
+.cs-btn:focus-visible { outline: 1px solid var(--cyan); outline-offset: 1px; }
+.cs-btn[aria-expanded=true] { border-color: var(--cyan); background: rgba(47, 216, 232, .07); }
+.cs-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.cs-val { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-caret { flex: none; width: 9px; height: 9px; color: var(--ink-soft); transition: transform .2s var(--ease, ease), color .15s; }
+.cs-btn[aria-expanded=true] .cs-caret { transform: rotate(180deg); color: var(--cyan); }
+.cs-pop { position: fixed; z-index: 120; min-width: 160px; max-height: 280px; overflow: auto; padding: 4px; background: var(--panel, rgba(10, 14, 17, .92)); border: 1px solid var(--hair); border-top: 2px solid var(--white); box-shadow: 0 12px 34px rgba(0, 0, 0, .5); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); animation: csIn .22s var(--ease, ease) both; }
+.cs-pop.up { animation-name: csInUp; }
+@keyframes csIn { from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-6px); } to { opacity: 1; clip-path: inset(-20px); transform: none; } }
+@keyframes csInUp { from { opacity: 0; clip-path: inset(100% 0 0 0); transform: translateY(6px); } to { opacity: 1; clip-path: inset(-20px); transform: none; } }
+.cs-grp { padding: 8px 8px 4px; font: 600 9px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); }
+.cs-opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 6px 10px 6px 12px; font: 500 12px var(--display); color: var(--ink); text-align: left; cursor: pointer; background: transparent; border: 0; border-radius: 0; position: relative; }
+.cs-opt:hover, .cs-opt.hi { background: rgba(233, 239, 241, .08); }
+.cs-opt[aria-selected=true] { background: rgba(47, 216, 232, .1); box-shadow: inset 2px 0 0 var(--cyan); }
+.cs-opt[aria-selected=true]::after { content: "ON"; margin-left: auto; font: 600 8.5px var(--mono); letter-spacing: .14em; color: var(--cyan); }
+.cs-opt[aria-disabled=true] { opacity: .4; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .cs-pop { animation: none; } }
