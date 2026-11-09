@@ -7,6 +7,7 @@ import { CAM_OFF, MAT, cam, canvas, controls, hemi, renderer, resize, scene, sun
 import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
 import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, forgetSave, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
+import { createOrbit } from './orbit.js';
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { createCaminoSky } from '../camino/sky.js';
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
@@ -560,8 +561,12 @@ addEventListener('resize', resize);
 if (saved && saved.log && saved.log.length) toast(rebaseNote(saved, AREA, ui.lastInfo) || `Welcome back: ${saved.log.length} edits restored from this browser.`);
 
 let lastShadowZoom = 0, lastNow = performance.now();
+// Cinematic idle camera (src/app/orbit.js): bird's-eye turns around the area centre until the first input.
+const orbit = createOrbit({ cam, controls, canvas, elev, enabled: !reduceMotion, bounds: (() => { let cached = null; return () => cached || (cached = (() => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const l of STATE.lots.values()) { const [x, z] = l.c; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return a > c ? [X0, Z0, X1, Z1] : [a, b, c, d]; })()); })() });
+orbit.start(performance.now());
 function frame(now) {
-  if (anim) anim(now);
+  if (anim) { orbit.stop(); anim(now); }
+  orbit.tick(now);
   controls.update(); tickRise(now); panStep(Math.min(0.05, (now - lastNow) / 1000 || 0), cam.position.distanceTo(controls.target));
   const t = controls.target; t.x = clamp(t.x, X0, X1); t.z = clamp(t.z, Z0, Z1);
   const dist = cam.position.distanceTo(t), polar = controls.getPolarAngle();
