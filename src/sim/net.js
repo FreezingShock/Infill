@@ -49,7 +49,7 @@ function buildNet(edges, opts = {}) {
     if (!lay.fwd.length && !lay.bwd.length) continue;
     const a = node(e.p[0], e.l0), b = node(e.p[e.p.length - 1], e.l1);
     if (a === b) continue;
-    const item = { e, xm: e.xm, dv: e.dv, tp: e.tp, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
+    const item = { e, xm: e.xm, dv: e.dv, tp: e.tp, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), lk: !!e.lk, speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
     a.legs.push({ item, end: 0 }); b.legs.push({ item, end: 1 });
     list.push(item);
   }
@@ -63,7 +63,7 @@ function buildNet(edges, opts = {}) {
       const pts = dir > 0 ? trimLine(base, ta, tb) : trimLine(base.slice().reverse(), tb, ta);
       const cum = cumLen(pts);
       const lane = { id: `${it.e.id}:${dir > 0 ? 'f' : 'b'}${idx}`, eid: it.e.id, dir, idx, n, off: L.off, pts, cum, len: cum.at(-1), from: dir > 0 ? it.a : it.b, to: dir > 0 ? it.b : it.a,
-        rank: it.rank, speed: it.speed, cars: [], conns: [], slots: [], reserved: 0 };
+        rank: it.rank, lk: it.lk, speed: it.speed, cars: [], conns: [], slots: [], reserved: 0 };
       lanes.push(lane); lane.from.outs.push(lane); lane.to.ins.push(lane); return lane;
     };
     it.fl = it.lay.fwd.map((L, i) => make(1, L, i, it.lay.fwd.length));
@@ -90,7 +90,12 @@ function buildNet(edges, opts = {}) {
   // pass 3: intersections
   for (const n of nodes.values()) {
     const nlegs = n.legs.length;
-    n.rank = Math.max(0, ...n.legs.map((l) => l.item.rank));
+    // Ramp terminals (general rule): where a freeway ramp meets a surface street the ramp gives way (stop or yield) to the street,
+    // or follows the signal there; the street's rank decides the node, never the ramp's freeway class.
+    const surf = n.legs.filter((l) => !l.item.lk && l.item.e.c !== 'motorway');
+    n.ramp = surf.length > 0 && n.legs.some((l) => l.item.lk);
+    const legRank = (l) => (n.ramp && l.item.lk ? 0 : l.item.rank);
+    n.rank = Math.max(0, ...(n.ramp ? surf : n.legs).map((l) => l.item.rank));
     n.nearEdge = !!bounds && (n.x < bounds[0] + 40 || n.x > bounds[2] - 40 || n.z < bounds[1] + 40 || n.z > bounds[3] - 40);
     n.portal = nlegs === 1 && n.nearEdge;
     // legs grouped by axis for signal phases
@@ -104,15 +109,15 @@ function buildNet(edges, opts = {}) {
     }
     n.phases = groups.length;
     const sig = signals.some((s) => Math.hypot(s[0] - n.x, s[1] - n.z) < 30);
-    const major = new Set(n.legs.filter((l) => l.item.rank >= 3).map((l) => l.group)).size; // crossing roads, not carriageways of one divided road
+    const major = new Set(n.legs.filter((l) => legRank(l) >= 3).map((l) => l.group)).size; // crossing roads, not carriageways of one divided road
     const set = control[n.id];
     if (nlegs >= 3 && set) {
       if (set === 'none') n.control = 'none'; // a merge: free flow, nobody stops
       else if (set === 'signal') n.control = 'signal';
       else if (set === 'allway') n.control = 'allway';
-      else { n.control = n.legs.some((l) => l.item.rank < n.rank) ? 'priority' : 'allway'; n.noStop = set === 'yield' || set === 'roundabout'; }
+      else { n.control = n.legs.some((l) => legRank(l) < n.rank) ? 'priority' : 'allway'; n.noStop = set === 'yield' || set === 'roundabout'; }
     } else if (nlegs >= 3 && (sig || (major >= 2 && nlegs >= 3 && n.phases > 1))) n.control = 'signal';
-    else if (nlegs >= 3) { const top = n.rank, low = n.legs.some((l) => l.item.rank < top); n.control = low ? 'priority' : 'allway'; }
+    else if (nlegs >= 3) { const top = n.rank, low = n.legs.some((l) => legRank(l) < top); n.control = low ? 'priority' : 'allway'; }
     n.sig = n.control === 'signal' ? planSignal(n) : null; // phasing by rule: see signals.js
     if (n.sig && !n.sig.phases.length) { n.sig = null; n.control = 'none'; } // fewer than two real approaches (a taper or ramp end): nothing to time, so traffic flows
     n.cycleOff = Math.abs(n.x * 7.3 + n.z * 3.1) % (n.sig?.cycle || 17);
@@ -147,7 +152,7 @@ function buildNet(edges, opts = {}) {
         const pts = connectorPath(c.L, c.M, c.type);
         const cum = cumLen(pts);
         const conn = { id: `${c.L.id}>${c.M.id}`, node: n, from: c.L, to: c.M, type: c.type, pts, cum, len: cum.at(-1), cars: [], conflicts: [], reserved: 0,
-          leg: li, mv: c.type === 'L' || c.type === 'U' ? 'L' : 'T', rank: c.L.rank, speed: turnSpeed(pts, Math.min(c.L.speed, c.M.speed)), group: legGroup(n, c.L) };
+          leg: li, mv: c.type === 'L' || c.type === 'U' ? 'L' : 'T', rank: n.ramp && c.L.lk ? 0 : c.L.rank, speed: turnSpeed(pts, Math.min(c.L.speed, c.M.speed)), group: legGroup(n, c.L) };
         conn.pv = conn.rank * 10 + (c.type === 'S' ? 3 : c.type === 'R' ? 2 : 1);
         c.L.conns.push(conn); n.conns.push(conn); connectors.push(conn);
       }
@@ -197,7 +202,7 @@ function drivableEdges(edgeMap, driveways) {
   const out = [];
   for (const e of edgeMap.values()) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
-    out.push({ id: e.id, p: e.p, c: e.c, l0: e.l0 || 0, l1: e.l1 || 0, dk: spansOf(e) || undefined, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0, dw: driveways?.get(e.id) });
+    out.push({ id: e.id, p: e.p, c: e.c, lk: e.s === 'link' ? 1 : 0, l0: e.l0 || 0, l1: e.l1 || 0, dk: spansOf(e) || undefined, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0, dw: driveways?.get(e.id) });
   }
   inferDivided(out);
   return out;

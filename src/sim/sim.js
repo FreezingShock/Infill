@@ -97,18 +97,27 @@ class Sim {
     if (fa !== ca) return fa < ca;
     return fd < d || (fd === d && f.id < car.id);
   }
+  // Rearmost point (metres from the lane start) of any car on `tl`, counting a long car that has already moved on into a
+  // connector but still overlaps the end of the lane. Short lanes between close junctions need this: without it a follower
+  // sees an empty lane and drives into the back of the vehicle ahead.
+  tail(tl) {
+    let pos = tl.len, v = 0, found = false;
+    const r = tl.cars[tl.cars.length - 1]; if (r) { pos = r.s - r.len; v = r.v; found = true; }
+    for (const k of tl.conns) { const q = k.cars[k.cars.length - 1]; if (!q) continue; const p = tl.len + q.s - q.len; if (p < pos) { pos = p; v = q.v; found = true; } }
+    return found ? { pos, v } : null;
+  }
   // The box stays clear: a car only enters when the exit lane has room for its whole length (plus the cars
   // already committed to that lane), so nobody ends up parked inside the junction.
   roomFor(conn, car) {
-    const tl = conn.to, rear = tl.cars[tl.cars.length - 1];
-    const free = rear ? rear.s - rear.len : tl.len;
+    const tl = conn.to, t = this.tail(tl);
+    const free = t ? t.pos : tl.len;
     const unit = Math.min(car.len + 1.5, tl.len);
     return free - tl.reserved * unit >= Math.min(unit + car.v * 0.4, tl.len);
   }
-  // true when no car on `k`'s approach reaches the junction within `need` seconds (a stopped car at the line counts as leaving now)
+  // true when no car on `k`'s approach reaches the junction within `need` seconds (a stopped car at the line counts as leaving now; a head car with nowhere to go does not count, so two blocked cars cannot wait on each other)
   gapClear(k, need) {
     const L = k.from.len;
-    for (const c of k.from.cars) { if (c.v < 0.5 && (c.i > 0 || c.wait > 4)) continue; const d = L - c.s; if (d < 120 && d / Math.max(c.v, 2.5) < need) return false; } // a queue that has stood still is not about to arrive
+    for (const c of k.from.cars) { if (c.v < 0.5 && (c.i > 0 || c.wait > 4)) continue; if (c.i === 0 && !c.granted && !this.roomFor(k, c)) continue; const d = L - c.s; if (d < 120 && d / Math.max(c.v, 2.5) < need) return false; } // a queue that has stood still is not about to arrive
     return true;
   }
   // a stop sign or an all-way stop: the car must come to rest at the line first
@@ -185,11 +194,11 @@ class Sim {
           if (c.granted) {
             const rear = plan.cars[plan.cars.length - 1];
             if (rear) { gap = d + rear.s - rear.len; vl = rear.v; }
-            else { const rr = plan.to.cars[plan.to.cars.length - 1]; if (rr) { gap = d + plan.len + rr.s - rr.len; vl = rr.v; } }
+            else { const t = this.tail(plan.to); if (t) { gap = d + plan.len + t.pos; vl = t.v; } }
           } else if (c.hold || this.stopSign(plan)) { gap = d + STOP_OFF; vl = 0; } // wall at the stop line
         }
       } else {
-        const rr = seg.to.cars[seg.to.cars.length - 1]; if (rr) { gap = d + rr.s - rr.len; vl = rr.v; }
+        const t = this.tail(seg.to); if (t) { gap = d + t.pos; vl = t.v; }
       }
     }
     let v0 = c.fac * seg.speed;
