@@ -77,3 +77,14 @@ test('imported one-way streets and recognised paving are sane in every ready pac
     assert.equal(inf.size > 0, (P.parkingInf || []).length > 0, `${a.id} lots carry pvi where paving was recognised`);
   }
 });
+
+test('backdrop files line up with their pack and stay small', () => {
+  for (const a of manifest.areas.filter((x) => x.status === 'ready' && x.bg)) {
+    const D = JSON.parse(fs.readFileSync(new URL(`../public/areas/${a.bg}`, import.meta.url)));
+    const T = D.terrain;
+    assert.equal(T.h.length, T.nx * T.nz, `${a.id} terrain grid`);
+    assert.equal(D.cells.length % 4, 0, `${a.id} cell records`);
+    assert.ok(D.core[0] > T.minx && D.core[2] < T.minx + T.nx * T.cell, `${a.id} ring surrounds the playable box`);
+    assert.ok(fs.statSync(new URL(`../public/areas/${a.bg}`, import.meta.url)).size < 2.5e6, `${a.id} backdrop under 2.5 MB`);
+  }
+});

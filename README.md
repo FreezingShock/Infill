@@ -23,6 +23,8 @@ Vite opens http://localhost:5173 with Woodland Hills (Topanga Canyon Blvd) loade
 
 With `npm run dev` running (and Python 3 installed), **Change area** has a *Load any spot in the Valley* box: search an address or place, or click or drag a box on the map, name it and press **Build this area**. It pulls real streets, buildings, parking and terrain (Overture Maps, AWS terrain) and, inside the City of LA, the real parcel boundaries, zoning and permit years from data.lacity.org, then opens the result. The first build installs a few Python packages into `tools/pack/.venv`; after that it takes about a minute. Outside the city the lots are estimated from address points.
 
+**The edge of the map** is not a wall: the real surroundings (terrain, main streets, buildings as soft blocks) fade into the fog. Point at them to see the box you could open, and click to open the area already built there or to start a new one. Each area's `<id>.bg.json` is built with it (`tools/pack/backdrop.py`).
+
 **Refresh this area's data** re-pulls the data for the highlighted area. Lots and streets keep their ids, so your saved edits carry over; any that no longer fit are skipped and counted when the area reopens. The same builder runs from the command line: `python tools/pack/build_area.py --id canoga-park --bbox=-118.6082,34.1955,-118.5958,34.2065` (add `--refresh` to rebuild an existing area).
 
 Other scripts:

@@ -124,3 +124,17 @@ async function build({ bbox, name, id, refresh }) {
     busy = false; progress(null, e.message, true); syncBuild(); $('laRefresh').disabled = !devServer;
   }
 }
+
+/** The backdrop was clicked at a lon/lat: open the area that is already built there, or start a new box on the map. */
+export async function proposeAt({ lon, lat }) {
+  if (!ctx) return;
+  $('areaBtn').click();
+  const hit = ctx.AREAS.areas.find((a) => a.status === 'ready' && a.bbox && lon >= a.bbox[0] && lon <= a.bbox[2] && lat >= a.bbox[1] && lat <= a.bbox[3]);
+  if (hit) { $('alist').querySelector(`[data-area="${hit.id}"]`)?.click(); return; }
+  setDraft(bboxAround(lon, lat, +$('laSize').value)); $('laName').value = ''; syncBuild();
+  try { // suggest a name from the neighbourhood under the click
+    const r = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&lat=${lat}&lon=${lon}`)).json();
+    const a = r.address || {}, nm = a.neighbourhood || a.suburb || a.quarter || a.city_district || a.city || '';
+    if (nm && !$('laName').value.trim()) { $('laName').value = nm; syncBuild(); ctx.redraw(); }
+  } catch { /* offline: the player names it */ }
+}
