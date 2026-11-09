@@ -161,7 +161,7 @@ function connectorPath(L, M, type) {
 function drivableEdges(edgeMap) {
   const out = [];
   for (const e of edgeMap.values()) {
-    if (!e.g || e.s === 'driveway' || !e.prof) continue;
+    if (!e.g || e.xmed || e.s === 'driveway' || !e.prof) continue; // xmed: median opening closed, not a road
     out.push({ id: e.id, p: e.p, c: e.c, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
   }
   inferDivided(out);

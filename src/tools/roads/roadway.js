@@ -13,7 +13,7 @@ const CELL = 40;
 function roadwayIndex(edges) {
   const grid = new Map(), items = [];
   for (const e of edges) {
-    if (!e.g || !e.prof || !e.p || e.p.length < 2 || e.s === 'driveway') continue;
+    if (!e.g || e.xmed || !e.prof || !e.p || e.p.length < 2 || e.s === 'driveway') continue;
     let o = 0, lo = Infinity, hi = -Infinity;
     const row = e.prof.els.reduce((s, q) => s + q[1], 0); o = -row / 2;
     for (const [k, w] of e.prof.els) { if (!NOT_ROADWAY.has(k)) { lo = Math.min(lo, o); hi = Math.max(hi, o + w); } o += w; }

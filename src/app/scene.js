@@ -104,6 +104,7 @@ function buildRoads(S) {
   const E = [...S.edges.values()].sort((a, b) => (ROAD_ORDER[a.c] ?? 0) - (ROAD_ORDER[b.c] ?? 0));
   const RP = roadPlan(S, PACK.walks), RW = roadwayIndex(E);
   for (const pass of [0, 1]) for (const e of E) {
+    if (e.xmed) continue; // the median continues across a closed opening
     const P = drawPath(e), els = e.prof.els, row = rowWidth(e.prof), base = 0.26 + (ROAD_ORDER[e.c] ?? 0) * 0.02;
     if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, P, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : ASPH[e.c] || ASPH.service); continue; }
     let o = -row / 2;

@@ -1,5 +1,5 @@
 import { bbox, clamp, nearestOnLine, offsetLine, polyLen } from '../../engine/core.js';
-import { ARTERIAL, roadClassOf } from './classes.js';
+import { ARTERIAL, rankOf, roadClassOf } from './classes.js';
 
 // =====================================================================
 // Divided roads (corridors). Map data draws a boulevard as two one-way pieces with whatever gap the mapper
@@ -44,9 +44,9 @@ function gapTo(e1, e2) {
 }
 
 // One carriageway, median side first: [half median, lanes, parking/bus lane, sidewalk].
-function carriageEls(rc, d) {
+function carriageEls(rc) {
   const A = rc === 'arterial' ? ARTERIAL : { walk: 2.2, park: 2, lane: 3.4, n: 1, median: 3 };
-  const n = rc === 'arterial' && d > 19 ? A.n + 1 : A.n;
+  const n = A.n; // lane count is a property of the class, so it never jumps along a road or across a merge
   return { n, els: [['median', A.median / 2], ...Array.from({ length: n }, () => ['lane', A.lane]), ['park', A.park], ['walk', A.walk]] };
 }
 // median on the side facing the partner. offsetLine(+) side is the end of the list.
@@ -117,9 +117,9 @@ function markDivided(S) {
     if (best && bd >= 7) found.set(e1.id, { e: e1, partner: best.e, d: bd, taper: best.taper });
   }
   const pairs = [], tapers = [];
-  for (const { e, partner, d, taper } of found.values()) {
+  for (const { e, partner, taper } of found.values()) {
     if (!found.has(partner.id)) continue; // both halves must agree
-    const { n, els } = carriageEls(roadClassOf(e), d);
+    const { n, els } = carriageEls(roadClassOf(e));
     e.prof = { k: 'asbuilt', els: oriented(e, partner, els) }; e.oneway = 1; e.divided = 1; e.dn = n;
     e.w = rowWidth(e.prof) - ARTERIAL.walk - els[0][1];
     if (taper) { e.taper = 1; tapers.push(e); } else pairs.push([e, partner]);
@@ -148,7 +148,24 @@ function markDivided(S) {
     const lanes = via.prof.els.filter((x) => x[0] === 'lane'); if (!lanes.length) continue;
     c.prof = { k: 'asbuilt', els: lanes.map((x) => ['lane', x[1]]) }; c.oneway = 1; c.divided = 1; c.w = lanes.length * lanes[0][1];
   }
+  closeMedianOpenings(S);
   return pairs.length + tapers.length;
+}
+
+// Where a residential street meets a divided arterial, the median continues across: the short piece that bridged the two
+// carriageways is not a road. Cars on the side street can only turn right in and right out (nothing crosses or turns left),
+// which falls out of the graph because the two carriageways no longer connect through it. Collectors and up keep their opening.
+function closeMedianOpenings(S) {
+  S.mclosed = {};
+  const div = (n) => [...S.edges.values()].filter((q) => q.g && q.divided && !q.xmed && (q.a === n || q.b === n));
+  for (const c of S.edges.values()) {
+    if (!c.g || c.divided || c.xmed || c.s === 'driveway' || polyLen(c.p) > 22) continue;
+    const da = div(c.a), db = div(c.b); if (!da.length || !db.length) continue;
+    if (!da.some((x) => db.some((y) => x !== y && x.n && x.n === y.n))) continue;
+    const others = [...S.edges.values()].filter((q) => q !== c && q.g && !q.divided && (q.a === c.a || q.b === c.a || q.a === c.b || q.b === c.b));
+    if (!others.length || others.some((q) => rankOf(q) > 1)) continue;
+    c.xmed = 1; S.mclosed[c.a] = 1; S.mclosed[c.b] = 1;
+  }
 }
 
 // The path to draw an edge along. Traffic uses e.p; a merge piece draws parallel to the road axis (e.dp).

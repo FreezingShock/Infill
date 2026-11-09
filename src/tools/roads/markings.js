@@ -10,7 +10,7 @@ import { rankOf } from './classes.js';
 //   - medians end before the crosswalk with a rounded nose
 // One rule for every junction in every area.
 // =====================================================================
-const SKIP_LEG = (e) => e.s === 'driveway' || e.s === 'alley' || e.prof?.k === 'plain';
+const SKIP_LEG = (e) => e.xmed || e.s === 'driveway' || e.s === 'alley' || e.prof?.k === 'plain';
 const BOX_MIN = 4, CW_HALF = 1.5, BAR_GAP = 1.3, NOSE_GAP = 0.6, NOSE_R = 1.75;
 
 // point and tangent (a to b) at distance d from the start of polyline p
@@ -65,6 +65,7 @@ function analyse(S) {
       es.forEach((q, j) => { if (j === i) return; const d = dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]; if (Math.abs(d) < 0.8) box = Math.max(box, rowWidth(q.prof) / 2); });
       // a main road meeting only minor streets has priority: its lines run through, nothing crosses it
       const rk = rankOf, priority = rk(e) >= 2 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 1);
+      if (priority && S.mclosed?.[n]) { get(e); return; } // the median runs straight across a closed opening: no gap, no nose
       if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); legs.push({ e, n, atEnd, D: box + 2.2, priority: true }); return; }
       const D = box + 2.2, len = polyLen(e.p);
       if (len < 2 * (D + CW_HALF + BAR_GAP) + 4) { const r = get(e); if (atEnd) r.t1 = len; else r.t0 = len; return; } // a short link inside the box: no markings at all
