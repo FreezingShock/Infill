@@ -33,8 +33,8 @@ const ICONS = {
   doze: '<path d="M1 13h10v-4H6L4 6H1z" fill="currentColor"/><path d="M11 6l4 2v6h-3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="3.5" cy="14" r="1.5" fill="currentColor"/><circle cx="8.5" cy="14" r="1.5" fill="currentColor"/>',
 };
 // Five everyday tools; the precise selection tools live in the Advanced drawer
-const TOOLS = [['select', 'Look', 'V'], ['build', 'Build', 'P'], ['roads', 'Roads', 'D'], ['doze', 'Bulldoze', 'X']];
-const ADV_TOOLS = [['box', 'Box', 'R'], ['lasso', 'Lasso', 'L'], ['brush', 'Brush', ''], ['along', 'Along street', 'S'], ['edit', 'Edit streets', 'E'], ['area', 'New area', 'A'], ['zone', 'Paint zones', 'Z']];
+const TOOLS = [['select', 'Look', 'V'], ['build', 'Build', 'P'], ['roads', 'Roads', 'G'], ['doze', 'Bulldoze', 'X']];
+const ADV_TOOLS = [['box', 'Box', 'R'], ['lasso', 'Lasso', 'L'], ['brush', 'Brush', ''], ['along', 'Along street', 'J'], ['edit', 'Edit streets', 'K'], ['area', 'New area', 'U'], ['zone', 'Paint zones', 'Z']];
 const DRAG_TOOLS = new Set(['box', 'lasso', 'brush', 'along', 'zone', 'build', 'doze']);
 const toolBtn = ([k, n, key]) => `<button class="tool" data-tool="${k}" aria-pressed="${ui.tool === k}" title="${n}${key ? ` (${key})` : ''}"><svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[k]}</svg>${n}${key ? `<kbd>${key}</kbd>` : ''}</button>`;
 function renderTools() {
@@ -325,9 +325,24 @@ function placeHandles() {
 function positionHandles() { $('labels').querySelectorAll('.handle-dot').forEach((h) => { const p = h._p; const [x, y] = screenOf(p[0], elev(p[0], p[1]) + 1, p[1]); h.style.left = x + 'px'; h.style.top = y + 'px'; }); }
 
 // ---------- keys ----------
+const panKeys = new Set(); // W A S D held: pan along the ground relative to the view
+window.addEventListener('keyup', (e) => panKeys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => panKeys.clear());
+const panV = new THREE.Vector3();
+function panStep(dt, dist) {
+  if (!panKeys.size || anim) return;
+  const fx = controls.target.x - cam.position.x, fz = controls.target.z - cam.position.z, L = Math.hypot(fx, fz) || 1;
+  const dx = fx / L, dz = fz / L; // forward on the ground; right is (-dz, dx)
+  const f = (panKeys.has('w') ? 1 : 0) - (panKeys.has('s') ? 1 : 0), r = (panKeys.has('d') ? 1 : 0) - (panKeys.has('a') ? 1 : 0);
+  if (!f && !r) return;
+  const v = dist * 0.9 * dt / Math.hypot(f, r);
+  panV.set(dx * f - dz * r, 0, dz * f + dx * r).multiplyScalar(v);
+  controls.target.add(panV); cam.position.add(panV);
+}
 window.addEventListener('keydown', (e) => {
   if (e.target.closest && e.target.closest('input, select, textarea')) { if (e.key === 'Escape') e.target.blur(); return; }
   const k = e.key.toLowerCase();
+  if (!(e.ctrlKey || e.metaKey || e.altKey) && 'wasd'.includes(k) && k.length === 1) { panKeys.add(k); e.preventDefault(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -338,7 +353,7 @@ window.addEventListener('keydown', (e) => {
   if ((e.key === 'Delete' || e.key === 'Backspace') && (ui.tool === 'edit' || ui.tool === 'roads' || ui.tool === 'select') && ui.edgeSel.size) { e.preventDefault(); deleteEdges(); return; }
   const tool = [...TOOLS, ...(ui.adv ? ADV_TOOLS : [])].find((t) => t[2] && t[2].toLowerCase() === k); if (tool) { setTool(tool[0]); return; }
   if (k === 'b') toggleView('asbuilt'); else if (k === 'c') toggleView('split'); else if (k === 't') toggleView('color'); else if (k === 'n') toggleView('night');
-  else if (k === 'q' || k === 'w') { const off = cam.position.clone().sub(controls.target); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (k === 'q' ? 1 : -1) * Math.PI / 12); cam.position.copy(controls.target).add(off); }
+  else if (k === 'q' || k === 'e') { const off = cam.position.clone().sub(controls.target); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (k === 'q' ? 1 : -1) * Math.PI / 12); cam.position.copy(controls.target).add(off); }
   else if (e.key === '[' || e.key === ']') { const off = cam.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.phi = clamp(sph.phi + (e.key === ']' ? 0.1 : -0.1), 0.12, 1.42); cam.position.copy(controls.target).add(off.setFromSpherical(sph)); }
   else if (e.key === '?') { $('keysm').hidden = false; }
 });
@@ -517,7 +532,7 @@ if (saved && saved.log && saved.log.length) toast(`Welcome back: ${saved.log.len
 let lastShadowZoom = 0, lastNow = performance.now();
 function frame(now) {
   if (anim) anim(now);
-  controls.update(); tickRise(now);
+  controls.update(); tickRise(now); panStep(Math.min(0.05, (now - lastNow) / 1000 || 0), cam.position.distanceTo(controls.target));
   const t = controls.target; t.x = clamp(t.x, X0, X1); t.z = clamp(t.z, Z0, Z1);
   const dist = cam.position.distanceTo(t), polar = controls.getPolarAngle();
   const nf = nearFar(dist, polar); if (Math.abs(nf.near - cam.near) > 0.05 || Math.abs(nf.far - cam.far) > 5) { cam.near = nf.near; cam.far = nf.far; cam.updateProjectionMatrix(); }
