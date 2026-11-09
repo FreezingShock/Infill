@@ -17,15 +17,15 @@
    "sub": "Topanga Canyon Blvd \u00b7 Ventura Blvd to Lopez St",
    "main": "Topanga Canyon",
    "bbox": [
-    -118.6115,
-    34.159,
-    -118.599,
-    34.17
+    -118.6215,
+    34.151,
+    -118.589,
+    34.1781
    ],
    "pack": "wh-topanga.json",
    "status": "ready",
    "built": "2026-11-09",
-   "lots": 1300,
+   "lots": 5735,
    "parcels": "city",
    "bg": "wh-topanga.bg.json",
    "infra": "wh-topanga.infra.json"
@@ -36,10 +36,10 @@
    "sub": "Owensmouth Ave and Sherman Way",
    "main": "Sherman Way",
    "bbox": [
-    -118.6082,
-    34.1955,
-    -118.5958,
-    34.2065
+    -118.6183,
+    34.1865,
+    -118.5858,
+    34.2136
    ],
    "pack": "canoga-park.json",
    "status": "ready",
@@ -238,6 +238,25 @@
    "parcels": "city",
    "bg": "north-hollywood.bg.json",
    "infra": "north-hollywood.infra.json"
+  },
+  {
+   "id": "west-hills",
+   "name": "West Hills",
+   "sub": "Valley Circle Blvd and Platt Ave",
+   "main": "Vanowen",
+   "bbox": [
+    -118.652,
+    34.19,
+    -118.6195,
+    34.2171
+   ],
+   "pack": "west-hills.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 6779,
+   "parcels": "city",
+   "bg": "west-hills.bg.json",
+   "infra": "west-hills.infra.json"
   }
  ]
 }

@@ -9,10 +9,10 @@ function applyLooks(sidecar) {
   if (sidecar) setLooksData(sidecar, PACK.buildings.length, packChecksum(PACK.buildings));
 }
 
-// jobs: [{ h, lot, demo }] where demo lists the demolished building indexes that touch this lot.
+// jobs: [{ h, lot, demo, geo }] (geo false = numbers only, no meshes) where demo lists the demolished building indexes that touch this lot.
 // genLot only reads S.demo (through liveBuildings), so that is all the worker needs of the city state.
 function genBatch(jobs) {
-  return encodeBatch(jobs.map((j) => ({ h: j.h, g: genLot(j.lot, { demo: new Set(j.demo) }) })));
+  return encodeBatch(jobs.map((j) => ({ h: j.h, g: genLot(j.lot, { demo: new Set(j.demo) }), geo: j.geo })));
 }
 
 export { applyLooks, genBatch };

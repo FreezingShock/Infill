@@ -119,6 +119,7 @@ function buildNet(edges, opts = {}) {
     } else if (nlegs >= 3 && (sig || (major >= 2 && nlegs >= 3 && n.phases > 1))) n.control = 'signal';
     else if (nlegs >= 3) { const top = n.rank, low = n.legs.some((l) => legRank(l) < top); n.control = low ? 'priority' : 'allway'; }
     n.sig = n.control === 'signal' ? planSignal(n) : null; // phasing by rule: see signals.js
+    if (n.sig && !n.sig.phases.length) { n.sig = null; n.control = 'none'; } // fewer than two real approaches (a taper or ramp end): nothing to time, so traffic flows
     n.cycleOff = Math.abs(n.x * 7.3 + n.z * 3.1) % (n.sig?.cycle || 17);
     // connectors
     for (const L of n.portal ? [] : n.ins) {

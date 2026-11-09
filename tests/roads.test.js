@@ -6,7 +6,9 @@ import fs from 'node:fs';
 const manifest = JSON.parse(fs.readFileSync(new URL('../public/areas/index.json', import.meta.url)));
 const area = manifest.areas.find((a) => a.id === manifest.default);
 globalThis.__RENOVATED_AREA__ = area;
-globalThis.__RENOVATED_PACK__ = JSON.parse(fs.readFileSync(new URL(`../public/areas/${area.pack}`, import.meta.url)));
+// these tests name Topanga's edges (E113, E103...), so they run on the compact 1.2 km Woodland Hills pack kept as a fixture;
+// the area itself has grown and edge ids move with the box. General rules are tested on the shipped pack in driveways, signals and areas tests.
+globalThis.__RENOVATED_PACK__ = JSON.parse(fs.readFileSync(new URL('./fixtures/topanga-compact.json', import.meta.url)));
 
 const { BASE, replay } = await import('../src/engine/commands.js');
 const shapes = await import('../src/tools/roads/shapes.js');

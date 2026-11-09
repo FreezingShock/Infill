@@ -20,7 +20,7 @@ let STATE = structuredClone(BASE), LOG = [], CUR = 0, SNAPS = [BASE], IDX = null
 const ui = { tool: 'select', sel: new Set(), filters: {}, groups: {}, dream: false, vary: true, tab: 'build', edgeSel: new Set(), splitOn: false, split: 0.5, asbuilt: false, color: 0, lotsOn: true, night: false,
   brushR: 18, alongBoth: true, zonePaint: 'R3-1', draw: null, area: null, skipped: null, scope: 'area', showOther: false, nStep: 3, drawProf: 'local', drawName: '', smooth: true, lastInfo: null,
   item: 'up.floor', copied: null, adv: false, custom: false, pick: [] };
-const world = new World(), beforeW = new World();
+const world = new World({ pin: true }), beforeW = new World();
 const overlays = new THREE.Group(), helpers = new THREE.Group();
 const C_SEL = C(0x3e9fdc), C_WARN = C(0xd04a32), C_HOVER = C(0xf5f2ea);
 const LAND = (X1 - X0) * (Z1 - Z0);

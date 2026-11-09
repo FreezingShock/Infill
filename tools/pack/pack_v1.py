@@ -1,4 +1,4 @@
-import json, math, sys
+import json, math, os, sys
 from shapely.geometry import shape, box, Point, LineString, Polygon, MultiPolygon, MultiPoint
 from shapely.ops import polygonize, unary_union
 import shapely
@@ -7,6 +7,7 @@ from PIL import Image
 D = sys.argv[1]
 W,S,E,N = map(float, (sys.argv[3] if len(sys.argv) > 3 else '-118.6115,34.1590,-118.5990,34.1700').split(','))  # lon/lat box; default is the Woodland Hills pack
 lat0=(S+N)/2; lon0=(W+E)/2
+if os.environ.get('PACK_ORIGIN'): lon0, lat0 = map(float, os.environ['PACK_ORIGIN'].split(','))  # a refresh keeps the old origin, so every coordinate (saves, sidecars) stays where it was
 KX = math.cos(math.radians(lat0))*111320; KY = 110540
 def P(lon,lat): return ((lon-lon0)*KX, -(lat-lat0)*KY)   # x east, z south
 def tr(g): return shapely.transform(g, lambda a: __import__('numpy').column_stack([(a[:,0]-lon0)*KX, -(a[:,1]-lat0)*KY]))

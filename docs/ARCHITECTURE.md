@@ -58,6 +58,15 @@ Edit `tools/pack/` (recognize, pack2, bulbs, rowwidth), write optional fields on
 ### Add a worker job
 Use `src/workers/pool.js`; send typed arrays as transferables; keep the page-thread fallback (12 ms slices) working. Log timings in `docs/perf-baseline.md`.
 
+## Big areas: detail streaming (`src/engine/lod.js`, `src/app/lod.js`)
+An area with more than 2,500 lots (Woodland Hills, Canoga Park and West Hills are about 3 km a side, 5,000 to 6,000 lots) cannot keep full-detail meshes for every lot (about 34 KB each). So `lod.on` is set at start-up and:
+- **Chunks** are the 110 m lot chunks `World` already merges. `DETAIL` (a `DetailSet`) holds the chunks near the view centre (radius 320 to 700 m, grows with zoom, drops at 1.35x so edges do not flicker) plus **pinned** chunks, those holding any lot that differs from the base city (edits, growth, demolitions), which always keep detail.
+- **Slim lots.** Every lot is still generated once (on the worker pool), because scores read its units, parking and so on, but a lot outside `DETAIL` is encoded without meshes (`geo: false` in `workers/codec.js`) and keeps its trees and parked cars only as numbers. `genCached(lot, S, geo)` returns the slim copy for stats and upgrades it only when `geo` is asked for. Anything that just needs numbers (scores, palette, zoning driver) calls it as before.
+- **Massing.** `massingChunks` merges plain extruded footprints and parking pads of every base building into one mesh per chunk; it is hidden wherever the world has a detailed chunk. Yard trees and parked cars are only instanced in detailed chunks (street trees and mapped scenery are always drawn).
+- **Streaming.** `lodTick(target, dist)` runs every frame and does nothing until the view moves 30 m or zooms 15%; then it updates `DETAIL`, builds meshes for newly near lots through `prewarm(STATE, true)` and re-syncs the world. The as-built world (`beforeW`) is only built the first time it is shown.
+- Small areas keep `lod.on = false` and run exactly as before. Force it with `?lod=1` or `?lod=0`.
+New code that needs per-lot meshes must go through `genCached(lot, S, true)`; code that only needs numbers must not.
+
 ## Tests
 `npm test` runs `node --test tests/*.test.js`. Engine, sim, views, roads, camino and areas tests all run in plain node (DOM stubbed where needed). `npm run check` adds eslint and a production build; CI (`.github/workflows/check.yml`) runs it on every PR to `integration` and `main`.
 

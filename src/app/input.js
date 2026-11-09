@@ -20,6 +20,8 @@ import { initPicker, openPicker, proposeAt } from '../areas/picker.js';
 import { initBackdrop } from '../areas/backdrop.js';
 import { rebaseNote } from '../areas/rebase.js';
 import { warmStart } from '../workers/warm.js';
+import { initLod, lodTick } from './lod.js';
+import { lod } from '../engine/lod.js';
 
 // =====================================================================
 // Tools and input
@@ -504,8 +506,9 @@ function updateScale() {
 const [terrain, skirt] = buildTerrain();
 const walks = buildWalks(), props = buildProps(); lampMat = props.userData.lampMat; refreshLight();
 scene.add(terrain, skirt, walks, props, beforeW.group, world.group, overlays, helpers);
+initLod({ scene, world, beforeW, getState: () => STATE, dist: CAM_OFF.length() }); // big areas: full detail only near the camera (src/app/lod.js)
 await warmStart(BASE); // lot geometry builds on the worker pool while the loader shows progress
-beforeW.sync(BASE);
+if (!lod.on) beforeW.sync(BASE); // big areas build the as-built copy the first time it is shown
 const saved = load();
 if (saved && Array.isArray(saved.log) && saved.log.length) { loadEdits(saved.log); ui.groups = saved.groups || {}; if (saved.dream) setMode(true); }
 else if (saved) ui.groups = saved.groups || {};
@@ -544,6 +547,8 @@ function frame(now) {
   sun.position.copy(t).addScaledVector(sunDir, SUN_DIST); sun.target.position.copy(t);
   const zoom = zoomForDist(dist);
   if (Math.abs(zoom - lastShadowZoom) / zoom > 0.04) { const half = Math.min(520, Math.max(70, 330 / zoom * 1.1)); Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 1600 }); sun.shadow.camera.updateProjectionMatrix(); lastShadowZoom = zoom; }
+  lodTick(t, dist);
+  if (lod.on && !beforeW.synced && (ui.asbuilt || ui.splitOn)) beforeW.sync(BASE);
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (ui.splitOn) {
     const sx = Math.round(w * ui.split); renderer.setScissorTest(true);

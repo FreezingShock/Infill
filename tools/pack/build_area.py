@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 AREAS = os.path.join(ROOT, 'public', 'areas')
 DEPS = ['s3fs', 'pyarrow', 'shapely', 'pillow', 'numpy']
-MAX_SIDE_M = 2600  # keep an area playable: the game builds every lot of the pack
+MAX_SIDE_M = 3400  # the game draws far lots as cheap massing and builds detail near the camera (src/app/lod.js)
 
 
 # The stages the picker shows, in order. Each say() names one of them.
@@ -195,7 +195,10 @@ def main():
     bb = ','.join(map(str, bbox))
     say('streets', 'Building streets, blocks and terrain', 40)
     v1 = os.path.join(work, 'pack_v1.json')
-    subprocess.check_call([sys.executable, os.path.join(HERE, 'pack_v1.py'), work, v1, bb], stdout=subprocess.DEVNULL)
+    v1env = dict(os.environ)
+    if prev:  # same origin as the pack being refreshed: growing or moving the box must not shift existing coordinates
+        o = json.load(open(prev))['origin']; v1env['PACK_ORIGIN'] = f'{o[0]},{o[1]}'
+    subprocess.check_call([sys.executable, os.path.join(HERE, 'pack_v1.py'), work, v1, bb], stdout=subprocess.DEVNULL, env=v1env)
     say('lots', 'Cutting lots, placing buildings, parking and props', 58)
     tmp = out + '.tmp'
     env = dict(os.environ, PREV_PACK=prev or '')
