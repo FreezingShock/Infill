@@ -104,3 +104,9 @@ test('where a divided road meets the undivided one, the taper has lanes only (no
   assert.ok(tapers.length >= 2);
   for (const e of tapers) { assert.equal(e.oneway, 1); assert.ok(e.prof.els.every((x) => x[0] === 'lane'), `${e.id} lanes only`); }
 });
+
+test('each taper pair gets a median wedge polygon', async () => {
+  const { taperMedians } = await import('../src/tools/roads/divided.js');
+  const w = taperMedians(BASE);
+  assert.ok(w.length >= 1 && w.every((r) => r.length >= 4));
+});

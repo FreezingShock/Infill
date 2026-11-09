@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
 import { hasCanopy, streetTreesAll } from '../engine/streettrees.js';
 import { addBulbs } from '../engine/bulbs.js';
-import { Acc, C, HG, T, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
+import { taperMedians } from '../tools/roads/divided.js';
+import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { BASE } from '../engine/commands.js';
@@ -126,6 +127,7 @@ function buildRoads(S) {
   }
   for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
   addBulbs(acc, S, ASPH.residential, C(EL.walk.c)); // cul-de-sac turnarounds (src/engine/bulbs.js)
+  for (const w of taperMedians(S)) decal(acc, w, 0.2, C(EL.median.c), 6); // median wedge where a divided road closes up
   const grp = new THREE.Group();
   const m1 = new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); m1.receiveShadow = true;
   const m2 = new THREE.Mesh(marks.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
