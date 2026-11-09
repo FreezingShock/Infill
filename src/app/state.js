@@ -7,6 +7,7 @@ import { BASE, exec } from '../engine/commands.js';
 import { MAT } from './render.js';
 import { LotIndex, World, genCached, lotObject } from './scene.js';
 import { renderCard } from './inspector.js';
+import { syncTraffic } from '../views/traffic.js';
 import { buildLabels, renderViews } from './input.js';
 
 // =====================================================================
@@ -88,7 +89,7 @@ function refresh(anim) {
   for (const id of [...ui.sel]) if (!STATE.lots.has(id)) ui.sel.delete(id);
   for (const id of [...ui.edgeSel]) if (!STATE.edges.has(id)) ui.edgeSel.delete(id);
   if (hold.size) startRise([...hold]);
-  buildLotLines(); buildColor(); buildFlags(); buildSel(); buildEdgeSel(); buildLabels(); renderHud();
+  buildLotLines(); buildColor(); buildFlags(); buildSel(); buildEdgeSel(); buildLabels(); renderHud(); syncTraffic(STATE);
   dispatchEvent(new Event('infill:state')); // info views and the HUD listen
 }
 function startRise(ids) {
