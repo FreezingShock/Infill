@@ -4,7 +4,7 @@ import { markDivided } from '../tools/roads/divided.js';
 import { ARTERIAL, classify } from '../tools/roads/classes.js';
 import { smoothSwerves } from '../tools/roads/swerves.js';
 import { planLevels } from './levels.js';
-import { planDriveway } from './driveways.js';
+import { frontageRings, planDriveway } from './driveways.js';
 import { area, bbox, centroid, elev, inPoly, nearestOnLine, pcSafe, pick, ringDistToLine, rng, segDist2, toPC } from './core.js';
 
 // =====================================================================
@@ -173,6 +173,8 @@ function lotDriveway(lot, S) {
   // plan on the true frontage point of the driveway, not the lot centroid: es is re-read from the chosen s
   const dw = planDriveway(lot, F, rings, { prof: e.prof, side, gap, es, rd: e.id });
   if (!dw) return null;
+  const rg = frontageRings({ ...lot, dw }, F), mid = rg && rg.drive && rg.drive.reduce((q, p) => [q[0] + p[0] / 4, q[1] + p[1] / 4], [0, 0]);
+  if (mid && !inPoly(mid[0], mid[1], lot.r)) return null; // an L-shaped or notched lot whose frontage strip lies outside it: no driveway rather than one on the neighbour's land
   const pt = F.P(dw.s, 0), h = nearestOnLine(e.p, pt[0], pt[1]), a0 = e.p[h.i], b0 = e.p[h.i + 1];
   let at = 0; for (let i = 0; i < h.i; i++) at += Math.hypot(e.p[i + 1][0] - e.p[i][0], e.p[i + 1][1] - e.p[i][1]);
   dw.es = Math.round((at + h.t * Math.hypot(b0[0] - a0[0], b0[1] - a0[1])) * 10) / 10;

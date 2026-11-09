@@ -34,9 +34,17 @@ function roadwayIndex(edges) {
   }
   // the nearest point just off the pavement (a gap beyond the roadway edge), or the point itself when it is already clear
   function nudge(x, z, gap = 0.9) {
-    const h = hit(x, z, 0); if (!h) return [x, z];
-    const t = h.lat < (h.it.lo + h.it.hi) / 2 ? h.it.lo - gap : h.it.hi + gap;
-    return [h.q.x + h.n[0] * t, h.q.z + h.n[1] * t];
+    // pushed off one roadway a point can land in the next (a junction wedge between two roads), so try both sides of
+    // each roadway in the way, a few levels deep, and keep the nearest point that is clear of all of them
+    const x0 = x, z0 = z; let best = null;
+    const go = (px, pz, depth) => {
+      const h = hit(px, pz, 0);
+      if (!h) { const d = Math.hypot(px - x0, pz - z0); if (!best || d < best.d) best = { d, p: [px, pz] }; return; }
+      if (depth === 0) return;
+      for (const t of [h.it.lo - gap, h.it.hi + gap]) go(h.q.x + h.n[0] * t, h.q.z + h.n[1] * t, depth - 1);
+    };
+    go(x, z, 4);
+    return best ? best.p : [x, z];
   }
   // A mapped footpath runs across the street in the data. Keep only the parts off the pavement; the crosswalks are drawn at junctions.
   function clipWalk(p) {

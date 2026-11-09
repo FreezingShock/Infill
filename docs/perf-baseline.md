@@ -28,3 +28,14 @@ Canoga Park box (1.2 km, 965 lots), cloud box, sequential steps before vs parall
 | Pack, imagery, bulbs | 8 s | 7 s |
 | Backdrop + infrastructure | 105 s | 21 s (side by side) |
 | **Total** | **173 s** | **35 s** |
+
+## Big areas (3 km a side), 9 Nov 2026, area expansion thread
+Plain node on the cloud box, so ratios and not frame times. Old areas: 1.2 km, 630 to 1,300 lots.
+| Area | Lots | Pack | Parse | Base city build (page thread) | genLot, every lot | Massing for all buildings |
+| --- | --- | --- | --- | --- | --- | --- |
+| Woodland Hills | 5,734 | 5.7 MB | 0.13 s | 5.3 s | 12 s CPU (3 s on 4 workers) | 23 MB, 0.22 s |
+| Canoga Park | 5,720 | 5.7 MB | 0.08 s | 5.9 s | 14 s CPU | 25 MB, 0.29 s |
+| West Hills | 6,779 | 6.0 MB | 0.12 s | 10.5 s | 24 s CPU | 21 MB, 0.30 s |
+- Full-detail meshes are about 34 KB a lot, so ~195 MB for 5,700 lots if every lot were detailed. With detail streaming (`src/engine/lod.js`) only the chunks within 320 to 700 m of the camera (a few hundred lots) hold meshes; the rest is the massing above (about 10 times lighter) plus the numbers each lot keeps for the scores.
+- The base city build was 11 s before the driveway scan got box rejects (`planDriveway`), same output. What is left in it is the driveway probe per lot; moving `buildBase` into a worker or caching `lot.dw` in the pack is the next step for load time.
+- `genLot` still runs once for every lot (scores read it), on the worker pool, but far lots come back without meshes, so the page decodes and merges only the near ones.

@@ -36,10 +36,14 @@ function cutDepth(prof, side, gap) {
   return clamp(sum + Math.max(0, gap), 0, 8);
 }
 
+const boxOf = (r) => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const p of r) { if (p[0] < a) a = p[0]; if (p[1] < b) b = p[1]; if (p[0] > c) c = p[0]; if (p[1] > d) d = p[1]; } return [a, b, c, d]; };
+const inRing = (x, z, r, b) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3] && inPoly(x, z, r);
+
 // F is frameOf(lot); rings are the live building footprints. info = { prof, side, gap, es, rd } from the street.
 function planDriveway(lot, F, rings, info) {
   if (!HOUSING.has(lot.lt) || !rings.length || lot.flags?.noaccess || !info) return null;
   const loc = lot.r.map(([x, z]) => F.L(x, z)), bl = rings.map((r) => r.map(([x, z]) => F.L(x, z)));
+  const bbs = bl.map(boxOf), lbb = boxOf(loc); // box rejects first: most probes are nowhere near a building, and this scan runs for every lot
   const front = F.smax - F.smin;
   if (front < 7 || (lot.fr || front) < 7) return null;
   const w = front < 12 ? 2.8 : front < 20 ? 3.2 : front < 26 ? 3.6 : 5.2;
@@ -52,7 +56,7 @@ function planDriveway(lot, F, rings, info) {
     let te = tf;
     for (let t = tf + 0.25; t <= tf + MAX_DRIVE; t += 0.5) {
       const pts = [[s - w / 2 - 0.5, t], [s, t], [s + w / 2 + 0.5, t]];
-      if (pts.some(([ps, pt]) => !inPoly(ps, pt, loc) || bl.some((b) => inPoly(ps, pt, b)))) break;
+      if (pts.some(([ps, pt]) => !inRing(ps, pt, loc, lbb) || bl.some((b, k) => inRing(ps, pt, b, bbs[k])))) break;
       te = t;
     }
     const len = te - tf;
