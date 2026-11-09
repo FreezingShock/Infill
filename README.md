@@ -1,23 +1,31 @@
 # sfvOS
 
-A live city game on real San Fernando Valley map data, played through the Camino interface (repo and package still named Infill / renovated). Pick a neighborhood, then upgrade houses, repurpose commercial buildings, add streets, change lane layouts and parking, and (soon) watch traffic and parked cars respond.
+**A live city builder on real San Fernando Valley data.** Open a neighborhood and you get its actual streets, lots, buildings, parking and terrain. Then rebuild it the way you would in Cities: Skylines 2: a few verbs, presets, paint and drag. It runs in the browser, played through the **Camino** interface.
 
-Contributors and Claude threads: start with [CLAUDE.md](CLAUDE.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md). The original plan is [docs/PLAN.md](docs/PLAN.md).
+No grids. Every lot is a real parcel and every street is a real centreline, so the city feels like the place it came from.
+
+## What you can do
+
+- **Open any part of the Valley.** Twelve neighborhoods ship ready (Woodland Hills, Encino, Sherman Oaks, Studio City, North Hollywood, Van Nuys, Panorama City, Reseda, Northridge, Chatsworth, Granada Hills, Canoga Park). Search an address or drag a box on the map and the game builds a new area from open data.
+- **Renovate lots.** Add floors, ADUs, solar, trees and roofs, swap building templates, repurpose commercial buildings into homes, shops or offices, and see the cost before you click.
+- **Paint like tiles, on real lots.** Pick from the palette, then click or drag across lots, a whole block, or a rectangle.
+- **Reshape streets.** Draw new streets and change existing ones with presets for lanes, medians, parking, one-ways and crosswalks. Road rules (hierarchy, right of way, median openings, lane markings) are general and apply to any area on load.
+- **Watch it live.** Cars drive and park, signals cycle, and a day and night clock runs over the city.
+- **Scan view.** A Camino overlay of the real infrastructure in the area, drawn only from mapped data.
+- **Undo anything.** Your work is an edit log, so it saves per area in the browser and carries over when an area's data is refreshed.
 
 ## Run it locally
 
-You need Node 20 or newer. Localhost runs the `integration` branch: every project thread's work is merged there first, so it is always the newest playable build.
+You need Node 20 or newer. Localhost runs the `integration` branch, where every feature lands first, so it is always the newest playable build.
 
 ```sh
-git clone https://github.com/FreezingShock/Infill.git && cd Infill
+git clone https://github.com/FreezingShock/sfvOS.git && cd sfvOS
 git checkout integration
 npm install
 npm run dev
 ```
 
-To pick up new work later: `git pull` on `integration`, then `npm install` if `package.json` changed. Vite reloads the page by itself while `npm run dev` is running.
-
-Vite opens http://localhost:5173 with Woodland Hills (Topanga Canyon Blvd) loaded. Pick another area with **Change area**.
+Vite serves the game at http://localhost:5173 with Woodland Hills loaded. Pick another area with **Change area**. Vite reloads the page by itself while `npm run dev` runs.
 
 ### Load any spot, or refresh an area
 
@@ -34,7 +42,7 @@ Other scripts:
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serves the production build on http://localhost:4173 |
 | `npm test` | Engine tests in node (loads the pack, replays every kind of edit, regenerates every lot) |
-| `npm run check` | Lint, tests and build |
+| `npm run check` | Lint, tests and build (what CI runs) |
 
 ## Playing
 
@@ -49,36 +57,40 @@ Four tools at the bottom left:
 
 Edits autosave to the browser per area. Saved designs are kept in the browser across areas.
 
-## Branches
-
-- `integration`: what runs on localhost. Feature branches open their pull requests against it and get merged here.
-- `main`: stable. `integration` is merged into `main` when a milestone is done.
-
-## Layout
-
-```
-index.html            page shell (Camino look: dark glass panels, Helvetica + IBM Plex Mono)
-src/main.js           picks the area from ?area=, loads its pack, starts the app
-src/engine/           pure data and generation, runs in node too
-  pack.js             the loaded area pack
-  core.js             geometry helpers, terrain sampling, mesh accumulators
-  model.js            lot types, zones, street elements and presets, base state, lot frames
-  templates.js        template buildings and the lot generator
-  commands.js         the edit log: every command and replay
-src/app/              rendering and UI
-  render.js           renderer, camera, controls, materials
-  scene.js            chunked lot meshes, roads, trees, cars, terrain, props
-  state.js            city state, undo/redo, overlays, scores, saves, selection
-  inspector.js        the right-hand card (build, tweak, lot, select tabs, street and area panels)
-  input.js            tools, picking, drawing, modals, area picker, start-up and frame loop
-src/styles/base.css   layout and controls; its :root tokens are the Camino palette
-  src/camino/         the Camino look (camino.css), HUD, scan view, real infrastructure, sky
-public/areas/         area manifest (index.json) and area packs
-tools/pack/           Python scripts that build area packs from open data
-tests/                node tests
-docs/PLAN.md          the plan
-```
-
 ## Data
 
-Every shape comes from open data, packed once per area: Overture Maps (streets, buildings, addresses, parking, street furniture, land use; mostly OpenStreetMap, ODbL), City of LA open data (parcels, zoning, general plan, addresses, permits) and AWS Terrain Tiles (USGS 3DEP). Nothing is traced from Google imagery. See the credits dialog in the game and `tools/pack/README.md`.
+Every shape comes from open data, packed once per area, and nothing is traced from Google imagery.
+
+| Source | Used for |
+| --- | --- |
+| Overture Maps (mostly OpenStreetMap, ODbL) | streets, one-ways and speeds, buildings and heights, addresses, parking, street furniture, land use |
+| City of LA open data (data.lacity.org) | parcel boundaries with county AIN, zoning, general plan, permit years |
+| AWS Terrain Tiles (USGS 3DEP) | ground height |
+| USGS NAIP imagery | aerial color for recognizing roofs and tree cover; never copied as geometry |
+
+Import details are in [docs/IMPORT.md](docs/IMPORT.md) and [tools/pack/README.md](tools/pack/README.md).
+
+## Project layout
+
+```
+index.html            page shell
+src/main.js           picks the area, loads its pack, starts the app
+src/engine/           pure data and generation, also runs in node (model, templates, edit log)
+src/app/              renderer, scene, state, inspector, input
+src/camino/           the Camino interface: HUD, command bar, scan view, sky
+src/areas/            area picker, backdrop, edit rebase on refresh
+src/sim/              live traffic and parking
+src/game/             zoning, growth, clock
+src/views/            info views
+src/workers/          off-main-thread lot generation
+public/areas/         area manifest and packs
+tools/pack/           Python builders that turn open data into area packs
+tests/                node tests
+docs/                 architecture, roadmap, import notes, road graph, plan
+```
+
+Start with [CLAUDE.md](CLAUDE.md), then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md). Pull requests branch from `integration`, run `npm run check`, and merge back into it. `main` carries the stable line.
+
+## Credits
+
+Map data (c) OpenStreetMap contributors and Overture Maps Foundation, City of Los Angeles, USGS. The in-game credits dialog lists them too.
