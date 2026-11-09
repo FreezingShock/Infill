@@ -27,15 +27,20 @@ export function makeBlocked(world) {
   const cell = 40, G = new Map(), put = (x, z, o) => { const key = Math.floor(x / cell) + ',' + Math.floor(z / cell); (G.get(key) || G.set(key, []).get(key)).push(o); };
   for (const b of (world && world.buildings) || []) { const r = b.r; if (!r || r.length < 3) continue; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of r) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); } for (let i = Math.floor((x0 - 2) / cell); i <= Math.floor((x1 + 2) / cell); i++) for (let j = Math.floor((z0 - 2) / cell); j <= Math.floor((z1 + 2) / cell); j++) (G.get(i + ',' + j) || G.set(i + ',' + j, []).get(i + ',' + j)).push({ r }); }
   for (const e of (world && world.edges) || []) { const p = e.p; if (!p) continue; for (let k = 1; k < p.length; k++) { const n = Math.ceil(Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]) / 20); for (let s = 0; s <= n; s++) { const t = s / (n || 1); put(p[k - 1][0] + (p[k][0] - p[k - 1][0]) * t, p[k - 1][1] + (p[k][1] - p[k - 1][1]) * t, { road: p, hw: (e.w || 8) / 2 }); } } }
-  return (x, z) => {
+  const RW = world && world.roadway, cuts = ((world && world.cuts) || []).map((c) => (Array.isArray(c) ? { x: c[0], z: c[1], r: c[2] || 3 } : { x: c.x, z: c.z, r: c.r || c.w || 3 }));
+  const fn = (x, z) => {
+    if (RW && RW.hit(x, z, 0.6)) return true; // roadway = lanes, parking, bike lanes; poles stand in the walk or tree strip behind the curb
+    for (const c of cuts) if (Math.hypot(x - c.x, z - c.z) < c.r) return true; // driveway curb cuts stay clear
     const i = Math.floor(x / cell), j = Math.floor(z / cell), seen = new Set();
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const o of G.get((i + a) + ',' + (j + b)) || []) {
       if (seen.has(o) || (seen.add(o), false)) continue;
       if (o.r && (inPoly(x, z, o.r) || polyDist(x, z, o.r.concat([o.r[0]])) < 1.2)) return true;
-      if (o.road && polyDist(x, z, o.road) < o.hw) return true;
+      if (!RW && o.road && polyDist(x, z, o.road) < o.hw) return true;
     }
     return false;
   };
+  fn.snap = (x, z) => { if (!RW) return [x, z]; const [nx, nz] = RW.nudge(x, z, 1.2); return fn(nx, nz) ? [x, z] : [nx, nz]; }; // just off the pavement
+  return fn;
 }
 
 /** Pole run along a distribution line: mapped poles and corners first, then evenly spaced fill (<= max metres),
@@ -61,6 +66,7 @@ export function poleRun(p, mapped = [], blocked = () => false, max = 42) {
   for (const q of chain) if (!run.length || Math.hypot(q[0] - run[run.length - 1][0], q[1] - run[run.length - 1][1]) > 6) run.push(q);
   return run.map((q, i) => {
     if (!blocked(q[0], q[1])) return q;
+    if (blocked.snap) { const t = blocked.snap(q[0], q[1]); if (!blocked(t[0], t[1])) return t; }
     const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L;
     for (let d = 1.5; d <= 14; d += 1.5) for (const sgn of [1, -1]) { const x = q[0] + nx * d * sgn, z = q[1] + nz * d * sgn; if (!blocked(x, z)) return [x, z]; }
     for (let d = 2; d <= 10; d += 2) for (const sgn of [1, -1]) { const x = q[0] + dx / L * d * sgn, z = q[1] + dz / L * d * sgn; if (!blocked(x, z)) return [x, z]; }
@@ -103,6 +109,7 @@ export function layoutInfra(D, lamps = [], bounds = null, world = null) {
   for (const run of runs) for (const q of run) { const key = Math.round(q[0]) + ',' + Math.round(q[1]); if (!seen.has(key)) { seen.add(key); poles.push({ k: 'power_pole', x: q[0], z: q[1] }); } }
   for (const q of mappedPoles) if (!q.used && !seen.has(Math.round(q.x) + ',' + Math.round(q.z))) {
     let x = q.x, z = q.z;
+    if (blocked(x, z) && blocked.snap) { const t = blocked.snap(x, z); if (!blocked(t[0], t[1])) { x = t[0]; z = t[1]; } }
     if (blocked(x, z)) { let fixed = false; for (let d = 1.5; d <= 12 && !fixed; d += 1.5) for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!blocked(x + ox * d, z + oz * d)) { x += ox * d; z += oz * d; fixed = true; break; } }
     poles.push({ k: 'power_pole', x, z });
   }
