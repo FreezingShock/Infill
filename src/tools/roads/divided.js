@@ -87,4 +87,18 @@ function markDivided(S) {
   return done.size;
 }
 
-export { markDivided };
+// The wedge between the two tapering carriageways, as polygons to draw as median (lanes are drawn on top).
+function taperMedians(S) {
+  const byNode = new Map();
+  for (const e of S.edges.values()) if (e.taper) for (const n of [e.a, e.b]) { if (!byNode.has(n)) byNode.set(n, []); byNode.get(n).push(e); }
+  const out = [];
+  for (const [m, es] of byNode) {
+    if (es.length !== 2) continue;
+    const far = (e) => (e.b === m ? e.p.slice() : e.p.slice().reverse()); // far end first, ends at the shared node
+    const a = far(es[0]), b = far(es[1]);
+    out.push(a.concat(b.reverse().slice(1)));
+  }
+  return out;
+}
+
+export { markDivided, taperMedians };

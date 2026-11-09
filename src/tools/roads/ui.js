@@ -178,7 +178,8 @@ function drawMarkers() {
     if (k < 3 || !STATE.nodes[n]) continue;
     const t = nodeControl(STATE, n); if (t === 'none') continue;
     if (R.node === n) disc(STATE.nodes[n], 4.2, 0x3e9fdc);
-    disc(STATE.nodes[n], 2.6, 0x2b2420); disc(STATE.nodes[n], 1.9, CTRL_COL[t] || 0xaaaaaa);
+    if (!(STATE.ctrl && STATE.ctrl[n]) && R.node !== n) continue; // only mark junctions you changed or selected
+    disc(STATE.nodes[n], 1.7, 0x2b2420); disc(STATE.nodes[n], 1.2, CTRL_COL[t] || 0xaaaaaa);
   }
   for (const e of STATE.edges.values()) {
     if (!e.g || !e.oneway || e.ring) continue;
