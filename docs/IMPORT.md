@@ -8,6 +8,7 @@
 | Overture buildings, addresses, land use, infrastructure | footprints and heights, lot addresses, mapped parking polygons, street props |
 | City of LA (data.lacity.org) | real parcel boundaries with county AIN, zoning, general plan, permit years |
 | AWS terrain tiles | ground height |
+| USGS NAIP aerial imagery (imagery.nationalmap.gov, public domain) | checks and trims recognised paving: asphalt-like pixels (not vegetation by NDVI, not colourful, mid-dark) outside buildings; the imagery is never stored |
 
 ## Street rules
 - A one-way segment is stored along its direction of travel with `ow: 1` (never `-1`), and gets a one-way cross-section (lanes all one way, no centre turn lane, no yellow centre line). Ramps and freeway carriageways are one-way too.
@@ -18,7 +19,7 @@
 
 ## Land cover: surface parking
 Map layers miss many lots. `tools/pack/recognize.py` adds `pack.parkingInf` (rings) and `lot.pvi` (recognised paved share). Evidence: service roads and parking aisles running through open ground, or a commercial group of lots with a big open area behind its buildings. It works on **groups of touching lots**, because a back lot usually serves several frontages. The game paves and stripes these exactly like mapped lots, and stalls for traffic and metrics come from the same `lot.pk` rings.
-Retrofit an existing pack without refetching: `python tools/pack/recognize.py public/areas/<id>.json`.
+With imagery (the default when the host answers) the paving is the asphalt-like ground outside buildings, at least a parking bay wide (no paths or driveways) and at least 180 m2; without it the aisle rules above apply. Retrofit an existing pack: `python tools/pack/recognize.py public/areas/<id>.json --naip` (drop `--naip` for the map-data rules only).
 
 ## Adding a recognition rule
 Put it in `tools/pack/`, make it read the pack (or the work folder) only, write optional fields, add a check to `tests/areas.test.js`, then run `build_area.py --id <area> --refresh` for every ready area.

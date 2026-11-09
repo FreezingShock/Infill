@@ -156,6 +156,13 @@ def main():
     if log.returncode: raise SystemExit('pack2 failed:\n' + log.stderr[-1500:])
     pack = json.load(open(tmp))
     pack['built'] = datetime.date.today().isoformat()
+    try:  # aerial imagery (NAIP) checks and trims recognised paving; without it the map-data rules stand
+        import naip, recognize
+        say('imagery', 'Checking paved areas against aerial imagery (NAIP)', 82)
+        mask = naip.fetch_mask(pack, os.path.join(work, 'naip'), log=lambda m: say('imagery', m, 85))
+        if mask is not None: recognize.apply(pack, mask)
+    except Exception as e:  # noqa: BLE001
+        say('imagery', f'Imagery check skipped ({type(e).__name__}: {e})', 85)
     json.dump(pack, open(tmp, 'w'), separators=(',', ':'))
     os.replace(tmp, out)
 
