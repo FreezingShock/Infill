@@ -191,9 +191,9 @@ class Sim {
         c.seg = conn; c.isConn = true; conn.cars.push(c); c.i = conn.cars.length - 1;
       } else {
         const tl = seg.to; seg.reserved--; tl.reserved--; c.s -= seg.len; seg.cars.splice(seg.cars.indexOf(c), 1);
-        if (c.trip < -200) { c.isConn = false; c.granted = null; dead.push(c); return; } // already released: remove() must not release it twice
         c.seg = tl; c.isConn = false; tl.cars.push(c); c.i = tl.cars.length - 1;
         c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(tl);
+        if (c.trip < -200) { dead.push(c); return; }
         if (c.trip <= 0 && !c.park && tl.idx === 0 && tl.slots.length) this.seekSlot(c, 6);
       }
     }
