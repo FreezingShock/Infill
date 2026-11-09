@@ -2,6 +2,7 @@ import PC from 'polygon-clipping';
 import { area, bbox, bufferLine, centroid, clamp, densify, fmt, fromPC, hash32, inPoly, nearestOnLine, obb, pcDiff, pcSafe, polyLen, ringDistToLine, rng, segX, toPC } from './core.js';
 import { BLD, EL, PRESETS, buildBase, curbHalf, frameOf, inferProgram, lotMeta, rowWidth, zfam } from './model.js';
 import { TPL, availability } from './templates.js';
+import { nodeCtrl, roundabout, roundaboutAt, streetOneway, streetSpeed } from '../tools/roads/graph.js';
 
 // =====================================================================
 // Edits are a log. The city = base pack + an ordered list of commands.
@@ -32,6 +33,13 @@ function exec(S, cmd, info) {
     case 'street.move': break; // applied by rewriting the matching street.add during replay
     case 'street.del': streetDel(S, cmd, info); break;
     case 'street.prof': streetProf(S, cmd, info); break;
+    case 'street.batch': for (const [k, st] of cmd.streets.entries()) streetAdd(S, { ...st, id: `${cmd.id}_${k}` }, info); break;
+    case 'street.oneway': streetOneway(S, cmd); break;
+    case 'street.profs': for (const it of cmd.items) streetProf(S, { id: cmd.id, ids: [it.id], prof: it.prof }, info); break;
+    case 'street.speed': streetSpeed(S, cmd); break;
+    case 'node.ctrl': nodeCtrl(S, cmd); break;
+    case 'node.roundabout': roundabout(S, cmd, info, HELP); break;
+    case 'roundabout.new': roundaboutAt(S, cmd, info, HELP); break;
     case 'area.new': areaNew(S, cmd, info); break;
   }
 }
@@ -330,6 +338,8 @@ function areaNew(S, cmd, info) {
   refreshNear(S, bbox(region), 20);
   info.notes.push(`New area: ${made.length} street pieces, ${n} lots`);
 }
+
+const HELP = { addNode, cutLots, refreshNear, lotMeta, streetAdd };
 
 export {
   BASE,

@@ -84,7 +84,7 @@ function inferProgram(lot) {
 }
 function mkEdge(e) { const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, g: e.g, grp: null }; E.prof = defaultProfile(E); E.bb = bbox(E.p); return E; }
 function buildBase() {
-  const S = { lots: new Map(), edges: new Map(), nodes: PACK.nodes.map((n) => n.slice()), blocks: PACK.blocks.map((r) => r), demo: new Set(), seq: 0, notes: [] };
+  const S = { lots: new Map(), edges: new Map(), nodes: PACK.nodes.map((n) => n.slice()), blocks: PACK.blocks.map((r) => r), demo: new Set(), ctrl: {}, rounds: {}, seq: 0, notes: [] };
   for (const l of PACK.lots) S.lots.set(l.id, mkLot(l));
   for (const e of PACK.edges) S.edges.set(e.id, mkEdge(e));
   // as-built paving: Overture parking polygons clipped to each lot

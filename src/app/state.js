@@ -58,6 +58,7 @@ function undo() { if (!CUR) return toast('Nothing to undo.'); const c = LOG[CUR 
 function redo() { if (CUR >= LOG.length) return toast('Nothing to redo.'); const c = LOG[CUR]; const before = scores(); CUR++; if (c.op === 'street.move') dropSnapsAfterAdd(c); STATE = stateAt(CUR); refresh(); showDelta(before, scores(), 'Redid ' + describe(c).toLowerCase()); save(); renderCard(); renderViews(); }
 function describe(c) {
   const n = (c.lots || []).length, L = (k) => `${fmt(k)} lot${k === 1 ? '' : 's'}`;
+  if (c.rl) return c.rl;
   switch (c.op) {
     case 'apply': return c.t === 'lot.clear' ? `Bulldozed ${L(n)}` : c.t === 'asb' ? `Restored ${L(n)}` : `${TPL[c.t]?.name || c.t} on ${L(n)}`;
     case 'bump': return `${c.d > 0 ? 'Added' : 'Removed'} a floor on ${L(n)}`;

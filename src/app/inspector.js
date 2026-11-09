@@ -6,6 +6,7 @@ import { CATS, TPL, TPL_BY_CAT, availability } from '../engine/templates.js';
 import { areaNew, uid } from '../engine/commands.js';
 import { cam } from './render.js';
 import { CUR, LOG, STATE, anyFilter, buildEdgeSel, buildSel, commit, ghost, ghostLots, lotStories, outlineMesh, save, scores, selIds, setOv, setSel, startRise, toast, ui, world } from './state.js';
+import { bindRoadEdgeExtras, roadEdgeExtras, roadModeBar, roadsCard } from '../tools/roads/ui.js';
 import { drawPreview, finishDraw, placeHandles, renderHint, setTool } from './input.js';
 import { addDesign, copyLook, designs, itemById, plan, preview, previewText, progAfter, removeDesign, shelves, suggestions } from './palette.js';
 
@@ -22,6 +23,7 @@ function mixed(vals, fmtv = (v) => v) { const u = [...new Set(vals.map((v) => v 
 function renderCard() {
   if (ui.tool === 'build') return renderPalette();
   if (ui.tool === 'doze') return renderDoze();
+  if (ui.tool === 'roads' && roadsCard(card, renderCard)) return;
   if (ui.tool === 'roads') return ui.edgeSel.size && !(ui.draw && ui.draw.pts.length) ? renderEdge() : renderDraw();
   if (ui.tool === 'draw') return renderDraw();
   if (ui.tool === 'area' && ui.area) return renderArea();
@@ -278,6 +280,7 @@ function renderEdge() {
   card.innerHTML = `<div><div class="eyebrow">Street · ${es.length} piece${es.length === 1 ? '' : 's'}</div><h2>${esc(names.slice(0, 2).join(', '))}${names.length > 2 ? '…' : ''}</h2><div class="alt">${fmt(len * FT)} ft long · ${fmt(fronting)} lots front it · right-of-way ${cur.toFixed(1)} m (${fmt(cur * FT)} ft)</div></div>
   <h3>Quick changes <small>one click, whole selection</small></h3>
   <div class="row">${Object.entries(PRESETS).map(([k, p]) => `<button class="chipb ${e.prof.k === k ? 'on' : ''}" data-quick="${k}" title="${rowWidth(p).toFixed(0)} m wide">${p.name}</button>`).join('')}</div>
+  ${roadEdgeExtras(es)}
   <div class="row" style="justify-content:space-between"><button class="btn ghost small" id="corr" ${e.n ? '' : 'disabled'}>Select all of ${esc(e.n || 'this street')}</button><button class="btn ghost small" id="eDel">Delete street</button></div>
   <button class="btn ghost small" id="cust" aria-expanded="${!!(ui.custom || ui.adv)}">${ui.custom || ui.adv ? 'Hide the cross-section' : 'Customize the cross-section'}</button>
   ${ui.custom || ui.adv ? `  <h3>Cross-section <small>left to right</small></h3>
@@ -291,6 +294,7 @@ function renderEdge() {
 ` : ''}
   ${e.grp ? '<div class="note">Drag the round handles to reshape this drawn street.</div>' : ''}
   <div class="src">Delete flags lots that lose street access and turns the freed right-of-way into land. Widening clips lots; buildings inside the new right-of-way come down.</div>`;
+  bindRoadEdgeExtras(card, es);
   const q = (s) => card.querySelector(s), qa = (s) => card.querySelectorAll(s), ids = es.map((x) => x.id);
   qa('[data-el]').forEach((b) => (b.onclick = () => { profPick = +b.dataset.el; renderEdge(); }));
   qa('[data-w]').forEach((b) => (b.onclick = () => { const el = profDraft.els[profPick]; el[1] = clamp(Math.round((el[1] + +b.dataset.w) * 10) / 10, 0.6, 12); profDraft.k = 'custom'; renderEdge(); }));
@@ -326,6 +330,7 @@ function renderDraw() {
   <div class="row"><button class="btn small" id="dDone" ${n < 2 ? 'disabled' : ''}>Build street</button><button class="btn ghost small" id="dBack" ${n ? '' : 'disabled'}>Remove last point</button><button class="btn ghost small" id="dCancel">Cancel</button></div>
   ${d && d.snap ? `<div class="note">Snap: ${esc(d.snap)}</div>` : ''}
   <div class="src">Crossings split both streets and add an intersection. The new right-of-way cuts through lots; slivers under 650 ft² fold into the street.</div>`;
+  roadModeBar(card, renderDraw);
   const q = (s) => card.querySelector(s);
   q('#dProf').onchange = (e) => { ui.drawProf = e.target.value; drawPreview(); };
   q('#dName').oninput = (e) => { ui.drawName = e.target.value; };
