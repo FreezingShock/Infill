@@ -1,0 +1,23 @@
+/* Camino build chip: a slim plaque under the area plaque, same hairline and mono voice as the toasts. */
+[data-theme=camino] #app .bchip { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 0 10px 0 0; min-height: 40px; overflow: hidden; text-align: left; cursor: pointer; color: var(--ink); font: 500 11px/1.2 var(--mono); border-radius: 0; animation: hudBoot .4s var(--ease) backwards; }
+[data-theme=camino] #app .bchip[hidden] { display: none; }
+[data-theme=camino] #app .bchip:hover, [data-theme=camino] #app .bchip:focus-visible { border-color: var(--hair-hi); outline: none; }
+[data-theme=camino] #app .bchip:focus-visible { outline: 1px solid var(--cyan); }
+[data-theme=camino] #app .bc-tag { align-self: stretch; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--cyan); color: #050607; font: 600 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+[data-theme=camino] #app .bc-tag em { font-style: normal; }
+[data-theme=camino] #app .bc-tag > i { width: 6px; height: 6px; background: currentColor; animation: bcPulse 1.2s ease-in-out infinite; }
+[data-theme=camino] #app .bc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 6px 0; }
+[data-theme=camino] #app .bc-name { font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--white); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme=camino] #app .bc-sub { font: 500 10px/1.2 var(--mono); color: var(--ink-soft); letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme=camino] #app .bc-num { display: flex; align-items: baseline; gap: 1px; font-variant-numeric: tabular-nums; }
+[data-theme=camino] #app .bc-num b { font: 500 18px/1 var(--mono); color: var(--white); }
+[data-theme=camino] #app .bc-num span { font: 500 10px/1 var(--mono); color: var(--ink-soft); }
+[data-theme=camino] #app .bc-eta { font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 62px; text-align: right; }
+[data-theme=camino] #app .bc-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(226, 238, 240, .12); }
+[data-theme=camino] #app .bc-bar > i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--cyan); box-shadow: 0 0 8px rgba(47, 216, 232, .7); transition: width .6s var(--ease); }
+[data-theme=camino] #app .bchip.fail .bc-tag { background: var(--alert); color: #fff; }
+[data-theme=camino] #app .bchip.fail .bc-eta { color: var(--alert); }
+[data-theme=camino] #app .bchip.fail .bc-num { display: none; }
+[data-theme=camino] #app .bchip.fail .bc-bar > i { background: var(--alert); box-shadow: none; }
+@keyframes bcPulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { [data-theme=camino] #app .bc-tag > i { animation: none; } [data-theme=camino] #app .bc-bar > i { transition: none; } [data-theme=camino] #app .bchip { animation: none; } }

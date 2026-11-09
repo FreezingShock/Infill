@@ -7,6 +7,9 @@ import { bboxAround, bboxProblem, bboxSizeM, slugify } from './geo.js';
 import { createMap } from './mapview.js';
 import { mergeSuggestions, nameFor, photon, searchLocal, streetIndex } from './search.js';
 import { stageView } from './stages.js';
+import { watch } from './buildwatch.js';
+import { km2Of, say as etaSay } from './eta.js';
+import { toast } from '../ui/toasts.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,6 +57,7 @@ export function initPicker({ AREA, AREAS, save }) {
     document.querySelectorAll('.ap-layers button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
   }));
   document.querySelectorAll('.ap-zoom button').forEach((b) => (b.onclick = () => { ensureMap(); b.dataset.zoom === 'reset' ? map.reset() : map.zoomBy(b.dataset.zoom === 'in' ? 1.6 : 1 / 1.6); }));
+  watch.subscribe(paintEta);
   ping(); loadValley();
 }
 
@@ -62,9 +66,12 @@ const center = (b) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 export function openPicker() {
   picked = ctx.AREA.id; filterText = ''; $('apFilter').value = '';
   $('areas').hidden = false; ensureMap(); map.resize();
-  setTab(busy ? 'add' : 'areas'); renderList(); selectArea(picked, { fly: true, keepTab: true }); ping();
+  setTab(busy || watch.get() ? 'add' : 'areas'); renderList(); selectArea(picked, { fly: true, keepTab: true }); ping();
   setTimeout(() => $('areaMap').focus({ preventScroll: true }), 50);
 }
+const pickerOpen = () => !!$('areas') && !$('areas').hidden;
+/** Open a built area from anywhere (the finish toast): the loaded one reloads, another is switched to. */
+export function openBuilt(id) { const a = byId(id); if (!a) return; ctx.save(); if (id === ctx.AREA.id) location.reload(); else location.search = `?area=${encodeURIComponent(id)}`; }
 export function closePicker() { if (!$('areas')) return; $('areas').hidden = true; clearSug(); $('areaBtn')?.focus(); }
 
 function ensureMap() {
@@ -163,6 +170,7 @@ function syncFoot() {
 function openPicked() {
   const a = byId(picked); if (!a || a.status !== 'ready') return;
   if (a.id === ctx.AREA.id) { closePicker(); ctx.save(); return; }
+  if (busy) { say('A build is running. Switching areas would stop it. Wait for it to finish.', true); return; }
   ctx.save(); location.search = `?area=${encodeURIComponent(a.id)}`;
 }
 
@@ -249,6 +257,12 @@ export function proposeAt({ lon, lat }) {
   setTab('add'); nameAuto = true; $('apName').value = ''; placeAt(lon, lat); map.flyToLL(lon, lat, 1.1);
 }
 
+// The ETA line under the clock in the progress view, and a note that the build keeps going when the window closes.
+function paintEta(st) {
+  const el = $('apEta'); if (!el) return;
+  el.textContent = st && st.status === 'run' ? `ETA ${etaSay(st.eta)}. Close this window and it keeps building.` : '';
+}
+
 // ---------- building, with a staged progress view ----------
 let view = null, abort = null;
 function showProgress(on) { $('apForm').hidden = on; $('apProg').hidden = !on; }
@@ -256,6 +270,7 @@ async function build({ bbox, name, id, refresh, custom }) {
   if (busy) return;
   id = id || slugify(name, [...areas().map((a) => a.id)]);
   busy = { id, name }; setTab('add'); showProgress(true); renderDetail();
+  const box = bbox || byId(id)?.bbox; watch.start({ id, name, refresh, km2: box ? km2Of(...bboxSizeM(box)) : 1.4 });
   $('apProgHead').textContent = refresh ? 'Refreshing' : 'Building'; $('apProgName').textContent = name;
   view = stageView({ fill: $('apFill'), pct: $('apPct'), time: $('apTime'), msg: $('apMsg'), list: $('apStages') }); view.start();
   $('apAct').innerHTML = '<button class="btn ghost small" id="apCancel" type="button">Cancel</button>'; $('apCancel').onclick = () => abort?.abort();
@@ -271,21 +286,24 @@ async function build({ bbox, name, id, refresh, custom }) {
         const line = buf.slice(0, i); buf = buf.slice(i + 1); if (!line) continue;
         const ev = JSON.parse(line);
         if (ev.step === 'error') throw new Error(ev.msg);
-        view.event(ev); if (ev.step === 'done') done = ev.area;
+        view.event(ev); watch.event(ev); if (ev.step === 'done') done = ev.area;
       }
     }
     if (!done) throw new Error('The builder stopped before finishing.');
-    view.finish(`${done.name} is ready: ${Number(done.lots).toLocaleString()} lots.`);
+    view.finish(`${done.name} is ready: ${Number(done.lots).toLocaleString()} lots.`); watch.finish(done);
     ctx.AREAS.areas = refresh ? areas().map((a) => (a.id === done.id ? { ...a, ...done } : a)) : [...areas().filter((a) => a.id !== done.id), done];
     map?.setAreas(areas()); busy = null; picked = done.id; map?.setSelected(done.id);
-    if (refresh && done.id === ctx.AREA.id) { $('apAct').innerHTML = '<span class="ap-note">Reloading the city with fresh data</span>'; setTimeout(() => location.reload(), 900); return; }
+    const away = !pickerOpen();
+    if (away) toast(`${done.name} is ready: ${Number(done.lots).toLocaleString()} lots.`, { kind: 'done', life: 15000, action: { label: refresh && done.id === ctx.AREA.id ? 'Reload' : 'Open', run: () => openBuilt(done.id) } });
+    if (refresh && done.id === ctx.AREA.id && !away) { $('apAct').innerHTML = '<span class="ap-note">Reloading the city with fresh data</span>'; setTimeout(() => location.reload(), 900); return; }
     $('apAct').innerHTML = `<button class="btn" id="apOpenNew" type="button">Open ${esc(done.name)}</button><button class="btn ghost small" id="apMore" type="button">${refresh ? 'Done' : 'Build another'}</button>`;
     $('apOpenNew').onclick = openPicked;
-    $('apMore').onclick = () => { showProgress(false); view.stop(); setTab(refresh ? 'areas' : 'add'); renderList(); renderDetail(); if (!refresh) { draft = null; map?.setDraft(null); $('apName').value = ''; nameAuto = true; } syncBuild(); };
+    $('apMore').onclick = () => { watch.clear(); showProgress(false); view.stop(); setTab(refresh ? 'areas' : 'add'); renderList(); renderDetail(); if (!refresh) { draft = null; map?.setDraft(null); $('apName').value = ''; nameAuto = true; } syncBuild(); };
   } catch (e) {
-    busy = null; view?.fail(e.name === 'AbortError' ? 'Cancelled.' : e.message);
+    busy = null; const cancelled = e.name === 'AbortError'; view?.fail(cancelled ? 'Cancelled.' : e.message); watch.fail(cancelled ? 'Cancelled.' : e.message, cancelled);
+    if (cancelled) watch.clear(); else if (!pickerOpen()) toast(`${name} could not be built. ${e.message}`, { kind: 'fail', action: { label: 'Details', run: openPicker } });
     $('apAct').innerHTML = '<button class="btn ghost small" id="apBack" type="button">Back</button>';
-    $('apBack').onclick = () => { showProgress(false); view.stop(); syncBuild(); renderDetail(); };
+    $('apBack').onclick = () => { watch.clear(); showProgress(false); view.stop(); syncBuild(); renderDetail(); };
   } finally { renderList(); renderDetail(); }
 }
 

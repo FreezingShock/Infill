@@ -31,6 +31,10 @@
 [data-theme=camino] #app .tn-row.out { opacity: 0; transition: grid-template-rows .36s var(--ease), opacity .22s ease; }
 [data-theme=camino] #app .tn-row > .tn { --kc: var(--cyan); position: relative; min-height: 0; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 0 4px 0 0; background: rgba(8, 11, 13, .86); border: 1px solid var(--hair); border-radius: 2px; box-shadow: 0 10px 26px rgba(0, 0, 0, .38); backdrop-filter: blur(14px) saturate(130%); -webkit-backdrop-filter: blur(14px) saturate(130%); }
 [data-theme=camino] #app .tn-row > .tn[data-kind=done] { --kc: var(--ok); }
+[data-theme=camino] #app .tn-row > .tn[data-kind=fail] { --kc: var(--alert); }
+[data-theme=camino] #app .tn-row > .tn.has-act { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+[data-theme=camino] #app .tn-act { padding: 6px 10px; border: 1px solid var(--kc); border-radius: 2px; background: transparent; color: var(--kc); font: 600 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; cursor: pointer; transition: background .15s, color .15s; }
+[data-theme=camino] #app .tn-act:hover, [data-theme=camino] #app .tn-act:focus-visible { background: var(--kc); color: #050607; outline: none; }
 [data-theme=camino] #app .tn-row > .tn[data-kind=warn] { --kc: var(--gold); }
 [data-theme=camino] #app .tn-row.in > .tn { animation: tnIn .42s var(--ease) both; }
 /* type tag: a solid plate in the notice colour, mono caps */

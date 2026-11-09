@@ -37,3 +37,4 @@ Seeded 9 Nov 2026 from the sfvOS project chat and from nate's Deepstack notes. T
 - Loading a new area was too slow and the picker felt janky. He wants a real map of the Valley (satellite or an on-theme render), address suggestions like the in-game search, a better progress bar, and custom areas he can install and remove.
 - Every scrollbar and every dropdown must be on theme, like the View and Layers menus (done app-wide in `src/camino/controls.js`).
 - 2026-11-09: The area picker's selected-area card was covering the list and its text collided. nate loves the frosted glass and wants the list still visible behind it, with every field and button kept. The card is now a docked footer with stronger blur, so the list reads as soft texture behind it. Its facts and actions sit in two columns.
+- 2026-11-09: nate wants long builds backgroundable with an ETA, a compact HUD chip and a finish toast with an Open action; closing the picker must not interrupt play.
