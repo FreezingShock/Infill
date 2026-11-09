@@ -8,7 +8,7 @@ import { X0, X1, Z0, Z1, elev as coreElev } from '../engine/core.js';
 
 const smooth = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 const ROAD_W = { m: 16, p: 12, s: 9, r: 6 };
-const TONES = [0xe9dfcc, 0xdcd2c0, 0xd2c8b6, 0xe3d6bf, 0xcfc6b8].map((c) => new THREE.Color(c));
+const TONES = [0xb4ab9b, 0xa59c8c, 0x9c9486, 0xaca18c, 0x948e84].map((c) => new THREE.Color(c));
 
 /** Draws the backdrop into `scene`; returns { dispose } or null when this area has none. */
 export async function initBackdrop({ scene, cam, canvas, onPick }) {
@@ -36,7 +36,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
   // --- terrain
   {
     const pos = new Float32Array(T.nx * T.nz * 3), col = new Float32Array(T.nx * T.nz * 3), tmp = new THREE.Color();
-    const grass = new THREE.Color(0xa3b58b), dry = new THREE.Color(0xcdbf8c), town = new THREE.Color(0xcbc3ae);
+    const grass = new THREE.Color(0x7d8a5c), dry = new THREE.Color(0xa09468), town = new THREE.Color(0x857f70);
     for (let j = 0; j < T.nz; j++) for (let i = 0; i < T.nx; i++) {
       const k = j * T.nx + i, x = T.minx + i * T.cell, z = T.minz + j * T.cell;
       pos[k * 3] = x; pos[k * 3 + 1] = ground(x, z) - 0.4; pos[k * 3 + 2] = z;
@@ -48,11 +48,11 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
     const idx = [];
     for (let j = 0; j < T.nz - 1; j++) for (let i = 0; i < T.nx - 1; i++) { const a = j * T.nx + i, b = a + 1, c = a + T.nx, d = c + 1; idx.push(a, c, b, b, c, d); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })); m.receiveShadow = false; group.add(m);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); m.receiveShadow = false; group.add(m);
   }
   // --- streets as ribbons
   {
-    const p = [], c = [], col = { m: new THREE.Color(0x77716a), p: new THREE.Color(0x7d7872), s: new THREE.Color(0x8a847c), r: new THREE.Color(0x9a948a) };
+    const p = [], c = [], col = { m: new THREE.Color(0x4b4743), p: new THREE.Color(0x504c48), s: new THREE.Color(0x58544f), r: new THREE.Color(0x66615a) };
     for (const [k, list] of Object.entries(D.roads)) for (const flat of list) {
       const pts = []; for (let i = 0; i < flat.length; i += 2) pts.push([flat[i], flat[i + 1]]);
       const P = []; for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 25)); for (let s = 0; s < n; s++) P.push([a[0] + (b[0] - a[0]) * s / n, a[1] + (b[1] - a[1]) * s / n]); }
@@ -65,12 +65,12 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
       }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); group.add(m);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); group.add(m);
   }
   // --- buildings as blocks, one per 30 m cell
   {
     const n = D.cells.length / 4, geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), n), M = new THREE.Matrix4(), q = new THREE.Quaternion(), pv = new THREE.Vector3(), sv = new THREE.Vector3();
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 }), n), M = new THREE.Matrix4(), q = new THREE.Quaternion(), pv = new THREE.Vector3(), sv = new THREE.Vector3();
     for (let k = 0, o = 0; k < D.cells.length; k += 4, o++) {
       const x = D.bx0 + (D.cells[k] + 0.5) * D.bcell, z = D.bz0 + (D.cells[k + 1] + 0.5) * D.bcell, h = Math.max(3.5, D.cells[k + 2] / 10), cv = D.cells[k + 3] / 100;
       const s = D.bcell * 0.82 * Math.sqrt(Math.min(1, Math.max(0.3, cv * 1.3)));

@@ -51,7 +51,7 @@ function lotObject(gens) {
 }
 
 // ---------- trees, cars ----------
-const TREE_COLS = [0x6f9a52, 0x7fa65a, 0x5d8a4a, 0x8aab5e, 0x6a8f58].map((h) => new THREE.Color(h));
+const TREE_COLS = [0x56773f, 0x62833f, 0x486b38, 0x6b8a47, 0x55704a].map((h) => new THREE.Color(h));
 const TREE_KINDS = (() => {
   const mk = (geo, y) => { geo.translate(0, y, 0); return geo; };
   return [
@@ -194,7 +194,7 @@ class World {
 // ---------- static scenery: terrain, mapped walks, street props, trees on wild land ----------
 function buildTerrain() {
   const pos = new Float32Array(T.nx * T.nz * 3), col = new Float32Array(T.nx * T.nz * 3);
-  const grass = C(0xa3b58b), meadow = C(0x93ab7c), dry = C(0xd2bb7f), dirt = C(0xc2a77a), tmp = new THREE.Color();
+  const grass = C(0x7d8a5c), meadow = C(0x6f7f50), dry = C(0xa89868), dirt = C(0x8d775a), tmp = new THREE.Color();
   for (let j = 0; j < T.nz; j++) for (let i = 0; i < T.nx; i++) {
     const k = j * T.nx + i, h = HG[k];
     pos[k * 3] = T.minx + i * T.cell; pos[k * 3 + 1] = h; pos[k * 3 + 2] = T.minz + j * T.cell;
@@ -206,7 +206,7 @@ function buildTerrain() {
   const idx = []; for (let j = 0; j < T.nz - 1; j++) for (let i = 0; i < T.nx - 1; i++) { const a = j * T.nx + i, b = a + 1, c = a + T.nx, d = c + 1; idx.push(a, c, b, b, c, d); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, toon({ vertexColors: true })); m.receiveShadow = true;
-  const sk = new Acc(), soil = C(0x8b6f4e), BOT = -12;
+  const sk = new Acc(), soil = C(0x5f4c38), BOT = -12;
   const edge = (pts) => { for (let k = 0; k < pts.length - 1; k++) { const [x0, z0] = pts[k], [x1, z1] = pts[k + 1]; sk.quad([x0, BOT, z0], [x1, BOT, z1], [x1, elev(x1, z1), z1], [x0, elev(x0, z0), z0], soil); } };
   edge(densify([[X0, Z0], [X1, Z0]], T.cell)); edge(densify([[X1, Z0], [X1, Z1]], T.cell)); edge(densify([[X1, Z1], [X0, Z1]], T.cell)); edge(densify([[X0, Z1], [X0, Z0]], T.cell));
   return [m, new THREE.Mesh(sk.geo(), toon({ vertexColors: true, side: THREE.DoubleSide }))];
