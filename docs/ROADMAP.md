@@ -1,9 +1,9 @@
-# Infill roadmap: the live city (written 9 Nov 2026)
+# sfvOS roadmap: the live city (updated 9 Nov 2026)
 
-Goal from nate: whatever area you load is **alive** (cars driving, parked cars, turns, signals, a clock), it **keeps evolving** with new iterations, and it plays as close to Cities: Skylines 2 / CityRT as we can get, **on real lots and real streets, never a grid**. Existing cities must be easy to **update**, not just create. Builds on [PLAN.md](PLAN.md) (v3); where they differ, this file wins.
+Goal from nate: whatever area you load is **alive** (cars driving, parked cars, turns, signals, a clock), it **keeps evolving** with new iterations, and it plays as close to Cities: Skylines 2 / CityRT as we can get, **on real lots and real streets, never a grid**. Existing cities must be easy to **update**, not just create. Builds on [PLAN.md](PLAN.md) (v3, historical); where they differ, this file wins. How the code fits together: [ARCHITECTURE.md](ARCHITECTURE.md). Rules and PR flow: [../CLAUDE.md](../CLAUDE.md).
 
-## How threads work here (borrowed from nate's Deepstack repo)
-Many threads, one focused PR each, CI-gated auto-merge into `integration`, strict folder ownership so PRs rarely touch the same file, a `CLAUDE.md` with the rules, and a living backlog plus a taste file ([nate-preferences.md](nate-preferences.md)) that every thread appends to when its PR merges. Big refactors go alone. Runtime multithreading is the other half: the heavy work moves off the main thread (see Workers).
+## How threads work here
+Many threads, one focused PR each, merged into `integration` by the thread itself once CI is green, strict folder ownership so PRs rarely touch the same file, a `CLAUDE.md` with the rules, and a living backlog plus a taste file ([nate-preferences.md](nate-preferences.md)) that every thread appends to when its PR merges. Big refactors go alone. Runtime multithreading is the other half: the heavy work moves off the main thread (see Workers).
 
 ## Workstreams
 
@@ -13,11 +13,11 @@ Many threads, one focused PR each, CI-gated auto-merge into `integration`, stric
 | B | **Areas: load and update**: area picker, build-from-game, versioned packs with stable lot ids, "Refresh area" that rebases your edit log onto new data, save migration | `src/areas/`, `tools/pack/`, `public/areas/` | thread running |
 | C | **CS2-style road tools and intersection edits**: curve, arc and grid-in-3-clicks presets, snapping, upgrade or replace in place, lane editor, one-ways, intersection control, speed limits, quick house/commercial edits | `src/tools/roads/` | thread running ("Add road tools and easy intersection edits") |
 | J | **Realistic building models**: open-licensed models and imagery-derived looks for buildings, loaded as assets | `src/assets/`, `public/models/`, `src/engine/looks.js` | thread running ("Get realistic building models") |
-| D | **Zoning and growth**: paint districts with a brush, demand bars (homes, shops, work), buildings level up on their own, the city reacts to your edits | `src/game/zoning/`, `src/game/growth.js` | proposed |
-| E | **Camera, light and feel**: CS2-like orbit/pitch camera, soft shadows, day/night tied to the clock, placement ghosts, sound, reduced-motion | `src/app/camera.js`, `src/views/light.js`, `src/audio/` | proposed |
-| F | **Info views and HUD**: Traffic, Parking, Zones, Happiness views, CS2-style info panels and advisor bar, clock controls | `src/views/`, `src/ui/` | proposed |
+| D | **Zoning and growth**: paint districts with a brush, demand bars (homes, shops, work), buildings level up on their own, the city reacts to your edits | `src/game/zoning/`, `src/game/growth.js` | started (check `src/`) |
+| E | **Camera, light and feel**: CS2-like orbit/pitch camera, soft shadows, day/night tied to the clock, placement ghosts, sound, reduced-motion | `src/app/camera.js`, `src/views/light.js`, `src/audio/` | started (check `src/`) |
+| F | **Info views and HUD**: Traffic, Parking, Zones, Happiness views, CS2-style info panels and advisor bar, clock controls | `src/views/`, `src/ui/` | started (check `src/`) |
 | G | **Renovate and repurpose**: keep-the-shell upgrades, strip mall to homes over shops, centers as one thing | `src/engine/renovate.js`, `src/tools/renovate/` | first slice in PR (Repurpose shelf: shops, mixed, homes, offices, facelift, one center) |
-| H | **People and transit**: pedestrians at crossings, bus routes from mapped stops, bikes | `src/sim/people/`, `src/sim/transit/` | later (after A) |
+| H | **People and transit**: pedestrians at crossings, bus routes from mapped stops, bikes | `src/sim/people/`, `src/sim/transit/` | later |
 | I | **Infra and speed**: shared worker pool, lot-gen and chunk meshing off the main thread, perf baseline, store module for edit-log state | `src/workers/`, `src/app/store.js`, `docs/perf-baseline.md` | first slice in PR: lot geometry on a worker pool, work store, perf baseline. Next: view metrics, edit-log store, feature registry |
 
 ### Contracts between threads (so A, B, C, D can build in parallel)
@@ -36,6 +36,14 @@ Many threads, one focused PR each, CI-gated auto-merge into `integration`, stric
 
 ## Order of merges
 1. This PR (rules, CI, roadmap). 2. A and B first slices (parking and live cars; area picker and refresh). 3. C, D, F start once A's lane graph lands. 4. E can start now (no dependency). 5. G after C. 6. I when A and B have merged. 7. H last.
+
+## Interface: Camino (workstream K)
+| # | Workstream | Owns | Status |
+| --- | --- | --- | --- |
+| K | **Camino theme**: realistic street view, scan view of real infrastructure, bottom dock and popovers, command bar, boot screen, notifications | `src/camino/`, `public/areas/*.infra.json`, `tools/pack/infra.py` | shipped as the only theme (PRs #33 to #40). Next: refinements from nate's playtests, FPS and label stability, more real scan data |
+
+## Current phase (9 Nov 2026)
+The foundation is in. Work now is **refinement** (small fixes from nate's localhost tests), **multithreaded feature threads** (one per workstream above) and occasional **big additions** (new building models, better menus, more real data). Pick work from the table, keep PRs small, and fix importer problems at the method level for all areas.
 
 ## Open questions for nate
 Tracked in the thread; answers get recorded in [nate-preferences.md](nate-preferences.md).
