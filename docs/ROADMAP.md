@@ -16,7 +16,7 @@ Many threads, one focused PR each, CI-gated auto-merge into `integration`, stric
 | D | **Zoning and growth**: paint districts with a brush, demand bars (homes, shops, work), buildings level up on their own, the city reacts to your edits | `src/game/zoning/`, `src/game/growth.js` | proposed |
 | E | **Camera, light and feel**: CS2-like orbit/pitch camera, soft shadows, day/night tied to the clock, placement ghosts, sound, reduced-motion | `src/app/camera.js`, `src/views/light.js`, `src/audio/` | proposed |
 | F | **Info views and HUD**: Traffic, Parking, Zones, Happiness views, CS2-style info panels and advisor bar, clock controls | `src/views/`, `src/ui/` | proposed |
-| G | **Renovate and repurpose**: keep-the-shell upgrades, strip mall to homes over shops, centers as one thing | `src/engine/renovate.js`, `src/tools/renovate/` | proposed |
+| G | **Renovate and repurpose**: keep-the-shell upgrades, strip mall to homes over shops, centers as one thing | `src/engine/renovate.js`, `src/tools/renovate/` | first slice in PR (Repurpose shelf: shops, mixed, homes, offices, facelift, one center) |
 | H | **People and transit**: pedestrians at crossings, bus routes from mapped stops, bikes | `src/sim/people/`, `src/sim/transit/` | later (after A) |
 | I | **Infra and speed**: shared worker pool, lot-gen and chunk meshing off the main thread, perf baseline, store module for edit-log state | `src/workers/`, `src/app/store.js`, `docs/perf-baseline.md` | proposed, runs alone |
 
