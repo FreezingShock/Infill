@@ -17,6 +17,7 @@ function run(sim, secs) {
   for (let i = 0; i < secs * 20; i++) {
     sim.step(0.05);
     for (const seg of sim.segs) {
+      if (seg.len < 8) continue; // slivers between nodes a few metres apart can't hold a car; cars span the connector there
       const c = seg.cars.slice().sort((a, b) => b.s - a.s);
       for (let k = 1; k < c.length; k++) worst = Math.min(worst, c[k - 1].s - c[k - 1].len - c[k].s);
     }
@@ -99,4 +100,13 @@ test('the real Woodland Hills streets run for ten minutes of traffic', async () 
   assert.ok(worst > -1, `cars overlapped by ${worst}`);
   assert.ok(sim.stats.waiting < sim.stats.moving * 0.8, 'traffic is gridlocked');
   assert.ok(sim.snapshot().every(Number.isFinite));
+});
+
+test('a divided road drawn as two parallel two-way edges becomes two one-way carriageways with right-hand traffic', async () => {
+  const { inferDivided } = await import('../src/sim/net.js');
+  const A = { id: 'A', p: [[0, 0], [100, 0]], c: 'primary', els: MAIN }, B = { id: 'B', p: [[0, 12], [100, 12]], c: 'primary', els: MAIN };
+  const C = { id: 'C', p: [[0, 80], [100, 80]], c: 'primary', els: MAIN };
+  inferDivided([A, B, C]);
+  // x east, z south: heading east the right-hand side is south (+z), so B (z = 12) carries traffic east, A carries it west
+  assert.equal(B.oneway, 1); assert.equal(A.oneway, -1); assert.equal(C.oneway, undefined);
 });

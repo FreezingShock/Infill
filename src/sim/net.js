@@ -164,7 +164,42 @@ function drivableEdges(edgeMap) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
     out.push({ id: e.id, p: e.p, c: e.c, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
   }
+  inferDivided(out);
   return out;
 }
 
-export { RANK, SLOT_LEN, buildNet, drivableEdges, keyOf };
+// Divided roads often arrive as two parallel two-way edges (one per carriageway). Where an edge runs alongside
+// a partner 3 to 30 m away, with nothing marked one-way yet, make each carriageway one-way with right-hand traffic.
+function inferDivided(list) {
+  const cand = list.filter((e) => e.oneway === undefined || e.oneway === 0).filter((e) => (RANK[e.c] ?? 0) >= 3 && !e.ring && polyLength(e.p) > 25);
+  const marks = new Map();
+  for (const e of cand) {
+    const ds = unit(e.p[0], e.p.at(-1));
+    for (const f of cand) {
+      if (f === e) continue;
+      const df = unit(f.p[0], f.p.at(-1));
+      if (Math.abs(ds[0] * df[0] + ds[1] * df[1]) < 0.94) continue;
+      let hit = 0, side = 0, n = 0;
+      for (let i = 1; i < 6; i++) {
+        const q = at(e.p, i / 6), d = nearestDist(f.p, q); n++;
+        if (d.d >= 3 && d.d <= 30) { hit++; side += (d.x - q[0]) * -ds[1] + (d.z - q[1]) * ds[0]; }
+      }
+      if (hit >= 4) { marks.set(e, side < 0 ? 1 : -1); break; } // partner on the left: this one is the right-hand carriageway, forward
+    }
+  }
+  for (const [e, ow] of marks) e.oneway = ow;
+}
+function polyLength(p) { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; }
+function unit(a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; }
+function at(p, t) { const c = cumLen(p), d = t * c.at(-1); let i = 1; while (i < c.length - 1 && c[i] < d) i++; const u = (d - c[i - 1]) / ((c[i] - c[i - 1]) || 1); return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * u, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * u]; }
+function nearestDist(p, q) {
+  let best = { d: 1e9, x: 0, z: 0 };
+  for (let i = 1; i < p.length; i++) {
+    const ax = p[i - 1][0], az = p[i - 1][1], bx = p[i][0], bz = p[i][1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((q[0] - ax) * dx + (q[1] - az) * dz) / L2)), x = ax + dx * t, z = az + dz * t, d = Math.hypot(q[0] - x, q[1] - z);
+    if (d < best.d) best = { d, x, z };
+  }
+  return best;
+}
+
+export { RANK, inferDivided, SLOT_LEN, buildNet, drivableEdges, keyOf };
