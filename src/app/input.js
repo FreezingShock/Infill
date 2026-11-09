@@ -424,7 +424,7 @@ function renderAreaList() {
 }
 // Area map colours: Nexus paper by default, Camino's dark tokens under the Camino theme (the canvas paints over its CSS).
 const MAP = CAMINO
-  ? { paper: '#0b1013', grid: 'rgba(226,238,240,.12)', road: '#5b666d', major: '#2fd8e8', edge: '#e9eff1', on: '#2fd8e8', onFill: 'rgba(47,216,232,.22)', ready: 'rgba(60,224,122,.22)', idle: 'rgba(233,239,241,.06)', label: '#e9eff1', sub: '#8a99a3', font: 'Arimo, Helvetica, Arial, sans-serif', sans: 'Arimo, Helvetica, Arial, sans-serif' }
+  ? { paper: '#0b1013', grid: null, road: '#5b666d', major: '#2fd8e8', edge: '#e9eff1', on: '#2fd8e8', onFill: 'rgba(47,216,232,.22)', ready: 'rgba(60,224,122,.22)', idle: 'rgba(233,239,241,.06)', label: '#e9eff1', sub: '#8a99a3', font: 'Arimo, Helvetica, Arial, sans-serif', sans: 'Arimo, Helvetica, Arial, sans-serif' }
   : { paper: '#e7e1cf', grid: 'rgba(93,81,72,.18)', road: '#8a7f72', major: '#c4613b', edge: '#2b2420', on: '#c4613b', onFill: 'rgba(196,97,59,.22)', ready: 'rgba(142,166,122,.35)', idle: 'rgba(246,237,217,.6)', label: '#2b2420', sub: '#5d5148', font: 'Fraunces, Georgia, serif', sans: 'Capriola, sans-serif' };
 function drawAreaMap() { // the Valley as a lon/lat frame with every area's rectangle; the loaded one shows its streets
   const cv = $('areaMap'), g = cv.getContext('2d'), W = cv.width, H = cv.height, pad = 18;
@@ -432,9 +432,9 @@ function drawAreaMap() { // the Valley as a lon/lat frame with every area's rect
   const s = Math.min((W - 2 * pad) / (rb[2] - rb[0]), (H - 2 * pad) / ((rb[3] - rb[1]) * ky)), ox = (W - (rb[2] - rb[0]) * s) / 2, oy = (H - (rb[3] - rb[1]) * ky * s) / 2;
   const LL = (lon, lat) => [ox + (lon - rb[0]) * s, oy + (rb[3] - lat) * ky * s];
   g.fillStyle = MAP.paper; g.fillRect(0, 0, W, H);
-  g.strokeStyle = MAP.grid; g.lineWidth = 1;
-  for (let lon = Math.ceil(rb[0] * 50) / 50; lon < rb[2]; lon += 0.02) { const a = LL(lon, rb[1]), b = LL(lon, rb[3]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
-  for (let lat = Math.ceil(rb[1] * 50) / 50; lat < rb[3]; lat += 0.02) { const a = LL(rb[0], lat), b = LL(rb[2], lat); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  if (MAP.grid) g.strokeStyle = MAP.grid; g.lineWidth = 1;
+  if (MAP.grid) for (let lon = Math.ceil(rb[0] * 50) / 50; lon < rb[2]; lon += 0.02) { const a = LL(lon, rb[1]), b = LL(lon, rb[3]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  if (MAP.grid) for (let lat = Math.ceil(rb[1] * 50) / 50; lat < rb[3]; lat += 0.02) { const a = LL(rb[0], lat), b = LL(rb[2], lat); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
   // the loaded pack's streets, placed by its lon/lat origin (x east, z south, metres)
   const o = PACK.origin, KX = Math.cos(o[1] * Math.PI / 180) * 111320, KY = 110540;
   const M = (x, z) => LL(o[0] + x / KX, o[1] - z / KY);
