@@ -14,7 +14,7 @@
   {
    "id": "wh-topanga",
    "name": "Woodland Hills",
-   "sub": "Topanga Canyon Blvd · Ventura Blvd to Lopez St",
+   "sub": "Topanga Canyon Blvd \u00b7 Ventura Blvd to Lopez St",
    "main": "Topanga Canyon",
    "bbox": [
     -118.6115,
@@ -36,8 +36,11 @@
     -118.5958,
     34.2065
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "canoga-park.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 965,
+   "parcels": "city"
   },
   {
    "id": "chatsworth",
@@ -50,8 +53,11 @@
     -118.5948,
     34.2625
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "chatsworth.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 1000,
+   "parcels": "city"
   },
   {
    "id": "northridge",
@@ -64,8 +70,11 @@
     -118.5298,
     34.2415
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "northridge.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 900,
+   "parcels": "city"
   },
   {
    "id": "granada-hills",
@@ -78,8 +87,11 @@
     -118.5168,
     34.2705
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "granada-hills.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 846,
+   "parcels": "city"
   },
   {
    "id": "reseda",
@@ -92,8 +104,11 @@
     -118.5299,
     34.2066
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "reseda.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 1192,
+   "parcels": "city"
   },
   {
    "id": "encino",
@@ -106,8 +121,11 @@
     -118.4948,
     34.1645
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "encino.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 783,
+   "parcels": "city"
   },
   {
    "id": "van-nuys",
@@ -120,8 +138,11 @@
     -118.4428,
     34.1905
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "van-nuys.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 919,
+   "parcels": "city"
   },
   {
    "id": "panorama-city",
@@ -134,8 +155,11 @@
     -118.4428,
     34.2265
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "panorama-city.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 872,
+   "parcels": "city"
   },
   {
    "id": "sherman-oaks",
@@ -148,8 +172,11 @@
     -118.4428,
     34.1565
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "sherman-oaks.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 1077,
+   "parcels": "city"
   },
   {
    "id": "studio-city",
@@ -162,8 +189,11 @@
     -118.3898,
     34.1485
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "studio-city.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 1096,
+   "parcels": "city"
   },
   {
    "id": "north-hollywood",
@@ -176,8 +206,11 @@
     -118.3708,
     34.1705
    ],
-   "pack": null,
-   "status": "planned"
+   "pack": "north-hollywood.json",
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 617,
+   "parcels": "city"
   }
  ]
 }

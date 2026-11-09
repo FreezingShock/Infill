@@ -233,12 +233,61 @@ for i, l in enumerate(lots):
 for b in B:
     if b.get('l') is None: b.pop('l', None)
 
+
+# ---------- stable ids: when refreshing an area, reuse the ids of lots and streets that are still there ----------
+# Saved edits point at lot ids (L12, E40), so a rebuilt pack must keep them or every edit would be lost.
+import os
+PREV = os.environ.get('PREV_PACK')
+reused = {'lots': 0, 'edges': 0}
+if PREV and os.path.exists(PREV):
+    O = json.load(open(PREV)); ox, oy = O['origin']; okx = math.cos(math.radians(oy)) * 111320
+    def to_new(x, z):  # old metres -> lon/lat -> new metres
+        lon = ox + x / okx; lat = oy - z / 110540
+        return ((lon - lon0) * KX, -(lat - lat0) * KY)
+    used = set()
+    otree_geoms = [Polygon([to_new(*p) for p in l['r']]).buffer(0) for l in O['lots']]
+    otree = STRtree(otree_geoms)
+    by_ain = {}
+    for i, l in enumerate(O['lots']):
+        if l.get('ain'): by_ain.setdefault(l['ain'], []).append(i)
+    for l in out_lots:
+        cand = None
+        for i in sorted(by_ain.get(l.get('ain'), []), key=lambda i: -otree_geoms[i].intersection(Polygon(l['r']).buffer(0)).area):
+            if O['lots'][i]['id'] not in used: cand = i; break
+        if cand is None:  # unparcelled lots: best overlap with an old lot
+            pg = Polygon(l['r']).buffer(0); best = 0
+            for i in otree.query(pg):
+                if O['lots'][i]['id'] in used: continue
+                ov = otree_geoms[i].intersection(pg).area
+                if ov > best and ov > 0.5 * min(pg.area, otree_geoms[i].area): best = ov; cand = int(i)
+        if cand is not None: l['id'] = O['lots'][cand]['id']; used.add(l['id']); reused['lots'] += 1
+    top = max([int(l['id'][1:]) for l in O['lots'] if l['id'][1:].isdigit()] + [0])
+    taken = {l['id'] for l in out_lots if l['id'] in used}
+    for l in out_lots:
+        if l['id'] in taken: continue
+        top += 1; l['id'] = f'L{top}'
+    eused = set(); etop = max([int(e['id'][1:]) for e in O['edges'] if e['id'][1:].isdigit()] + [0])
+    oed = [(e, [to_new(*p) for p in e['p']]) for e in O['edges']]
+    emap = {}
+    for e in edges:
+        old_id = e['id']; a, b = e['p'][0], e['p'][-1]; hit = None
+        for oe, op in oed:
+            if oe['id'] in eused or (oe.get('n') or '') != (e.get('n') or ''): continue
+            d = lambda p, q: math.hypot(p[0] - q[0], p[1] - q[1])
+            if (d(a, op[0]) < 4 and d(b, op[-1]) < 4) or (d(a, op[-1]) < 4 and d(b, op[0]) < 4): hit = oe; break
+        if hit: e['id'] = hit['id']; eused.add(hit['id']); reused['edges'] += 1
+        else:
+            etop += 1; e['id'] = f'E{etop}'
+        emap[old_id] = e['id']
+    for l in out_lots:
+        if l.get('rd') in emap: l['rd'] = emap[l['rd']]
+    print('stable ids:', reused, 'of', len(out_lots), 'lots,', len(edges), 'edges')
 pack = {'v': 2, 'origin': P['origin'], 'bbox': P['bbox'], 'terrain': T, 'nodes': node_list,
         'edges': [{k: v for k, v in e.items() if v is not None} for e in edges], 'walks': P['walks'], 'buildings': B, 'lots': out_lots,
         'blocks': [ring(b) for b in blocks], 'parking': [ring(p) for p in parking if p.geom_type == 'Polygon'],
         'props': props, 'landuse': [{'k': x['k'], 'r': ring(x['g'].simplify(1))} for x in lu],
         'sources': P['sources'] | {'parking': 'Overture Maps base/infrastructure 2026-10-21.0 (from OSM)', 'props': 'Overture Maps base/infrastructure 2026-10-21.0', 'landuse': 'Overture Maps base/land_use 2026-10-21.0'}
-        | ({'lots': 'City of LA BOE parcels (data.lacity.org qyra-qm2s, with LA County AIN), pulled 2026-10-25', 'zoning': 'City of LA ZONING_PLY (data.lacity.org jjxn-vhan) and GENPLAN_PLY (c3g2-yzgc)',
+        | ({'lots': 'City of LA BOE parcels (data.lacity.org qyra-qm2s, with LA County AIN), pulled ' + __import__('datetime').date.today().isoformat(), 'zoning': 'City of LA ZONING_PLY (data.lacity.org jjxn-vhan) and GENPLAN_PLY (c3g2-yzgc)',
             'addresses': 'City of LA addresses (data.lacity.org 4ca8-mxuh)', 'years': 'LADBS new-building permits with CofO (data.lacity.org), else estimated'} if REAL else {})}
 s = json.dumps(pack, separators=(',', ':'))
 open(OUT, 'w').write(s)

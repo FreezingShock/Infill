@@ -196,7 +196,7 @@ let toastT;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 4200); }
 
 // ---------- save / load ----------
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ log: LOG.slice(0, CUR), groups: ui.groups, dream: ui.dream })); } catch (e) { /* storage unavailable: edits last for this visit */ } }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ log: LOG.slice(0, CUR), groups: ui.groups, dream: ui.dream, built: AREA.built })); } catch (e) { /* storage unavailable: edits last for this visit */ } }
 function load() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { return null; } }
 
 // ---------- selection ----------
