@@ -56,5 +56,5 @@ export function mountFps() {
 
 export function mountKeys() {
   const keys = document.querySelector('#keysm .keys');
-  if (keys) keys.insertAdjacentHTML('beforeend', '<div><kbd>F</kbd> Street / Scan view</div><div>Classic paper look: add <code>?theme=nexus</code></div>');
+  if (keys) keys.insertAdjacentHTML('beforeend', '<div><kbd>F</kbd> Street / Scan view</div><div><kbd>/</kbd> Command bar: views, tools, areas, addresses</div><div>Classic paper look: add <code>?theme=nexus</code></div>');
 }

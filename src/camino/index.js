@@ -11,6 +11,7 @@ import { initScan, onScan, scanOn, setScan, tick } from './scan.js';
 import { anchors, createTags } from './tags.js';
 import { skyState } from './sky.js';
 import { mountFps, mountKeys, mountSwitch, mountTitle, showDossier } from './hud.js';
+import { mountCommandBar } from './commandbar.js';
 
 const AREA = globalThis.__RENOVATED_AREA__ || {};
 let D = null;
@@ -26,6 +27,7 @@ const tags = createTags(document.getElementById('app'), anchors(I)); tags.show(f
 onScan((on) => { tags.show(on); syncSwitch(on); });
 showDossier(AREA, infraTotals(I));
 const fps = mountFps();
+mountCommandBar(); // "/" or Ctrl+K: views, tools, areas, Street/Scan and addresses
 
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;

@@ -394,6 +394,11 @@ function toggleView(k) {
   else if (k === 'night') { ui.night = !ui.night; setHour(ui.night ? 22 : 14); dock.sync(); refreshLight(); }
   placeSplit(); renderViews();
 }
+// Hooks for the command bar (src/camino/commandbar.js): each runs the same code as the matching button or key.
+export function pickTool(t) { if (ADV_TOOLS.some((x) => x[0] === t) && !ui.adv) { ui.adv = true; renderViews(); } setTool(t); }
+export function setLightHour(h) { setHour(h); ui.night = lightAt(h).isNight; dock.sync(); refreshLight(); renderViews(); }
+export function searchLots(q) { return search(q); }
+export function goToLot(l) { setTool('select'); setSel([l.id]); flyTo(l.c[0], l.c[1], Math.max(camZoom(), 3.4)); }
 const splitEl = $('split'), handle = $('splitHandle');
 function placeSplit() { splitEl.hidden = !ui.splitOn; splitEl.style.left = ui.split * 100 + '%'; handle.setAttribute('aria-valuenow', Math.round(ui.split * 100)); }
 handle.addEventListener('pointerdown', (e) => {
@@ -577,4 +582,8 @@ export {
   renderTools,
   renderViews,
   setTool,
+  closeModals,
+  openAreas,
+  openLog,
+  toggleView,
 };
