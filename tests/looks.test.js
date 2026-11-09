@@ -36,3 +36,15 @@ test('every lot generates finite geometry with looks on', () => {
     for (const arr of [g.s.p, g.g.p]) for (const v of arr) assert.ok(Number.isFinite(v), `lot ${lot.id}`);
   }
 });
+
+test('street trees follow the inventory sidecar and stay off streets that already have a tree strip', async () => {
+  const st = await import('../src/engine/streettrees.js');
+  const data = JSON.parse(fs.readFileSync(new URL(`../public/areas/${area.pack.replace('.json', '.streets.json')}`, import.meta.url)));
+  assert.equal(st.setStreetTrees(data), true);
+  const named = [...BASE.edges.values()].filter((e) => e.n && data.streets[st.norm(e.n)] && e.prof.k === 'asbuilt');
+  assert.ok(named.length > 5, `planted streets: ${named.length}`);
+  const n = named.reduce((s, e) => s + st.streetTrees(e, 2.2, e.prof.els.reduce((a, q) => a + q[1], 0)).length, 0);
+  assert.ok(n > 50, `trees: ${n}`);
+  const e = { ...named[0], prof: { k: 'complete', els: [['walk', 3], ['trees', 1.6], ['lane', 3]] } };
+  assert.equal(st.streetTrees(e, 3, 7.6).length, 0);
+});

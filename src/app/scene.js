@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
+import { streetTrees } from '../engine/streettrees.js';
 import { Acc, C, HG, T, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
@@ -102,6 +103,7 @@ function buildRoads(S) {
       }
       o += w;
     }
+    if (pass === 1) { const w0 = els[0]?.[0] === 'walk' ? els[0][1] : 2.2; for (const t of streetTrees(e, w0, row)) trees.push(t); } // inventory-based street trees (src/engine/streettrees.js)
     if (pass === 1) { // markings
       let o2 = -row / 2; const pos = [];
       for (const [k, w] of els) { pos.push([k, o2, o2 + w]); o2 += w; }
