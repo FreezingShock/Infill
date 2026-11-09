@@ -11,7 +11,7 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z ]/g, ' ').split
 
 // Pure: where would trees go along this street? Returns [x, y, z, scale, kind, colourIx] like the other trees.
 function streetTrees(e, walkOuter, rowW) {
-  if (!DATA || !e.n || e.s === 'driveway' || !e.prof || e.prof.k === 'plain') return [];
+  if (!DATA || !e.n || e.s === 'driveway' || !e.prof || e.prof.k === 'plain' || e.c === 'motorway' || e.c === 'trunk') return []; // freeways get natural cover instead (src/app/roadside.js)
   if (e.prof.els.some((q) => q[0] === 'trees' || q[0] === 'median')) return [];
   const st = DATA.streets[norm(e.n)]; if (!st) return [];
   const out = [], off = rowW / 2 - walkOuter + 0.7;

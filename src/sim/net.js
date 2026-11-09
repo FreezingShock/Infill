@@ -5,6 +5,7 @@
 // Optional future fields (absent means today's behaviour): oneway: 1|-1, speed: m/s.
 import { planSignal } from './signals.js';
 import { bezier, cubic, cumLen, offsetLine, pathsCross, trimLine } from './geom.js';
+import { heightIn, project, spanAt, spansOf } from '../tools/roads/deck.js';
 
 const RANK = { motorway: 5, primary: 4, secondary: 3, tertiary: 2, residential: 1, unclassified: 1, service: 0, unknown: 0 };
 const SPEED = { motorway: 19, primary: 14, secondary: 12, tertiary: 10.5, residential: 8.5, unclassified: 8.5, service: 5, unknown: 5 };
@@ -37,7 +38,8 @@ function laneLayout(e) {
 function buildNet(edges, opts = {}) {
   const signals = opts.signals || [], bounds = opts.bounds || null, control = opts.control || {};
   const nodes = new Map(), lanes = [], connectors = [];
-  const node = (pt) => { const k = keyOf(pt); let n = nodes.get(k); if (!n) { n = { id: k, x: pt[0], z: pt[1], legs: [], ins: [], outs: [], conns: [], control: 'none', rank: 0 }; nodes.set(k, n); } return n; };
+  // a node is a place AND a level: roads on a bridge and roads beneath it never meet, even where their ends share a spot (src/engine/levels.js)
+  const node = (pt, lv = 0) => { const k = lv ? keyOf(pt) + '^' + lv : keyOf(pt); let n = nodes.get(k); if (!n) { n = { id: k, x: pt[0], z: pt[1], legs: [], ins: [], outs: [], conns: [], control: 'none', rank: 0 }; nodes.set(k, n); } return n; };
   const half = (e) => { let r = 0; for (const [, w] of e.els) r += w; return r / 2; };
   // pass 1: nodes and legs
   const list = [];
@@ -45,7 +47,7 @@ function buildNet(edges, opts = {}) {
     if (!e.p || e.p.length < 2) continue;
     const lay = laneLayout(e);
     if (!lay.fwd.length && !lay.bwd.length) continue;
-    const a = node(e.p[0]), b = node(e.p[e.p.length - 1]);
+    const a = node(e.p[0], e.l0), b = node(e.p[e.p.length - 1], e.l1);
     if (a === b) continue;
     const item = { e, xm: e.xm, dv: e.dv, tp: e.tp, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
     a.legs.push({ item, end: 0 }); b.legs.push({ item, end: 1 });
@@ -156,7 +158,8 @@ function buildNet(edges, opts = {}) {
   }
   const slots = []; for (const l of lanes) for (const s of l.slots) slots.push(s);
   let laneMeters = 0; for (const l of lanes) laneMeters += l.len;
-  return { nodes: [...nodes.values()], lanes, connectors, slots, laneMeters, laneById: new Map(lanes.map((l) => [l.id, l])), connById: new Map(connectors.map((c) => [c.id, c])) };
+  const decks = new Map(); for (const e of edges) if (e.dk && e.dk.length) decks.set(e.id, e);
+  return { nodes: [...nodes.values()], lanes, connectors, slots, laneMeters, decks, laneById: new Map(lanes.map((l) => [l.id, l])), connById: new Map(connectors.map((c) => [c.id, c])) };
 }
 
 // Speed a car can hold through a connector: limited by the tightest bend (lateral acceleration about 2.2 m/s^2) and the slower of the two streets.
@@ -193,7 +196,7 @@ function drivableEdges(edgeMap, driveways) {
   const out = [];
   for (const e of edgeMap.values()) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
-    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0, dw: driveways?.get(e.id) });
+    out.push({ id: e.id, p: e.p, c: e.c, l0: e.l0 || 0, l1: e.l1 || 0, dk: spansOf(e) || undefined, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0, dw: driveways?.get(e.id) });
   }
   inferDivided(out);
   return out;
@@ -233,4 +236,11 @@ function nearestDist(p, q) {
   return best;
 }
 
-export { RANK, inferDivided, SLOT_LEN, buildNet, drivableEdges, keyOf };
+// height of the deck a car on edge `eid` is driving on at (x, z), NaN where that edge runs on the ground
+function deckHeight(net, eid, x, z) {
+  const e = net.decks.get(eid); if (!e) return NaN;
+  const q = project(e.p, x, z), sp = spanAt(e.dk, q.s);
+  return sp ? heightIn(sp, q.s) : NaN;
+}
+
+export { RANK, inferDivided, SLOT_LEN, buildNet, deckHeight, drivableEdges, keyOf };

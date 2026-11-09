@@ -26,6 +26,8 @@ Progress is reported to the boot screen in `index.html` via `app/loader.js`.
 - Design kit for outside use: `/mnt/project-files/camino-design-system/`.
 - The dock moves the existing bars into popovers instead of rebuilding them, because the app re-renders `#tools`, `#views`, `#infobar`, `#card` with `innerHTML`. Hook stable containers or use a `MutationObserver`; never assume your DOM node survives a render.
 
+- **Levels**: `engine/levels.js` plans bridges, cut ground and node levels once on the base city; `app/bridges.js` and `app/roadside.js` draw decks, barriers and freeway vegetation; `tools/roads/deck.js` is the pure reader the sim also uses. Rules in [ROAD_GRAPH.md](ROAD_GRAPH.md).
+
 ## Importer
 `tools/pack/build_area.py` builds a pack for any box; details, sources and recognition rules are in [IMPORT.md](IMPORT.md). Summary: Overture segments/buildings/addresses/land use + City of LA parcels and zoning + AWS terrain + NAIP imagery checks -> `public/areas/<id>.json` plus `.bg.json` (backdrop), `.infra.json` (scan data), `.looks.json`, `.streets.json`, `.canopy.json`. Lots and streets keep stable ids across `--refresh`, so saves survive.
 

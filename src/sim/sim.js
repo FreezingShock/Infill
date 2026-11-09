@@ -3,8 +3,9 @@
 // Pure JS with no THREE and no DOM, so it runs in a Web Worker and in node tests.
 import { rng, sampleAt } from './geom.js';
 import { stateAt } from './signals.js';
+import { deckHeight } from './net.js';
 
-const CAR_LEN = 4.4, STRIDE = 7;
+const NO_DECK = -999, CAR_LEN = 4.4, STRIDE = 8; // snapshot per vehicle: id, x, z, heading, vx, vz, look, height of the deck it drives on (NO_DECK = on the ground)
 // vehicle kinds: 0 sedan, 1 SUV, 2 pickup, 3 van, 4 bus. A look is colour (0..5) + 8 * kind.
 const LENS = [4.4, 4.7, 5.2, 5.0, 10.5];
 const kindOf = (look) => Math.floor(look / 8);
@@ -268,7 +269,7 @@ class Sim {
     return { flow, curb };
   }
 
-  // ---------- output: [id, x, z, heading, vx, vz, colour] per vehicle ----------
+  // ---------- output: [id, x, z, heading, vx, vz, colour, deck height] per vehicle ----------
   snapshot() {
     const net = this.net; if (!net) return new Float32Array(0);
     const parked = net.slots.filter((s) => s.state === 1);
@@ -276,7 +277,7 @@ class Sim {
     let o = 0, wait = 0, sum = 0;
     const put = (id, seg, s, lat, v, color) => {
       const p = sampleAt(seg.pts, seg.cum, Math.max(0, s - LENS[kindOf(color)] / 2));
-      out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color;
+      out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color; out[o++] = NO_DECK;
     };
     // A moving car is posed by its two axles, which can lie on different segments (the lane it just left and the
     // connector it is on). That keeps the car continuous across handovers and turns its heading smoothly through a corner.
@@ -286,7 +287,7 @@ class Sim {
       let dx = f[0] - r[0], dz = f[1] - r[1]; const L = Math.hypot(dx, dz);
       if (L < 0.3) { dx = f[2]; dz = f[3]; } else { dx /= L; dz /= L; }
       const x = (f[0] + r[0]) / 2 - dz * c.lat, z = (f[1] + r[1]) / 2 + dx * c.lat;
-      out[o++] = c.id; out[o++] = x; out[o++] = z; out[o++] = Math.atan2(dx, dz); out[o++] = dx * c.v; out[o++] = dz * c.v; out[o++] = c.color;
+      out[o++] = c.id; out[o++] = x; out[o++] = z; out[o++] = Math.atan2(dx, dz); out[o++] = dx * c.v; out[o++] = dz * c.v; out[o++] = c.color; const dy = net.decks?.size ? deckHeight(net, c.seg.eid ?? c.seg.from?.eid, x, z) : NaN; out[o++] = Number.isFinite(dy) ? dy : NO_DECK;
     };
     for (const c of this.cars) { pose(c); sum += c.v; if (c.v < 0.3) wait++; }
     for (const s of parked) put(1e6 + s.ix, s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
@@ -295,4 +296,4 @@ class Sim {
   }
 }
 
-export { CAR_LEN, LENS, STRIDE, Sim };
+export { CAR_LEN, LENS, NO_DECK, STRIDE, Sim };

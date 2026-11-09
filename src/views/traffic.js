@@ -9,7 +9,7 @@ import { drivewaysByEdge } from '../engine/driveways.js';
 import { nodeControl } from '../tools/roads/graph.js';
 import { provide } from './providers.js';
 import { drivableEdges, keyOf } from '../sim/net.js';
-import { Sim, STRIDE } from '../sim/sim.js';
+import { NO_DECK, Sim, STRIDE } from '../sim/sim.js';
 import { advance, applyMessage } from '../sim/host.js';
 import { exportSignals } from '../sim/signals.js';
 import { setSignals, tickSignals } from './signals.js';
@@ -152,7 +152,7 @@ function tickTraffic(now) {
   for (let q = 0; q < st.mvN; q++) {
     const o = st.mvOff[q], k = Math.min(4, (buf[o + 6] | 0) >> 3), i = nm[k]++;
     if (i >= MOVING_CAP) continue;
-    writeCar(moving[k], i, buf[o + 1] + buf[o + 4] * dt, buf[o + 2] + buf[o + 5] * dt, buf[o + 3]);
+    writeCar(moving[k], i, buf[o + 1] + buf[o + 4] * dt, buf[o + 2] + buf[o + 5] * dt, buf[o + 3], buf[o + 7]);
   }
   for (const f of moving) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
   if (st.fresh) {
@@ -160,15 +160,16 @@ function tickTraffic(now) {
     for (let o = 0; o < buf.length; o += STRIDE) {
       if (buf[o] < 1e6) continue;
       const k = Math.min(4, (buf[o + 6] | 0) >> 3), i = np[k]++;
-      if (i < PARKED_CAP) writeCar(parked[k], i, buf[o + 1], buf[o + 2], buf[o + 3]);
+      if (i < PARKED_CAP) writeCar(parked[k], i, buf[o + 1], buf[o + 2], buf[o + 3], NO_DECK);
     }
     for (const f of parked) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
     st.fresh = false;
   }
 }
 // one car's matrix into both of its instanced meshes (body and trim share it)
-function writeCar(f, i, x, z, h) {
-  const c = Math.cos(h), s = Math.sin(h), y = elev(x, z) + 0.3, j = i * 16, A = f.a.instanceMatrix.array, B = f.b.instanceMatrix.array;
+function writeCar(f, i, x, z, h, deckY) {
+  const c = Math.cos(h), s = Math.sin(h), y = (deckY > NO_DECK / 2 ? deckY : elev(x, z)) + 0.3, j = i * 16, // on a bridge the car rides the deck, else the ground
+    A = f.a.instanceMatrix.array, B = f.b.instanceMatrix.array;
   A[j] = c; A[j + 1] = 0; A[j + 2] = -s; A[j + 3] = 0; A[j + 4] = 0; A[j + 5] = 1; A[j + 6] = 0; A[j + 7] = 0; A[j + 8] = s; A[j + 9] = 0; A[j + 10] = c; A[j + 11] = 0; A[j + 12] = x; A[j + 13] = y; A[j + 14] = z; A[j + 15] = 1;
   B.set(A.subarray(j, j + 16), j);
 }

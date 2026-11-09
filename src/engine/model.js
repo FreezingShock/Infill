@@ -3,6 +3,7 @@ import { PACK } from './pack.js';
 import { markDivided } from '../tools/roads/divided.js';
 import { ARTERIAL, classify } from '../tools/roads/classes.js';
 import { smoothSwerves } from '../tools/roads/swerves.js';
+import { planLevels } from './levels.js';
 import { planDriveway } from './driveways.js';
 import { area, bbox, centroid, elev, inPoly, nearestOnLine, pcSafe, pick, ringDistToLine, rng, segDist2, toPC } from './core.js';
 
@@ -48,6 +49,7 @@ const EL = {
   park: { name: 'Parking', c: 0x77716b }, lane: { name: 'Car lane', c: 0x6c6662, car: 1 }, turn: { name: 'Turn lane', c: 0x6c6662 },
   bike: { name: 'Bike lane', c: 0x5f9e63 }, bus: { name: 'Bus lane', c: 0xa8554a, car: 1 }, shared: { name: 'Shared lane', c: 0xc79c7a },
   plaza: { name: 'Plaza', c: 0xdccdb0, curb: 1 },
+  shoulder: { name: 'Shoulder', c: 0x7a746e, hide: 1 }, barrier: { name: 'Concrete barrier', c: 0xbab6ae, curb: 1, hide: 1 }, // freeway pieces: not offered in the street editor
 };
 const PRESETS = {
   complete: { name: 'Complete street', els: [['walk', 3], ['trees', 1.6], ['bike', 1.8], ['park', 2.4], ['lane', 3.3], ['turn', 3.2], ['lane', 3.3], ['park', 2.4], ['bike', 1.8], ['trees', 1.6], ['walk', 3]] },
@@ -59,10 +61,24 @@ const PRESETS = {
   local: { name: 'Local street', els: [['walk', 2.2], ['park', 2], ['lane', 2.5], ['lane', 2.5], ['park', 2], ['walk', 2.2]] },
 };
 const WALKABLE = new Set(['complete', 'diet', 'slow', 'woonerf', 'ped']);
+// Freeway rules, for any motorway-class road or ramp: concrete barrier on both outer edges (a median barrier where the two
+// carriageways meet), a narrow inner and a wide outer shoulder, lanes of 3.5 m, no planted strips. One carriageway is 2 to 4
+// lanes by its mapped width; a ramp is one lane. A two-way motorway gets a median barrier between its two halves.
+function freewayProfile(e) {
+  const LN = 3.5, B = 0.6;
+  if (e.s === 'link') return { k: 'asbuilt', els: [['shoulder', 1], ['lane', Math.max(3.4, e.w - 3.2)], ['shoulder', 2.2]] };
+  if (e.oneway) {
+    const n = Math.max(2, Math.min(4, Math.round((e.w - 2 * B - 3.2) / LN)));
+    return { k: 'asbuilt', els: [['barrier', B], ['shoulder', 1], ...Array.from({ length: n }, () => ['lane', LN]), ['shoulder', 2.2], ['barrier', B]] };
+  }
+  const h = Math.max(2, Math.min(4, Math.round((e.w - 2 * B - 4.4 - 0.8) / (2 * LN))));
+  const side = Array.from({ length: h }, () => ['lane', LN]);
+  return { k: 'asbuilt', els: [['barrier', B], ['shoulder', 2.2], ...side, ['shoulder', 1], ['barrier', 0.8], ['shoulder', 1], ...side, ['shoulder', 2.2], ['barrier', B]] };
+}
 function defaultProfile(e) {
+  if (e.c === 'motorway' || e.c === 'trunk') return freewayProfile(e);
   if (!e.oneway) return defaultProfile2(e);
   // one-way from the map data (a carriageway of a divided road, a ramp, a one-way street): lanes all one way, no centre turn lane
-  if (e.c === 'motorway') { const n = Math.max(2, Math.round((e.w - 2.5) / 3.6)); return { k: 'asbuilt', els: Array.from({ length: n }, () => ['lane', (e.w - 2.5) / n]).concat([['trees', 1.2]]) }; }
   if (e.c === 'service' || e.c === 'unknown' || e.s === 'link') return e.w >= 6.5 ? { k: 'asbuilt', els: [['lane', e.w / 2], ['lane', e.w / 2]] } : defaultProfile2(e);
   const n = e.c === 'primary' ? 3 : e.c === 'secondary' ? 2 : 1, pk = e.c === 'primary' ? 2 : 2.2;
   return { k: 'asbuilt', els: [['walk', 2.2], ['park', pk], ...Array.from({ length: n }, () => ['lane', 3.3]), ['park', pk], ['walk', 2.2]] };
@@ -105,6 +121,7 @@ function mkEdge(e) {
   const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, rw: e.rw, g: e.g, grp: null };
   if (e.ow) E.oneway = 1; // from the map data: travel runs along p (src/tools/roads may refine it)
   if (e.sp) E.speed = e.sp; // posted mph
+  if (e.lv) E.lv = e.lv; // bridge and tunnel spans in metres along the edge (tools/pack/levels.py)
   E.prof = defaultProfile(E); E.bb = bbox(E.p); return E;
 }
 function buildBase() {
@@ -114,6 +131,7 @@ function buildBase() {
   smoothSwerves(S); // arterial and collector corners become curves before divided pairs are matched
   markDivided(S);
   classify(S);
+  planLevels(S); // decks, abutments' ground cut, and the level of each edge end (src/engine/levels.js)
   for (const lot of S.lots.values()) lot.dw = lotDriveway(lot, S);
   // as-built paving: Overture parking polygons clipped to each lot
   const PK = PACK.parking.concat(PACK.parkingInf || []).map((r) => ({ r, bb: bbox(r) })); // mapped lots + lots recognised from open ground (tools/pack/recognize.py)
