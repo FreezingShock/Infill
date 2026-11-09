@@ -66,32 +66,51 @@
 [data-theme=camino] .split .tag { border-radius: 0; background: var(--white); color: #050607; font-family: var(--mono); }
 /* boot screen (index.html #loading, driven by src/app/loader.js): a dark ctOS-style readout that fades out when the city is ready */
 [data-theme=camino] .loading { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; overflow: hidden; background: radial-gradient(120% 90% at 50% 42%, #101a1e 0%, #05080a 60%, #030405 100%); color: var(--ink); font: 400 13px/1.4 var(--body); transition: opacity .8s ease, visibility .8s; }
-[data-theme=camino] .loading::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(226, 238, 240, .035) 0 1px, transparent 1px 4px); }
+[data-theme=camino] .loading { box-shadow: inset 0 0 180px rgba(0, 0, 0, .75); }
+/* scanlines, a faint film of noise and a slow scan band: the surveillance-readout texture */
+[data-theme=camino] .loading::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .88 0 0 0 0 .93 0 0 0 0 .94 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), repeating-linear-gradient(to bottom, rgba(226, 238, 240, .035) 0 1px, transparent 1px 4px); }
+[data-theme=camino] .loading::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 26%; pointer-events: none; background: linear-gradient(to bottom, transparent, rgba(47, 216, 232, .065), transparent); transform: translateY(-100%); animation: bootScan 7s linear infinite; }
 [data-theme=camino] .loading.out { opacity: 0; visibility: hidden; }
-[data-theme=camino] .loading .boot { position: relative; width: min(440px, 100%); border-top: 3px solid var(--white); padding-top: 18px; }
+/* decorative grid: only scattered patches that drift in and fade out, never a full-screen grid */
+[data-theme=camino] .boot-field { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+[data-theme=camino] .boot-field i { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); translate: -50% -50%; opacity: 0; background-image: linear-gradient(rgba(47, 216, 232, .16) 1px, transparent 1px), linear-gradient(90deg, rgba(47, 216, 232, .16) 1px, transparent 1px); background-size: 28px 28px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000 18%, rgba(0, 0, 0, .55) 52%, transparent 100%); mask-image: radial-gradient(closest-side, #000 18%, rgba(0, 0, 0, .55) 52%, transparent 100%); animation: bootPatch var(--t) ease-in-out var(--d) infinite; }
+[data-theme=camino] .boot-field i:nth-child(even) { background-image: linear-gradient(rgba(226, 238, 240, .12) 1px, transparent 1px), linear-gradient(90deg, rgba(226, 238, 240, .12) 1px, transparent 1px); background-size: 14px 14px; }
+[data-theme=camino] .loading .boot { position: relative; z-index: 1; width: min(440px, 100%); border-top: 3px solid var(--white); padding-top: 18px; }
+/* corner brackets frame the readout */
+[data-theme=camino] .loading .boot::before { content: ""; position: absolute; inset: -16px; pointer-events: none; opacity: .55; background: linear-gradient(var(--cyan), var(--cyan)) top left / 14px 1px no-repeat, linear-gradient(var(--cyan), var(--cyan)) top left / 1px 14px no-repeat, linear-gradient(var(--cyan), var(--cyan)) bottom right / 14px 1px no-repeat, linear-gradient(var(--cyan), var(--cyan)) bottom right / 1px 14px no-repeat; }
 [data-theme=camino] .boot-top { display: flex; justify-content: space-between; gap: 12px; font: 500 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
 [data-theme=camino] .boot-top span:last-child { color: var(--cyan); }
 [data-theme=camino] .boot-title { margin-top: 34px; font: 700 68px/.9 var(--display); letter-spacing: -.045em; color: var(--white); }
 [data-theme=camino] .boot-sub { margin-top: 12px; font: 600 11px/1 var(--mono); letter-spacing: .36em; text-transform: uppercase; color: var(--cyan); }
-[data-theme=camino] .boot-meter { background: rgba(226, 238, 240, .12); }
+[data-theme=camino] .boot-meter { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(5, 8, 10, .85) calc(10% - 1px) 10%), rgba(226, 238, 240, .12); }
 [data-theme=camino] .boot-meter i { background: var(--white); box-shadow: 0 0 16px rgba(47, 216, 232, .75); }
 [data-theme=camino] .boot-meter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 28%; background: linear-gradient(90deg, transparent, rgba(47, 216, 232, .7), transparent); transform: translateX(-100%); animation: bootSweep 1.7s linear infinite; }
 [data-theme=camino] .boot-read { color: var(--ink); }
 [data-theme=camino] .boot-read b { font: 500 46px/.9 var(--mono); color: var(--white); letter-spacing: -.02em; }
 [data-theme=camino] .boot-read span { font: 500 15px/1 var(--mono); color: var(--ink-soft); margin-right: auto; }
 [data-theme=camino] .boot-read em { font: 500 10.5px/1.35 var(--mono); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); text-align: right; max-width: 60%; }
-[data-theme=camino] .boot-log { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 7px; font: 500 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
-[data-theme=camino] .boot-log li { display: flex; justify-content: space-between; gap: 12px; animation: bootIn .4s ease both; }
+[data-theme=camino] .boot-log { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 0; counter-reset: step; font: 500 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+[data-theme=camino] .boot-log li { counter-increment: step; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid rgba(226, 238, 240, .08); animation: bootIn .45s cubic-bezier(.2, .7, .2, 1) both; }
+[data-theme=camino] .boot-log li:last-child { border-bottom: 1px solid rgba(226, 238, 240, .08); }
+[data-theme=camino] .boot-log li::before { content: counter(step, decimal-leading-zero); font-variant-numeric: tabular-nums; color: rgba(226, 238, 240, .32); }
 [data-theme=camino] .boot-log li.run { color: var(--ink); }
+[data-theme=camino] .boot-log li.run::before { color: var(--cyan); }
 [data-theme=camino] .boot-log li.done b { color: var(--cyan); }
 [data-theme=camino] .boot-log li.run b { animation: bootBlink 1s steps(2, start) infinite; }
 [data-theme=camino] .loading.failed .boot-meter i { background: var(--alert); box-shadow: none; }
 [data-theme=camino] .loading.failed .boot-read em { color: var(--alert); }
 [data-theme=camino] .loading.failed .boot-meter::after { display: none; }
 @keyframes bootSweep { to { transform: translateX(380%); } }
-@keyframes bootIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes bootIn { from { opacity: 0; transform: translateY(6px); clip-path: inset(0 0 100% 0); } to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); } }
 @keyframes bootBlink { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { [data-theme=camino] .boot-meter::after, [data-theme=camino] .boot-log li, [data-theme=camino] .boot-log li.run b { animation: none; } }
+@keyframes bootScan { to { transform: translateY(420%); } }
+@keyframes bootPatch { 0% { opacity: 0; scale: .96; } 35% { opacity: .9; } 60% { opacity: .55; } 100% { opacity: 0; scale: 1.04; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme=camino] .boot-meter::after, [data-theme=camino] .boot-log li, [data-theme=camino] .boot-log li.run b, [data-theme=camino] .loading::after, [data-theme=camino] .boot-field i { animation: none; }
+  [data-theme=camino] .loading::after { display: none; }
+  [data-theme=camino] .boot-field i { opacity: .28; } /* a still set of patches instead of motion */
+  [data-theme=camino] .boot-field i:nth-child(n+4) { opacity: .14; }
+}
 /* panels with nothing in them stay out of the way */
 [data-theme=camino] .plaque:empty { display: none; }
 [data-theme=camino] .delta .up { color: var(--ok); } [data-theme=camino] .delta .down { color: var(--warn); }
