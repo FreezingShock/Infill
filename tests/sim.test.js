@@ -100,3 +100,12 @@ test('the real Woodland Hills streets run for ten minutes of traffic', async () 
   assert.ok(sim.stats.waiting < sim.stats.moving * 0.8, 'traffic is gridlocked');
   assert.ok(sim.snapshot().every(Number.isFinite));
 });
+
+test('a divided road drawn as two parallel two-way edges becomes two one-way carriageways with right-hand traffic', async () => {
+  const { inferDivided } = await import('../src/sim/net.js');
+  const A = { id: 'A', p: [[0, 0], [100, 0]], c: 'primary', els: MAIN }, B = { id: 'B', p: [[0, 12], [100, 12]], c: 'primary', els: MAIN };
+  const C = { id: 'C', p: [[0, 80], [100, 80]], c: 'primary', els: MAIN };
+  inferDivided([A, B, C]);
+  // x east, z south: heading east the right-hand side is south (+z), so B (z = 12) carries traffic east, A carries it west
+  assert.equal(B.oneway, 1); assert.equal(A.oneway, -1); assert.equal(C.oneway, undefined);
+});
