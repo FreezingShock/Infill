@@ -2,6 +2,7 @@
 // stars and a moon at night, and a black data sky in scan view.
 // update(L) runs first inside applyLight, so it also tunes L (fog haze colour, light warmth) for the realistic look.
 import * as THREE from 'three';
+import { applyGrade } from './palette.js';
 
 const VERT = `varying vec3 vDir;
 void main(){ vDir = normalize(position); vec4 p = projectionMatrix * viewMatrix * vec4(position + cameraPosition, 1.0); gl_Position = p.xyww; gl_Position.z *= 0.99999; }`;
@@ -30,7 +31,7 @@ void main(){
 const hex = (h) => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 // real-world sky colours (zenith, horizon) for day, golden hour and night
-const DAY = [hex(0x3d78c2), hex(0xc6d8e4)], GOLD = [hex(0x34437a), hex(0xf0a76e)], NIGHT = [hex(0x04060c), hex(0x141c2c)];
+const DAY = [hex(0x3a6fb0), hex(0xb7c8d3)], GOLD = [hex(0x34437a), hex(0xe39a68)], NIGHT = [hex(0x03050a), hex(0x0c1220)];
 const SCAN_FOG = hex(0x05080a);
 
 export const skyState = { scan: 0, L: null };
@@ -62,9 +63,11 @@ export function createCaminoSky(scene) {
       U.scan.value = skyState.scan;
       // the rest of applyLight reads these: a real haze colour for fog and the page, warmer low sun, cooler shade
       L.skyTop = skyState.scan ? SCAN_FOG : z; L.skyBottom = skyState.scan ? SCAN_FOG : hz;
-      L.hemiGround = mix([0.36, 0.33, 0.28], [0.08, 0.09, 0.11], L.night);
-      L.hemiSky = mix(mix([0.62, 0.74, 0.92], [0.55, 0.5, 0.62], L.golden * 0.6), [0.16, 0.2, 0.32], L.night);
-      L.hemiI *= skyState.scan ? 0.6 : 0.78; L.sunI *= 1.12; L.sunCol = mix(L.sunCol, [1, 0.7, 0.45], L.golden * 0.35);
+      L.hemiGround = mix([0.3, 0.27, 0.22], [0.03, 0.035, 0.05], L.night);
+      L.hemiSky = mix(mix([0.6, 0.7, 0.86], [0.52, 0.47, 0.56], L.golden * 0.6), [0.1, 0.14, 0.26], L.night);
+      // day: softer, less blown-out light; night: moonlight is a faint cool wash, not a second sun
+      L.hemiI *= (skyState.scan ? 0.6 : 0.62) * (1 - 0.35 * L.night); L.sunI *= 0.92 * (1 - 0.72 * L.night); L.sunCol = mix(L.sunCol, [1, 0.7, 0.45], L.golden * 0.35);
+      applyGrade(L, !!skyState.scan);
     },
     follow(target) { dome.position.copy(target); },
     /** Scan switched: repaint the dome and fog now instead of waiting for the clock to move. */

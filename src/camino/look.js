@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { INK, MAT, renderer, sun } from '../app/render.js';
 
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 0.95;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 sun.shadow.radius = 3;
 sun.shadow.bias = -0.00025;
