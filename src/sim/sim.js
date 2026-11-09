@@ -236,6 +236,7 @@ class Sim {
       if (s.state !== 1 || s.leaveAt > this.t) continue;
       const lane = s.lane; let clear = true;
       for (const c of lane.cars) if (c.s > s.s - 18 && c.s - c.len < s.s + 6) { clear = false; break; }
+      if (clear && s.s < 40) for (const cn of lane.from.conns) if (cn.to === lane && cn.cars.length) { clear = false; break; } // a car about to enter from the junction
       if (!clear || !lane.conns.length || this.cars.length >= this.target() * 1.1) { s.leaveAt = this.t + 3; continue; }
       s.state = 0;
       this.add(lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, 0, s.color ?? 0, s.lat, 150 + this.r() * 700);
