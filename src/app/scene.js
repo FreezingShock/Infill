@@ -22,19 +22,20 @@ const GEN = new Map(); // lot hash -> generated lot, shared by the before and af
 function lotHash(lot, S) { return JSON.stringify([lot.id, lot.r, lot.prog, liveBuildings(lot, S), lot.z, lot.fd, lot.flags.noaccess ? 1 : 0, lot.pk.length, lot.lt]); }
 function genCached(lot, S) {
   const h = lotHash(lot, S); let g = GEN.get(h);
-  if (!g) { g = genLot(lot, S); g.h = h; if (GEN.size > 9000) GEN.clear(); GEN.set(h, g); }
+  if (!g) { g = genLot(lot, S); g.h = h; if (GEN.size > 30000) GEN.clear(); GEN.set(h, g); }
   return g;
 }
 const chunkKey = (c) => Math.floor((c[0] - X0) / CH) + ',' + Math.floor((c[1] - Z0) / CH);
 function concatAcc(gens, key) {
   let n = 0, nl = 0; for (const g of gens) { n += g[key].p.length; nl += g[key].l.length; }
   const p = new Float32Array(n), c = new Float32Array(n), l = new Float32Array(nl); let o = 0, ol = 0;
-  for (const g of gens) { const a = g[key]; p.set(a.p, o); c.set(a.c, o); o += a.p.length; l.set(a.l, ol); ol += a.l.length; }
-  return { p, c, l };
+  const hasN = gens.every((g) => g[key].n && g[key].n.length === g[key].p.length), nn = hasN ? new Float32Array(n) : null; // normals arrive ready from the workers
+  for (const g of gens) { const a = g[key]; p.set(a.p, o); c.set(a.c, o); if (hasN) nn.set(a.n, o); o += a.p.length; l.set(a.l, ol); ol += a.l.length; }
+  return { p, c, l, n: nn };
 }
 function meshFrom(arr, mat, shadow) {
   if (!arr.p.length) return null;
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(arr.p, 3)); g.setAttribute('color', new THREE.BufferAttribute(arr.c, 3)); g.computeVertexNormals();
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(arr.p, 3)); g.setAttribute('color', new THREE.BufferAttribute(arr.c, 3)); if (arr.n) g.setAttribute('normal', new THREE.BufferAttribute(arr.n, 3)); else g.computeVertexNormals();
   const m = new THREE.Mesh(g, mat); if (shadow) { m.castShadow = true; m.receiveShadow = true; } else m.receiveShadow = true; return m;
 }
 function lotObject(gens) {
@@ -227,11 +228,13 @@ const STATIC_TREES = (() => { // forest and reserve land outside any lot: trees 
 })();
 
 export {
+  GEN,
   LotIndex,
   World,
   buildProps,
   buildTerrain,
   buildWalks,
   genCached,
+  lotHash,
   lotObject,
 };

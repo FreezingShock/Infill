@@ -17,6 +17,7 @@ import { itemById, preview, previewText, progAfter } from './palette.js';
 import { startGrowth } from '../game/zoning/driver.js';
 import { drawDraft, initPicker } from '../areas/picker.js';
 import { rebaseNote } from '../areas/rebase.js';
+import { warmStart } from '../workers/warm.js';
 
 // =====================================================================
 // Tools and input
@@ -518,10 +519,12 @@ function updateScale() {
 const [terrain, skirt] = buildTerrain();
 const walks = buildWalks(), props = buildProps(); lampMat = props.userData.lampMat; refreshLight();
 scene.add(terrain, skirt, walks, props, beforeW.group, world.group, overlays, helpers);
+await warmStart(BASE); // lot geometry builds on the worker pool while the loader shows progress
 beforeW.sync(BASE);
 const saved = load();
 if (saved && Array.isArray(saved.log) && saved.log.length) { loadEdits(saved.log); ui.groups = saved.groups || {}; if (saved.dream) setMode(true); }
 else if (saved) ui.groups = saved.groups || {};
+await warmStart(STATE); // saved edits: build their lots on the workers too (a no-op for a fresh start)
 setBasePark(Math.max(1, [...BASE.lots.values()].reduce((s, l) => s + genCached(l, BASE).park, 0)));
 refresh();
 renderTools(); renderViews(); renderHint(); renderCard(); placeSplit();
