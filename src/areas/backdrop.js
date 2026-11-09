@@ -8,7 +8,7 @@ import { X0, X1, Z0, Z1, elev as coreElev } from '../engine/core.js';
 
 const smooth = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 const ROAD_W = { m: 16, p: 12, s: 9, r: 6 };
-const TONES = [0xb4ab9b, 0xa59c8c, 0x9c9486, 0xaca18c, 0x948e84].map((c) => new THREE.Color(c));
+const TONES = [0xd2c4a6, 0xc4b69a, 0xb8aa94, 0xcdbb9a, 0xaaa090].map((c) => new THREE.Color(c));
 
 /** Draws the backdrop into `scene`; returns { dispose } or null when this area has none. */
 export async function initBackdrop({ scene, cam, canvas, onPick }) {
@@ -36,7 +36,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
   // --- terrain
   {
     const pos = new Float32Array(T.nx * T.nz * 3), col = new Float32Array(T.nx * T.nz * 3), tmp = new THREE.Color();
-    const grass = new THREE.Color(0x7d8a5c), dry = new THREE.Color(0xa09468), town = new THREE.Color(0x857f70);
+    const grass = new THREE.Color(0x5f8a3c), dry = new THREE.Color(0xb8a05c), town = new THREE.Color(0x9a9078);
     for (let j = 0; j < T.nz; j++) for (let i = 0; i < T.nx; i++) {
       const k = j * T.nx + i, x = T.minx + i * T.cell, z = T.minz + j * T.cell;
       pos[k * 3] = x; pos[k * 3 + 1] = ground(x, z) - 0.4; pos[k * 3 + 2] = z;
@@ -52,7 +52,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
   }
   // --- streets as ribbons
   {
-    const p = [], c = [], col = { m: new THREE.Color(0x4b4743), p: new THREE.Color(0x504c48), s: new THREE.Color(0x58544f), r: new THREE.Color(0x66615a) };
+    const p = [], c = [], col = { m: new THREE.Color(0x5a5550), p: new THREE.Color(0x605a54), s: new THREE.Color(0x6a645c), r: new THREE.Color(0x7a7268) };
     for (const [k, list] of Object.entries(D.roads)) for (const flat of list) {
       const pts = []; for (let i = 0; i < flat.length; i += 2) pts.push([flat[i], flat[i + 1]]);
       const P = []; for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 25)); for (let s = 0; s < n; s++) P.push([a[0] + (b[0] - a[0]) * s / n, a[1] + (b[1] - a[1]) * s / n]); }
@@ -65,6 +65,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
       }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(Array.from({ length: p.length }, (_, i) => (i % 3 === 1 ? 1 : 0)), 3)); // ribbons carry no normals; flat roads face up so the lit material does not render black
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); group.add(m);
   }
   // --- buildings as blocks, one per 30 m cell
