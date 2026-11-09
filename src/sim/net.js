@@ -179,9 +179,9 @@ function inferDivided(list) {
       if (f === e) continue;
       const df = unit(f.p[0], f.p.at(-1));
       if (Math.abs(ds[0] * df[0] + ds[1] * df[1]) < 0.94) continue;
-      let hit = 0, side = 0, n = 0;
+      let hit = 0, side = 0;
       for (let i = 1; i < 6; i++) {
-        const q = at(e.p, i / 6), d = nearestDist(f.p, q); n++;
+        const q = at(e.p, i / 6), d = nearestDist(f.p, q);
         if (d.d >= 3 && d.d <= 30) { hit++; side += (d.x - q[0]) * -ds[1] + (d.z - q[1]) * ds[0]; }
       }
       if (hit >= 4) { marks.set(e, side < 0 ? 1 : -1); break; } // partner on the left: this one is the right-hand carriageway, forward

@@ -110,6 +110,8 @@
 
 /* area picker panel (picker.css paints it cream by default) */
 [data-theme=camino] .loadarea { background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; color: var(--ink); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); }
+/* picker error text: picker.css paints it #a3321e (2.8:1 on glass); use the alert token (5.6:1) */
+[data-theme=camino] .loadarea .la-err { color: var(--alert); }
 
 /* scan switch ring */
 .camring { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--cyan); box-shadow: 0 0 24px rgba(47, 216, 232, .5); opacity: 0; pointer-events: none; z-index: 2; }

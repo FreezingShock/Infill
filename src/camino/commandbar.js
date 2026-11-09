@@ -8,6 +8,7 @@ import { redo, save, ui, undo } from '../app/state.js';
 import { VIEWS, current, cycleView, setView } from '../views/index.js';
 import { scanOn, setScan } from './scan.js';
 import { matchRows } from './cmdmatch.js';
+import { askResetTown } from './reset.js';
 
 const $ = (id) => document.getElementById(id);
 const MODALS = ['areas', 'credits', 'logm', 'keysm'];
@@ -54,6 +55,7 @@ function commands() {
     { g: 'Edit', t: 'Undo', k: 'Ctrl Z', w: 'undo back', run: undo },
     { g: 'Edit', t: 'Redo', k: 'Ctrl Y', w: 'redo forward', run: redo },
     { g: 'Edit', t: 'Edit log and save file', w: 'log save history export import', run: openLog },
+    { g: 'Edit', t: 'Reset town', w: 'reset town start over clear restart as built original fresh', run: askResetTown },
     { g: 'Areas', t: 'Change area', w: 'area map pick switch', run: openAreas },
     ...areas.map((a) => ({ g: 'Areas', t: `Go to ${a.name}`, sub: a.sub || 'area', w: `${a.name} area switch load`, run: () => { save(); location.search = `?area=${encodeURIComponent(a.id)}`; } })),
     { g: 'Help', t: 'Keys and mouse', k: '?', w: 'help keys shortcuts', run: () => { closeModals(); $('keysm').hidden = false; } },

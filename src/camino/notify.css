@@ -7,7 +7,7 @@
 
 /* severity tag: solid plate with a notch, mono caps, no border (the cm-tag callout) */
 [data-theme=camino] #app .adv-tag { position: relative; gap: 6px; padding: 5px 8px 5px 7px; border: 0; border-radius: 0; background: var(--sev); color: #050607; font: 500 10px/1 var(--mono); letter-spacing: .14em; }
-[data-theme=camino] #app .advisor[data-sev=alert] .adv-tag { color: #fff; }
+[data-theme=camino] #app .advisor[data-sev=alert] .adv-tag { color: #050607; } /* white on #ff4436 is 3.4:1 at 10px; ink is 5.9:1 */
 [data-theme=camino] #app .adv-tag::after { content: ""; position: absolute; left: 0; top: 100%; border-left: 7px solid var(--sev); border-bottom: 7px solid transparent; }
 [data-theme=camino] #app .adv-tag svg { width: 10px; height: 10px; }
 

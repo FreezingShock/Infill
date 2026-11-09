@@ -1,3 +1,5 @@
+> Historical plan (v3, Oct 2026). Current priorities live in [ROADMAP.md](ROADMAP.md); code map in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # Renovated: plan v3
 
 **A playable city renovator for the San Fernando Valley, with traffic and parked cars.**

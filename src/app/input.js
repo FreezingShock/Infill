@@ -5,7 +5,7 @@ import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
 import { BASE, uid } from '../engine/commands.js';
 import { CAM_OFF, MAT, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
 import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
-import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
+import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, forgetSave, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { createCaminoSky } from '../camino/sky.js';
@@ -468,6 +468,16 @@ $('file').addEventListener('change', async (e) => {
 });
 $('logClear').onclick = () => { loadLog([], ui.groups); $('logm').hidden = true; toast('Back to the base pack. Your saved groups are kept.'); };
 function loadLog(log, groups) { loadEdits(log); ui.groups = groups; ui.sel.clear(); ui.edgeSel.clear(); refresh(); save(); renderCard(); renderViews(); }
+// Reset town (Camino's More popover and "/" bar, after its confirm step): the area goes back to its as-built pack.
+// Edits, zoning and growth all live in the edit log, so an empty log clears them and the undo history with them.
+// Budget is worked out from the city, so it goes back too. Groups, Dream mode and the saved copy are cleared as well.
+export function resetTown() {
+  forgetSave();
+  loadEdits([]); ui.groups = {}; ui.sel.clear(); ui.edgeSel.clear(); ui.skipped = null;
+  if (ui.dream) { ui.dream = false; $('mReal')?.classList.add('on'); $('mDream')?.classList.remove('on'); $('mReal')?.setAttribute('aria-checked', 'true'); $('mDream')?.setAttribute('aria-checked', 'false'); }
+  refresh(); renderCard(); renderViews();
+  toast('Town reset to as-built. Edits, zoning, growth and undo history are cleared.');
+}
 $('mReal').onclick = () => setMode(false); $('mDream').onclick = () => setMode(true);
 function setMode(d) { ui.dream = d; $('mReal').classList.toggle('on', !d); $('mDream').classList.toggle('on', d); $('mReal').setAttribute('aria-checked', !d); $('mDream').setAttribute('aria-checked', d); save(); renderCard(); toast(d ? 'Dream mode: no setbacks, up to 8 storeys, any template on any lot.' : 'Real rules: simplified LA zoning for setbacks, height and uses.'); }
 
@@ -495,9 +505,9 @@ function flyTo(x, z, zoom) {
 function cardShift(zoom) { if (canvas.clientWidth < 760) return new THREE.Vector3(); const viewW = viewHeightAt(distForZoom(zoom)) * cam.aspect, right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0); right.y = 0; right.normalize(); return right.multiplyScalar(viewW * 0.12); }
 
 // ---------- street labels ----------
-let labels = [];
+let labels = [], viewKey = '';
 function buildLabels() {
-  const box = $('labels'); box.querySelectorAll('.st-label').forEach((l) => l.remove()); labels = [];
+  const box = $('labels'); box.querySelectorAll('.st-label').forEach((l) => l.remove()); labels = []; viewKey = '';
   const best = new Map();
   for (const e of STATE.edges.values()) { if (!e.n || !e.g || e.c === 'motorway') continue; const L = polyLen(e.p); if (!best.has(e.n) || best.get(e.n).L < L) best.set(e.n, { e, L }); }
   for (const [n, { e, L }] of best) {
@@ -507,6 +517,12 @@ function buildLabels() {
     el.textContent = n.replace(/ Street$/, ' St').replace(/ Avenue$/, ' Ave').replace(/ Drive$/, ' Dr').replace(/ Boulevard$/, ' Blvd').replace(/ Road$/, ' Rd'); box.appendChild(el);
     labels.push({ el, v: new THREE.Vector3(pt[0], elev(pt[0], pt[1]) + 2, pt[1]), major: el.classList.contains('major') || e.drawn });
   }
+}
+// The camera usually sits still, so the label and scale-bar DOM writes wait until the view actually moves.
+function viewMoved() {
+  const e = cam.matrixWorld.elements, w = canvas.clientWidth, h = canvas.clientHeight;
+  const k = e[12] + ',' + e[13] + ',' + e[14] + ',' + e[0] + ',' + e[2] + ',' + e[5] + ',' + cam.zoom + ',' + cam.right + ',' + cam.top + ',' + w + ',' + h + ',' + labels.length;
+  if (k === viewKey) return false; viewKey = k; return true;
 }
 function placeLabels() {
   const w = canvas.clientWidth, h = canvas.clientHeight, v = new THREE.Vector3();
@@ -564,7 +580,8 @@ function frame(now) {
     beforeW.group.visible = false; world.group.visible = true; overlays.visible = true; renderer.setScissor(sx, 0, w - sx, h); renderer.render(scene, cam);
     renderer.setScissorTest(false);
   } else { beforeW.group.visible = ui.asbuilt; world.group.visible = !ui.asbuilt; overlays.visible = !ui.asbuilt; renderer.render(scene, cam); }
-  placeLabels(); updateScale(); positionHandles();
+  if (viewMoved()) { placeLabels(); updateScale(); }
+  positionHandles();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
