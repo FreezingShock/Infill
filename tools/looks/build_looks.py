@@ -25,7 +25,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--pack', required=True); ap.add_argument('--bld', required=True); ap.add_argument('--places', required=True)
 ap.add_argument('--out'); ap.add_argument('--imagery', help='RGB image (png/jpg/tif) covering --imagery-bbox'); ap.add_argument('--imagery-bbox')
 ap.add_argument('--fetch-naip', action='store_true', help='download NAIP for the pack box from the USGS National Map ImageServer (public domain)')
-ap.add_argument('--naip-mpp', type=float, default=0.6, help='metres per pixel to request (NAIP is 0.6 m)')
+ap.add_argument('--save-imagery', help='also keep the downloaded picture (used by imagery_canopy.py)')
+ap.add_argument('--naip-mpp', type=float, default=0.3, help='metres per pixel to request (the service holds 0.3 m)')
 a = ap.parse_args()
 
 pack = json.load(open(a.pack)); lon0, lat0 = pack['origin']
@@ -80,11 +81,13 @@ def load_image():
     if a.fetch_naip:
         from PIL import Image
         W, S, E, N = pack['bbox']; px = lambda d: int(round(d / (a.naip_mpp / 111320)))
-        w, h = min(4000, int((E - W) * KX / a.naip_mpp)), min(4000, int((N - S) * KY / a.naip_mpp))
+        w, h = int((E - W) * KX / a.naip_mpp), int((N - S) * KY / a.naip_mpp); k = min(1, 4000 / max(w, h)); w, h = int(w * k), int(h * k)   # the service caps at 4000 px
         url = ('https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage'
                f'?bbox={W},{S},{E},{N}&bboxSR=4326&imageSR=4326&size={w},{h}&format=png&f=image')
         print('fetching', url, file=sys.stderr)
-        return Image.open(io.BytesIO(urllib.request.urlopen(url, timeout=120).read())).convert('RGB'), [W, S, E, N]
+        im = Image.open(io.BytesIO(urllib.request.urlopen(url, timeout=180).read())).convert('RGB')
+        if a.save_imagery: im.save(a.save_imagery)
+        return im, [W, S, E, N]
     return None, None
 
 def roof_stats(im, bbox, pg, area_m2):
@@ -97,7 +100,9 @@ def roof_stats(im, bbox, pg, area_m2):
     if x1 - x0 < 4 or y1 - y0 < 4: return None
     m = Image.new('L', (x1 - x0, y1 - y0), 0); ImageDraw.Draw(m).polygon([(px - x0, py - y0) for px, py in pts], fill=1)
     mask = np.asarray(m, bool)
-    er = mask.copy(); er[1:] &= mask[:-1]; er[:-1] &= mask[1:]; er[:, 1:] &= mask[:, :-1]; er[:, :-1] &= mask[:, 1:]   # 1 px erosion: skip edge mixing
+    er = mask.copy()
+    for _ in range(3 if area_m2 > 80 else 1):   # erode ~1 m: footprints sit a metre or two off the picture, so skip the edges
+        e2 = er.copy(); e2[1:] &= er[:-1]; e2[:-1] &= er[1:]; e2[:, 1:] &= er[:, :-1]; e2[:, :-1] &= er[:, 1:]; er = e2
     rgb = np.asarray(im.crop((x0, y0, x1, y1)), float)
     r_, g_, b_ = rgb[..., 0], rgb[..., 1], rgb[..., 2]; lum = 0.3 * r_ + 0.59 * g_ + 0.11 * b_
     ok = er & ~((g_ > r_ * 1.06) & (g_ > b_ * 1.04)) & (lum > 35)   # not tree/lawn, not deep shadow
