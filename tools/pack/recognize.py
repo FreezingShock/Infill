@@ -12,8 +12,9 @@ and metrics/traffic read their stalls from the same lot.pk rings. Idempotent: it
     python tools/pack/recognize.py public/areas/wh-topanga.json [more packs...]     # retrofit existing packs
 pack2.py calls infer() itself when it builds a pack.
 """
-import json, sys
-from shapely.geometry import LineString, Polygon
+import json, os, sys
+import shapely
+from shapely.geometry import LineString, Polygon, box
 from shapely.ops import nearest_points, unary_union
 from shapely import STRtree
 
@@ -42,7 +43,7 @@ def _polys(g):
     return [q for q in (g.geoms if hasattr(g, 'geoms') else [g]) if q.geom_type == 'Polygon']
 
 
-def infer(pack):
+def infer(pack, mask=None):
     """Returns (rings, per-lot m2 dict). Does not modify the pack."""
     B = [Polygon(b['r']).buffer(0) for b in pack['buildings']]
     mapped = unary_union([Polygon(r).buffer(0) for r in pack['parking']]) if pack['parking'] else Polygon()
@@ -74,6 +75,24 @@ def infer(pack):
         keys = [k for i in idx for k in lots[i][0]['b'] + lots[i][0].get('sh', [])]
         blds = unary_union([B[k] for k in set(keys)]).buffer(BUILD_BUFFER) if keys else Polygon()
         free = gu.difference(blds).difference(mapped.buffer(0.5)).buffer(-2.0).buffer(2.0)  # drop thin strips; aisles stay inside, they are drawn as roads
+        if free.is_empty: continue
+        if mask is not None:  # imagery decides: ground that looks like asphalt from above, outside buildings
+            cx, cz = mask.cells(free.bounds)
+            if not len(cx): continue
+            hit = shapely.contains_xy(free, cx, cz)
+            if not hit.any(): continue
+            cells = unary_union([box(x - 1.5, z - 1.5, x + 1.5, z + 1.5) for x, z in zip(cx[hit], cz[hit])]).buffer(1.6).buffer(-1.6)
+            free = free.intersection(cells).buffer(-2.4).buffer(2.4)  # paths and driveways are narrower than a parking bay
+            for q in _polys(free):
+                if q.area < 180: continue
+                for r in [w for pc in _polys(q.buffer(-EDGE_MARGIN * 0.5).difference(roads)) for w in _solid(pc)]:
+                    r = r.simplify(0.3)
+                    if r.area < 60 or r.area > MAX_BLOCK: continue
+                    out.append([[round(x, 1), round(z, 1)] for x, z in list(r.exterior.coords)[:-1]])
+                    for i in idx:
+                        ar = lots[i][1].intersection(r).area
+                        if ar > 5: per[lots[i][0]['id']] = per.get(lots[i][0]['id'], 0) + round(ar)
+            continue
         for q in _polys(free):
             if q.area < MIN_OPEN: continue
             ev = 0.0
@@ -98,8 +117,8 @@ def infer(pack):
     return out, per
 
 
-def apply(pack):
-    rings, per = infer(pack)
+def apply(pack, mask=None):
+    rings, per = infer(pack, mask)
     pack['parkingInf'] = rings
     for lot in pack['lots']:
         lot.pop('pvi', None)
@@ -108,9 +127,13 @@ def apply(pack):
 
 
 if __name__ == '__main__':
-    for path in sys.argv[1:]:
+    for path in [a for a in sys.argv[1:] if not a.startswith('--')]:
         P = json.load(open(path))
         if 'buildings' not in P: continue  # not a pack (other tools keep side files here)
-        n, m2 = apply(P)
+        mask = None
+        if '--naip' in sys.argv[1:]:
+            import naip
+            mask = naip.fetch_mask(P, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'work', 'naip-' + os.path.basename(path)[:-5]))
+        n, m2 = apply(P, mask)
         json.dump(P, open(path, 'w'), separators=(',', ':'))
         print(f'{path}: {n} recognised lots, {m2} m2 of paving added')
