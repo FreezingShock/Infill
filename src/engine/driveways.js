@@ -100,4 +100,11 @@ function drivewaysByEdge(lots) {
   return m;
 }
 
-export { HOUSING, cutDepth, drivewaysByEdge, frontageRings, planDriveway, tFront };
+// Curb cut mouths as [x, z, radius] for things that must stay clear of them (utility poles, street trees).
+function driveCuts(lots, frameOf) {
+  const out = [];
+  for (const l of lots) { const d = l.dw; if (!d) continue; const p = frameOf(l).P(d.s, -Math.min(d.a, 4)); out.push([Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10, Math.round((d.w / 2 + 1.2) * 10) / 10]); }
+  return out;
+}
+
+export { HOUSING, driveCuts, cutDepth, drivewaysByEdge, frontageRings, planDriveway, tFront };
