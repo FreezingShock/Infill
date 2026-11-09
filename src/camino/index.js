@@ -11,6 +11,8 @@ import { infraTotals, layoutInfra } from './infra-data.js';
 import { initScan, onScan, scanOn, setScan, tick } from './scan.js';
 import { anchors, createTags } from './tags.js';
 import { skyState } from './sky.js';
+import { mountHud2 } from './hud2.js';
+import './hud2.css';
 import { mountFps, mountKeys, mountSwitch, mountTitle, showDossier } from './hud.js';
 import { mountCommandBar } from './commandbar.js';
 
@@ -29,6 +31,7 @@ onScan((on) => { tags.show(on); syncSwitch(on); });
 showDossier(AREA, infraTotals(I));
 const fps = mountFps();
 mountCommandBar(); // "/" or Ctrl+K: views, tools, areas, Street/Scan and addresses
+mountHud2();
 
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
