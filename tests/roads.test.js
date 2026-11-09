@@ -139,3 +139,13 @@ test('junction details: ladders and stop bars set back from the box, markings an
   // divided roads end their median with a nose before the crosswalk
   assert.ok(P.noses.length >= 2, `noses ${P.noses.length}`);
 });
+
+test('a main road meeting only minor streets keeps its lines and has no crosswalk or stop bar of its own', async () => {
+  const { plan } = await import('../src/tools/roads/markings.js');
+  const P = plan(BASE, []);
+  const topanga = [...BASE.edges.values()].filter((e) => e.divided && e.oneway === 1 && e.prof.els.some((x) => x[0] === 'median'));
+  assert.ok(topanga.length);
+  for (const id of ['E113', 'E114']) { const r = P.info.get(id); assert.ok(r && r.t0 === 0 && r.t1 === 0, `${id} lines run through the Avenue San Luis junction`); }
+  assert.ok(P.ladders.every((l) => !l.e || !l.e.divided), 'no ladder across the divided carriageways');
+  assert.ok(topanga.every((e) => e.speed >= 45), 'boulevard is 45 mph');
+});

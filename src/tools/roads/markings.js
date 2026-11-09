@@ -9,6 +9,7 @@ import { EL, rowWidth } from '../../engine/model.js';
 //   - medians end before the crosswalk with a rounded nose
 // One rule for every junction in every area.
 // =====================================================================
+const RANK = { motorway: 5, trunk: 5, primary: 4, secondary: 3, tertiary: 2, residential: 1, unclassified: 1, service: 0, unknown: 0 };
 const SKIP_LEG = (e) => e.s === 'driveway' || e.s === 'alley' || e.prof?.k === 'plain';
 const BOX_MIN = 4, CW_HALF = 1.5, BAR_GAP = 1.3, NOSE_GAP = 0.6, NOSE_R = 1.75;
 
@@ -47,13 +48,16 @@ function analyse(S) {
   const legs = [];
   const get = (e) => { let r = info.get(e.id); if (!r) { r = { t0: 0, t1: 0, mt0: 0, mt1: 0, nose: [] }; info.set(e.id, r); } return r; };
   for (const [n, es] of deg) {
-    if (es.length < 3 || es.some((e) => e.ring || e.taper)) continue; // a merge into the two-way road is not an intersection
+    if (es.length < 3 || es.some((e) => e.ring) || es.filter((e) => e.taper).length >= 2) continue; // a merge into the two-way road is not an intersection
     const dirs = es.map((e) => { const atEnd = e.b === n, p = e.p, q = atEnd ? at(p, polyLen(p) - 4) : at(p, 4); const x0 = p[atEnd ? p.length - 1 : 0]; return [q.x - x0[0], q.z - x0[1]].map((v, _, a) => v / (Math.hypot(a[0], a[1]) || 1)); });
     es.forEach((e, i) => {
       const atEnd = e.b === n;
       // the box reaches as far as the widest street that crosses this one
       let box = BOX_MIN;
       es.forEach((q, j) => { if (j === i) return; const d = dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]; if (Math.abs(d) < 0.8) box = Math.max(box, rowWidth(q.prof) / 2); });
+      // a main road meeting only minor streets has priority: its lines run through, nothing crosses it
+      const rk = (q) => RANK[q.c] ?? 1, priority = rk(e) >= 3 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 2);
+      if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); return; }
       const D = box + 2.2, len = polyLen(e.p);
       if (len < 2 * (D + CW_HALF + BAR_GAP) + 4) { const r = get(e); if (atEnd) r.t1 = len; else r.t0 = len; return; } // a short link inside the box: no markings at all
       const r = get(e), clear = D + CW_HALF + BAR_GAP;

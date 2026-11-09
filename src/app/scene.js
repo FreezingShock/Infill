@@ -137,7 +137,7 @@ function buildRoads(S) {
     const poly = [n.c.slice()]; for (let k = 0; k <= 6; k++) { const t = k / 6 * Math.PI / 2; poly.push([n.c[0] + n.r * (Math.cos(t) * n.v[0] + Math.sin(t) * n.u[0]), n.c[1] + n.r * (Math.cos(t) * n.v[1] + Math.sin(t) * n.u[1])]); }
     decal(acc, poly, 0.4, C(EL.median.c), 6);
   }
-  for (const w of taperMedians(S)) decal(acc, w, 0.2, C(EL.median.c), 6); // median wedge where a divided road closes up
+  for (const w of taperMedians(S)) decal(acc, w, 0.25, ASPH.primary, 6); // paved wedge where the two ways close up, not an island
   const grp = new THREE.Group();
   const m1 = new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); m1.receiveShadow = true;
   const m2 = new THREE.Mesh(marks.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));

@@ -77,6 +77,9 @@ function markDivided(S) {
     if (nb) { const ln = nb.prof.els.filter((x) => x[0] === 'lane'); e.prof = { k: 'asbuilt', els: ln.map((x) => ['lane', x[1]]) }; e.w = ln.reduce((a, x) => a + x[1], 0); }
   }
   reshapeTapers(S);
+  // a street with a divided stretch is a 45 mph boulevard along its whole length
+  const blvd = new Set([...S.edges.values()].filter((e) => e.divided && e.n).map((e) => e.n));
+  for (const e of S.edges.values()) if (e.g && e.n && blvd.has(e.n) && (e.c === 'primary' || e.c === 'secondary')) e.speed = Math.max(e.speed || 0, 45);
   // connectors: short pieces that join a divided pair back into the two-way road at one node
   const ends = (n) => [...S.edges.values()].filter((q) => q.g && (q.a === n || q.b === n));
   for (const c of [...S.edges.values()]) {
@@ -94,7 +97,7 @@ function markDivided(S) {
 // Real divided roads keep both carriageways parallel at a constant median width and only close up over a short smooth
 // transition. Map data often starts the closing-up right at the cross street, so the pair splays into a long V.
 // Rebuild each taper pair from the merge node: parallel at the far end's offset, then a smoothstep blend onto the axis.
-const TAPER_LEN = 14, CLEAR = 12; // the carriageways close up over 14 m, starting 12 m past the cross street
+const TAPER_LEN = 36, CLEAR = 8; // a long gentle closing-up, starting just past the cross street
 function reshapeTapers(S) {
   const byNode = new Map();
   for (const e of S.edges.values()) if (e.taper) for (const n of [e.a, e.b]) { if (!byNode.has(n)) byNode.set(n, []); byNode.get(n).push(e); }
