@@ -1,7 +1,6 @@
 // sfvOS Camino: wires the realistic street look, the scan view, real infrastructure and the HUD parts into the running game.
 // Loaded by main.js after the app and the HUD when the Camino theme is on (src/camino/theme.js).
-import './camino.css';
-import './look.js';
+import './look.js'; // camino.css is linked from index.html so it applies before first paint
 import { PACK } from '../engine/pack.js';
 import { X0, X1, Z0, Z1 } from '../engine/core.js';
 import { scene } from '../app/render.js';

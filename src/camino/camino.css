@@ -63,7 +63,36 @@ html[data-theme=camino] {
 [data-theme=camino] .split::before { background: var(--white); width: 2px; }
 [data-theme=camino] .split .handle { border-radius: 2px; border: 1px solid var(--hair-hi); box-shadow: none; background: var(--glass); color: var(--ink); }
 [data-theme=camino] .split .tag { border-radius: 0; background: var(--white); color: #050607; font-family: var(--mono); }
-[data-theme=camino] .loading { background: #05080a; color: var(--ink); font: 500 13px var(--mono); letter-spacing: .2em; text-transform: uppercase; }
+/* boot screen (index.html #loading, driven by src/app/loader.js): a dark ctOS-style readout that fades out when the city is ready */
+[data-theme=camino] .loading { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; overflow: hidden; background: radial-gradient(120% 90% at 50% 42%, #101a1e 0%, #05080a 60%, #030405 100%); color: var(--ink); font: 400 13px/1.4 var(--body); transition: opacity .8s ease, visibility .8s; }
+[data-theme=camino] .loading::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(226, 238, 240, .035) 0 1px, transparent 1px 4px); }
+[data-theme=camino] .loading.out { opacity: 0; visibility: hidden; }
+[data-theme=camino] .loading .boot { position: relative; width: min(440px, 100%); border-top: 3px solid var(--white); padding-top: 18px; }
+[data-theme=camino] .boot-top { display: flex; justify-content: space-between; gap: 12px; font: 500 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
+[data-theme=camino] .boot-top span:last-child { color: var(--cyan); }
+[data-theme=camino] .boot-title { margin-top: 34px; font: 700 68px/.9 var(--display); letter-spacing: -.045em; color: var(--white); }
+[data-theme=camino] .boot-sub { margin-top: 12px; font: 600 11px/1 var(--mono); letter-spacing: .36em; text-transform: uppercase; color: var(--cyan); }
+[data-theme=camino] .boot-meter { background: rgba(226, 238, 240, .12); }
+[data-theme=camino] .boot-meter i { background: var(--white); box-shadow: 0 0 16px rgba(47, 216, 232, .75); }
+[data-theme=camino] .boot-meter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 28%; background: linear-gradient(90deg, transparent, rgba(47, 216, 232, .7), transparent); transform: translateX(-100%); animation: bootSweep 1.7s linear infinite; }
+[data-theme=camino] .boot-read { color: var(--ink); }
+[data-theme=camino] .boot-read b { font: 500 46px/.9 var(--mono); color: var(--white); letter-spacing: -.02em; }
+[data-theme=camino] .boot-read span { font: 500 15px/1 var(--mono); color: var(--ink-soft); margin-right: auto; }
+[data-theme=camino] .boot-read em { font: 500 10.5px/1.35 var(--mono); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); text-align: right; max-width: 60%; }
+[data-theme=camino] .boot-log { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 7px; font: 500 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+[data-theme=camino] .boot-log li { display: flex; justify-content: space-between; gap: 12px; animation: bootIn .4s ease both; }
+[data-theme=camino] .boot-log li.run { color: var(--ink); }
+[data-theme=camino] .boot-log li.done b { color: var(--cyan); }
+[data-theme=camino] .boot-log li.run b { animation: bootBlink 1s steps(2, start) infinite; }
+[data-theme=camino] .loading.failed .boot-meter i { background: var(--alert); box-shadow: none; }
+[data-theme=camino] .loading.failed .boot-read em { color: var(--alert); }
+[data-theme=camino] .loading.failed .boot-meter::after { display: none; }
+@keyframes bootSweep { to { transform: translateX(380%); } }
+@keyframes bootIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes bootBlink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { [data-theme=camino] .boot-meter::after, [data-theme=camino] .boot-log li, [data-theme=camino] .boot-log li.run b { animation: none; } }
+/* panels with nothing in them stay out of the way */
+[data-theme=camino] .plaque:empty { display: none; }
 [data-theme=camino] .delta .up { color: var(--ok); } [data-theme=camino] .delta .down { color: var(--warn); }
 
 /* street name labels from the app: quiet white text, no paper chips */

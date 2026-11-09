@@ -534,7 +534,6 @@ renderTools(); renderViews(); renderHint(); renderCard(); placeSplit();
 const start = (AREA.main && [...STATE.lots.values()].find((l) => (l.a || '').includes(AREA.main))) || STATE.lots.values().next().value;
 controls.target.set(start.c[0], start.e, start.c[1]); cam.position.copy(controls.target).add(CAM_OFF);
 resize(); cam.lookAt(controls.target); cam.updateMatrixWorld();
-$('loading').remove();
 initPicker({ AREA, AREAS, redraw: drawAreaMap });
 initBackdrop({ scene, cam, canvas, onPick: proposeAt });
 if (!saved) openAreas();
