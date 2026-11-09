@@ -65,6 +65,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
       }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(Array.from({ length: p.length }, (_, i) => (i % 3 === 1 ? 1 : 0)), 3)); // ribbons carry no normals; flat roads face up so the lit material does not render black
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); group.add(m);
   }
   // --- buildings as blocks, one per 30 m cell
