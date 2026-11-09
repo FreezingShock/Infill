@@ -39,7 +39,7 @@ def fetch(theme, typ, out, bbox):
         for row in t.to_pylist():
             g = wkb.loads(row.pop('geometry'))
             props = {}
-            for k in ('number','street','postcode','unit','id','subtype','class','names','height','num_floors','road_surface','subclass','level'):
+            for k in ('number','street','postcode','unit','id','subtype','class','names','height','num_floors','road_surface','subclass','level','road_flags','access_restrictions','speed_limits','width_rules','prohibited_transitions','connectors','level_rules','routes','destinations','subclass_rules'):
                 if k in row and row[k] is not None: props[k]=row[k]
             feats.append({'type':'Feature','geometry':g.__geo_interface__,'properties':props})
     json.dump({'type':'FeatureCollection','features':feats}, open(out,'w'), default=str)

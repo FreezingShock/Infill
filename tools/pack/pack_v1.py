@@ -45,6 +45,25 @@ def elev(x,zz):
   return Hg[j,i]*(1-dx)*(1-dz)+Hg[j,i+1]*dx*(1-dz)+Hg[j+1,i]*(1-dx)*dz+Hg[j+1,i+1]*dx*dz
 # ---- roads
 seg=json.load(open(f'{D}/seg.geojson'))
+def oneway_of(p):
+  # Overture marks a one-way road by denying travel against its digitised direction: heading=backward -> forward only
+  d = set()
+  for a in p.get('access_restrictions') or []:
+    w = a.get('when') or {}
+    if a.get('access_type') != 'denied' or w.get('heading') not in ('forward', 'backward') or a.get('between'): continue
+    if w.get('during') or w.get('using') or w.get('vehicle'): continue
+    if w.get('mode') and not set(w['mode']) & {'vehicle', 'motor_vehicle', 'car'}: continue
+    d.add(w['heading'])
+  return 1 if d == {'backward'} else -1 if d == {'forward'} else 0
+def speed_of(p):
+  best = None
+  for s in p.get('speed_limits') or []:
+    m = s.get('max_speed')
+    if m and not s.get('when') and not s.get('between'):
+      v = m['value'] * (0.621371 if m.get('unit') == 'km/h' else 1); best = round(v) if best is None else min(best, round(v))
+  return best
+# carriageway width when the road is one-way (a divided road is drawn as two of these)
+OWW={'motorway':14,'primary':16,'secondary':12,'tertiary':9,'residential':7.5,'unclassified':7.5,'service':4.5,'unknown':5}
 WID={'motorway':22,'primary':20,'secondary':14,'tertiary':11,'residential':9,'unclassified':8,'service':4.5,'unknown':5}
 roads=[]; walks=[]; blocklines=[]
 for f in seg['features']:
@@ -63,7 +82,14 @@ for f in seg['features']:
       if sub=='driveway': w=3.2
       if sub=='parking_aisle': w=5
       if sub=='link': w=7
-      roads.append({'c':cls,'s':sub,'n':name,'w':w,'p':pts})
+      ow=oneway_of(p) if cls not in ('service','unknown') or sub=='alley' else 0
+      if ow==-1: pts=pts[::-1]
+      if ow and sub!='link' and sub!='driveway': w=OWW[cls]
+      r={'c':cls,'s':sub,'n':name,'w':w,'p':pts}
+      if ow: r['ow']=1
+      sp=speed_of(p)
+      if sp: r['sp']=sp
+      roads.append(r)
       if cls not in ('service','unknown') or sub=='alley':
         blocklines.append((part,w))
 # ---- blocks

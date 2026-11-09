@@ -64,3 +64,16 @@ test('every ready pack has unique ids and resolvable references', () => {
     for (const b of P.buildings) if (b.l !== undefined) assert.ok(b.l < P.lots.length, `${a.id} building lot`);
   }
 });
+
+test('imported one-way streets and recognised paving are sane in every ready pack', () => {
+  for (const a of manifest.areas.filter((x) => x.status === 'ready')) {
+    const P = JSON.parse(fs.readFileSync(new URL(`../public/areas/${a.pack}`, import.meta.url)));
+    const ow = P.edges.filter((e) => e.ow);
+    for (const e of ow) assert.equal(e.ow, 1, `${a.id} ${e.id}: one-way edges are stored along their direction of travel`);
+    if (a.id === 'wh-topanga') assert.ok(ow.length >= 8, 'Topanga has one-way carriageways');
+    for (const e of P.edges) if (e.sp) assert.ok(e.sp >= 5 && e.sp <= 85, `${a.id} ${e.id} speed`);
+    for (const r of P.parkingInf || []) assert.ok(r.length >= 3 && r.every((p) => p.length === 2 && p.every(Number.isFinite)), `${a.id} paving ring`);
+    const inf = new Set((P.lots || []).filter((l) => l.pvi).map((l) => l.id));
+    assert.equal(inf.size > 0, (P.parkingInf || []).length > 0, `${a.id} lots carry pvi where paving was recognised`);
+  }
+});
