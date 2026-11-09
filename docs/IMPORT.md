@@ -22,3 +22,6 @@ Retrofit an existing pack without refetching: `python tools/pack/recognize.py pu
 
 ## Adding a recognition rule
 Put it in `tools/pack/`, make it read the pack (or the work folder) only, write optional fields, add a check to `tests/areas.test.js`, then run `build_area.py --id <area> --refresh` for every ready area.
+
+## Surroundings (backdrop)
+`tools/pack/backdrop.py` writes `<id>.bg.json` for each area: a 3.2 km ring around the playable box with a 40 m terrain grid, simplified streets by class and a 30 m raster of building coverage and height (a blur of the real footprints). `src/areas/backdrop.js` draws it and lets you point at it to open or build that part of the Valley. It is read-only, optional (the game runs without the file) and uses the pack's local metres and base height, so it joins the playable terrain without conversion. A future step is streaming real neighbouring tiles into the playable area as you scroll; for now one area is one pack, at most 2.6 km a side.

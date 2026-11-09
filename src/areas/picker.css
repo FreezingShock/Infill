@@ -12,3 +12,5 @@
 .la-prog small { display: block; margin-top: 4px; }
 .la-off { opacity: 0.8; }
 .la-err { color: #a3321e; }
+.bd-tip { position: fixed; z-index: 30; pointer-events: none; padding: 5px 9px; border: 2px solid var(--ink); border-radius: 8px; background: #fffaf0; font-size: 0.78rem; box-shadow: 0 2px 0 var(--ink); }
+canvas.bd-hover { cursor: pointer; }
