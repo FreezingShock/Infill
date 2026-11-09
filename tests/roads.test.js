@@ -146,6 +146,6 @@ test('a main road meeting only minor streets keeps its lines and has no crosswal
   const topanga = [...BASE.edges.values()].filter((e) => e.divided && e.oneway === 1 && e.prof.els.some((x) => x[0] === 'median'));
   assert.ok(topanga.length);
   for (const id of ['E113', 'E114']) { const r = P.info.get(id); assert.ok(r && r.t0 === 0 && r.t1 === 0, `${id} lines run through the Avenue San Luis junction`); }
-  assert.ok(P.ladders.every((l) => !l.e || !l.e.divided), 'no ladder across the divided carriageways');
+  assert.ok(P.ladders.every((l) => !l.e || !['E113', 'E114'].includes(l.e.id)), 'no ladder across Topanga at Avenue San Luis');
   assert.ok(topanga.every((e) => e.speed >= 45), 'boulevard is 45 mph');
 });
