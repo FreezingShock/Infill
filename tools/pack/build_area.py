@@ -163,6 +163,11 @@ def main():
         if mask is not None: recognize.apply(pack, mask)
     except Exception as e:  # noqa: BLE001
         say('imagery', f'Imagery check skipped ({type(e).__name__}: {e})', 85)
+    try:  # cul-de-sac bulbs from the parcels around dead-end streets (no network needed)
+        import bulbs, rowwidth
+        say('bulbs', f'Found {bulbs.apply(pack)} cul-de-sac turnarounds, right-of-way width on {rowwidth.apply(pack)} streets', 87)
+    except Exception as e:  # noqa: BLE001
+        say('bulbs', f'Cul-de-sac check skipped ({type(e).__name__}: {e})', 87)
     json.dump(pack, open(tmp, 'w'), separators=(',', ':'))
     os.replace(tmp, out)
 

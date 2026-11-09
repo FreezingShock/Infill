@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
-import { streetTreesAll } from '../engine/streettrees.js';
+import { hasCanopy, streetTreesAll } from '../engine/streettrees.js';
+import { addBulbs } from '../engine/bulbs.js';
 import { Acc, C, HG, T, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
@@ -100,7 +101,7 @@ function buildRoads(S) {
       if ((pass === 0) === curb) {
         const col = (k === 'lane' || k === 'turn' || k === 'park') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : ASPH[e.c]) : C(d.c);
         ribbon(acc, e.p, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col);
-        if (k === 'trees' || k === 'median') alongPts(offsetLine(e.p, o + w / 2), k === 'median' ? 12 : 9, (x, z) => trees.push([x, elev(x, z), z, k === 'median' ? 0.85 : 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
+        if ((k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) || k === 'median') alongPts(offsetLine(e.p, o + w / 2), k === 'median' ? 12 : 9, (x, z) => trees.push([x, elev(x, z), z, k === 'median' ? 0.85 : 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
       }
       o += w;
     }
@@ -122,6 +123,7 @@ function buildRoads(S) {
     }
   }
   for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
+  addBulbs(acc, S, ASPH.residential, C(EL.walk.c)); // cul-de-sac turnarounds (src/engine/bulbs.js)
   const grp = new THREE.Group();
   const m1 = new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); m1.receiveShadow = true;
   const m2 = new THREE.Mesh(marks.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));

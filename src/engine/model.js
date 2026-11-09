@@ -68,7 +68,10 @@ function defaultProfile2(e) {
   const w = e.w;
   if (e.c === 'primary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2], ['lane', 3.25], ['lane', 3.25], ['turn', w - 17], ['lane', 3.25], ['lane', 3.25], ['park', 2], ['walk', 2.2]] };
   if (e.c === 'secondary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2.5], ['lane', (w - 5) / 2], ['lane', (w - 5) / 2], ['park', 2.5], ['walk', 2.2]] };
-  if (['tertiary', 'residential', 'unclassified'].includes(e.c) && e.s !== 'link') { const p = w >= 10 ? 2 : 1.6, l = (w - 2 * p) / 2; return { k: 'asbuilt', els: [['walk', 2.2], ['park', p], ['lane', l], ['lane', l], ['park', p], ['walk', 2.2]] }; }
+  if (['tertiary', 'residential', 'unclassified'].includes(e.c) && e.s !== 'link') {
+    const p = w >= 10 ? 2 : 1.6, l = (w - 2 * p) / 2;
+    if (e.rw && e.rw - w >= 4.8) { const side = (e.rw - w) / 2, pw = Math.min(2.6, side - 1.6); return { k: 'asbuilt', els: [['walk', side - pw], ['trees', pw], ['park', p], ['lane', l], ['lane', l], ['park', p], ['trees', pw], ['walk', side - pw]] }; } // measured right of way: sidewalk plus planted parkway (tools/pack/rowwidth.py)
+    return { k: 'asbuilt', els: [['walk', 2.2], ['park', p], ['lane', l], ['lane', l], ['park', p], ['walk', 2.2]] }; }
   return { k: 'plain', els: [[e.s === 'driveway' ? 'drive' : 'lane', w]] };
 }
 const rowWidth = (prof) => prof.els.reduce((s, e) => s + e[1], 0);
@@ -93,7 +96,7 @@ function inferProgram(lot) {
   return pr;
 }
 function mkEdge(e) {
-  const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, g: e.g, grp: null };
+  const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, rw: e.rw, g: e.g, grp: null };
   if (e.ow) E.oneway = 1; // from the map data: travel runs along p (src/tools/roads may refine it)
   if (e.sp) E.speed = e.sp; // posted mph
   E.prof = defaultProfile(E); E.bb = bbox(E.p); return E;

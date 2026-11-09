@@ -60,3 +60,25 @@ test('imagery crowns become yard trees and street trees', async () => {
   for (const t of street) assert.ok(t.every(Number.isFinite));
   st.setCanopy(null);
 });
+
+test('every ready pack has valid cul-de-sac bulbs and measured right-of-way widths', () => {
+  for (const a of manifest.areas.filter((x) => x.status === 'ready' && x.pack)) {
+    const p = JSON.parse(fs.readFileSync(new URL(`../public/areas/${a.pack}`, import.meta.url)));
+    assert.ok(Array.isArray(p.bulbs), `${a.id} bulbs`);
+    for (const [x, z, r, n] of p.bulbs) { assert.ok(r >= 8 && r <= 14 && Number.isFinite(x + z), `${a.id} bulb`); assert.ok(p.nodes[n], `${a.id} bulb node`); }
+    const rw = p.edges.filter((e) => e.rw); assert.ok(rw.length > 10, `${a.id} rw ${rw.length}`);
+    for (const e of rw) assert.ok(e.rw >= 12 && e.rw <= 20, `${a.id} ${e.id} rw`);
+  }
+});
+
+test('a measured right of way becomes a sidewalk plus planted parkway, and bulbs vanish when their street does', async () => {
+  const { BASE: B } = await import('../src/engine/commands.js');
+  const wide = [...B.edges.values()].find((e) => e.rw && e.rw - e.w >= 4.8 && e.prof.k === 'asbuilt' && ['residential', 'tertiary', 'unclassified'].includes(e.c) && !e.oneway);
+  assert.ok(wide, 'a street with a measured right of way');
+  assert.equal(wide.prof.els.filter((q) => q[0] === 'trees').length, 2);
+  const row = wide.prof.els.reduce((s, q) => s + q[1], 0); assert.ok(Math.abs(row - wide.rw) < 0.2, `row ${row} vs rw ${wide.rw}`);
+  const { addBulbs } = await import('../src/engine/bulbs.js');
+  const acc = { n: 0, tri() { this.n++; }, quad() { this.n++; } };
+  const made = addBulbs(acc, B, {}, {}); assert.ok(made > 0 && acc.n > 0, `bulbs drawn ${made}`);
+  const S2 = { edges: new Map() }; assert.equal(addBulbs(acc, S2, {}, {}), 0);
+});
