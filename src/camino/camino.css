@@ -31,6 +31,16 @@ html[data-theme=camino] {
 [data-theme=camino] .tool[aria-pressed=true] { background: var(--white); color: #050607; }
 [data-theme=camino] .tool kbd, [data-theme=camino] .keys kbd { font: 500 9.5px/1.4 var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); border-radius: 0; background: transparent; }
 [data-theme=camino] .tool[aria-pressed=true] kbd { color: #384047; border-color: rgba(0, 0, 0, .25); }
+/* Active (pressed or selected) controls. The base control rules above are #app-scoped (specificity 1,2,0), so a bare
+   attribute selector lost to them and put light text on the white active fill (Street, Look, N). Both forms are listed so
+   the rule also reaches controls outside #app; the #app form is the one that wins inside the HUD. */
+[data-theme=camino] :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true],
+[data-theme=camino] :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on,
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true],
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on { background: var(--white); color: #050607; }
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true]:hover,
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on:hover { background: #ffffff; color: #050607; }
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true] kbd { color: #384047; border-color: rgba(0, 0, 0, .25); }
 [data-theme=camino] .btn { border-radius: 2px; border: 1px solid var(--cyan); background: var(--cyan); color: var(--cyan-ink); box-shadow: none; font-weight: 600; }
 [data-theme=camino] .btn:hover { background: #63e6f1; }
 [data-theme=camino] .btn:active { transform: none; }
@@ -75,7 +85,11 @@ html[data-theme=camino] {
 /* Street / Scan switch */
 .camswitch { gap: 2px; }
 .camswitch .tool { font: 600 12px var(--display); letter-spacing: .02em; padding: 7px 12px; }
-.camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); }
+[data-theme=camino] #app .camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); }
+[data-theme=camino] #app .camswitch #camScan[aria-pressed=true]:hover { background: #63e6f1; color: var(--cyan-ink); }
+
+/* area picker panel (picker.css paints it cream by default) */
+[data-theme=camino] .loadarea { background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; color: var(--ink); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); }
 
 /* scan switch ring */
 .camring { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--cyan); box-shadow: 0 0 24px rgba(47, 216, 232, .5); opacity: 0; pointer-events: none; z-index: 2; }
