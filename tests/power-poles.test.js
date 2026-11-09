@@ -32,3 +32,11 @@ test('every area: no distribution wire spans more than 80 m and no pole stands i
     for (const p of I.poles) assert.ok(!blocked(p.x, p.z));
   }
 });
+
+test('poles never stand on the roadway or a driveway cut; they go to the strip behind the curb', () => {
+  const roadway = { hit: (x, z, pad = 0) => (Math.abs(z) < 7 + pad ? { lat: z } : null), nudge: (x, z, gap = 0.9) => [x, z < 0 ? -7 - gap : 7 + gap] };
+  const blocked = makeBlocked({ buildings: [], edges: [], roadway, cuts: [{ x: 100, z: 9, r: 3 }] });
+  const run = poleRun([[0, 0], [200, 0]], [], blocked);
+  for (const q of run) { assert.ok(!roadway.hit(q[0], q[1], 0.6), 'pole in roadway at ' + q); assert.ok(!blocked(q[0], q[1])); }
+  assert.ok(run.every((q) => Math.abs(q[1]) >= 8));
+});
