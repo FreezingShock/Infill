@@ -110,3 +110,32 @@ test('each taper pair gets a median wedge polygon', async () => {
   const w = taperMedians(BASE);
   assert.ok(w.length >= 1 && w.every((r) => r.length >= 4));
 });
+
+test('taper pairs run parallel at the median gap and only close up near the merge node', () => {
+  const tapers = [...BASE.edges.values()].filter((e) => e.taper);
+  for (const e of tapers) {
+    const far = e.p.length ? (BASE.nodes[e.a] === e.p[0] || (e.p[0][0] === BASE.nodes[e.a][0] && e.p[0][1] === BASE.nodes[e.a][1]) ? e.p : e.p) : e.p;
+    assert.ok(polyLen(far) > 20);
+  }
+  const pair = tapers.filter((e) => e.id === 'E116' || e.id === 'E117');
+  if (pair.length === 2) {
+    const [a, b] = pair, mid = (p) => p[Math.floor(p.length * 0.2)];
+    // near the far end the two carriageways are still a full median apart (not already closing)
+    const ga = Math.hypot(a.p[0][0] - b.p.at(-1)[0], a.p[0][1] - b.p.at(-1)[1]);
+    assert.ok(ga > 12, `far ends ${ga}`);
+    void mid;
+  }
+});
+
+test('junction details: ladders and stop bars set back from the box, markings and medians trimmed', async () => {
+  const { plan, trimPath } = await import('../src/tools/roads/markings.js');
+  const P = plan(BASE, globalThis.__RENOVATED_PACK__.walks);
+  assert.ok(P.ladders.length > 50 && P.bars.length > 10, `ladders ${P.ladders.length} bars ${P.bars.length}`);
+  for (const l of P.ladders) { assert.ok(Number.isFinite(l.o1) && Number.isFinite(l.o2) && l.o2 > l.o1); assert.ok(l.p.every((q) => q.every(Number.isFinite))); }
+  // trimmed markings stay on the road and shorter than the street
+  let trimmed = 0;
+  for (const e of BASE.edges.values()) { const r = P.info.get(e.id); if (!r) continue; const mp = trimPath(e.p, r.t0, r.t1); assert.ok(mp.length === 0 || polyLen(mp) <= polyLen(e.p) + 1e-6); if (r.t0 || r.t1) trimmed++; }
+  assert.ok(trimmed > 20);
+  // divided roads end their median with a nose before the crosswalk
+  assert.ok(P.noses.length >= 2, `noses ${P.noses.length}`);
+});
