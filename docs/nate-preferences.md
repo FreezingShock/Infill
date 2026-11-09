@@ -38,3 +38,4 @@ Seeded 9 Nov 2026 from the sfvOS project chat and from nate's Deepstack notes. T
 - Every scrollbar and every dropdown must be on theme, like the View and Layers menus (done app-wide in `src/camino/controls.js`).
 - 2026-11-09: The area picker's selected-area card was covering the list and its text collided. nate loves the frosted glass and wants the list still visible behind it, with every field and button kept. The card is now a docked footer with stronger blur, so the list reads as soft texture behind it. Its facts and actions sit in two columns.
 - 2026-11-09: nate wants long builds backgroundable with an ETA, a compact HUD chip and a finish toast with an Open action; closing the picker must not interrupt play.
+- 2026-11-09: nate hit the 101 freeway at Shoup Ave and Ventura: no level separation, street-tree rows, no barriers. Wants multi-level roads as a general rule, underpasses that look right, and a freeway model with barriers and natural vegetation (PR #76).
