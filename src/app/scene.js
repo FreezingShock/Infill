@@ -112,7 +112,7 @@ function buildRoads(S) {
         const [k, a, b] = pos[i], nk = pos[i + 1]?.[0];
         if (k === 'turn') { ribbon(marks, e.p, a + 0.1, a + 0.28, base + 0.16, YEL, 2); ribbon(marks, e.p, b - 0.28, b - 0.1, base + 0.16, YEL, 2); }
         if ((k === 'lane' || k === 'bus') && (nk === 'lane' || nk === 'bus')) {
-          if (!hasTurn && Math.abs(b) < 0.6) { ribbon(marks, e.p, b - 0.32, b - 0.14, base + 0.16, YEL, 2); ribbon(marks, e.p, b + 0.14, b + 0.32, base + 0.16, YEL, 2); }
+          if (!hasTurn && !e.oneway && Math.abs(b) < 0.6) { ribbon(marks, e.p, b - 0.32, b - 0.14, base + 0.16, YEL, 2); ribbon(marks, e.p, b + 0.14, b + 0.32, base + 0.16, YEL, 2); }
           else dashed(marks, e.p, b - 0.08, b + 0.08, base + 0.16, WHITE, 3, 6);
         }
         if (k === 'bike' && (nk === 'lane' || nk === 'park' || nk === 'turn')) ribbon(marks, e.p, b - 0.12, b + 0.04, base + 0.16, WHITE, 3);
