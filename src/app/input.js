@@ -10,6 +10,7 @@ import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, render
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
 import { clock, setHour, tickClock } from '../game/clock.js';
+import { ROAD, roadClick, roadHover, roadPath } from '../tools/roads/ui.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
 import { startGrowth } from '../game/zoning/driver.js';
 
@@ -125,7 +126,7 @@ canvas.addEventListener('pointermove', (e) => {
   const g = groundAt(e);
   if (t === 'build' || t === 'doze') { const l = IDX && IDX.at(g[0], g[1]); setHover(l ? l.id : null); hoverPreview(l); if (!l && t === 'doze') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'not-allowed' : 'cell'; } else canvas.style.cursor = 'cell'; return; }
   if (t === 'roads' && !(ui.draw && ui.draw.pts.length) && !e.shiftKey) { const hit = edgeAt(g[0], g[1]); if (hit) { setOv('draw', null); canvas.style.cursor = 'pointer'; return; } canvas.style.cursor = 'crosshair'; }
-  if (t === 'roads') { hoverDraw(g, e); return; }
+  if (t === 'roads') { if (roadHover(g, e, roadCtx)) return; hoverDraw(g, e); return; }
   if (t === 'brush' || t === 'zone') brushRing(g);
   if (t === 'draw' || (t === 'area' && !ui.area)) { hoverDraw(g, e); return; }
   if (t === 'edit') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'pointer' : ''; return; }
@@ -140,6 +141,7 @@ canvas.addEventListener('pointerup', (e) => {
   else if (t === 'edit') { const hit = edgeAt(g[0], g[1]); if (!hit) { ui.edgeSel.clear(); } else if (e.shiftKey) { if (ui.edgeSel.has(hit.e.id)) ui.edgeSel.delete(hit.e.id); else ui.edgeSel.add(hit.e.id); } else ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); ui.sel.clear(); buildSel(); buildEdgeSel(); renderCard(); }
   else if (t === 'draw') addDrawPoint(g, e);
   else if (t === 'roads') {
+    if (roadClick(g, e, roadCtx)) return;
     const hit = !(ui.draw && ui.draw.pts.length) && !e.shiftKey ? edgeAt(g[0], g[1]) : null;
     if (hit) { ui.draw = null; setOv('draw', null); ui.sel.clear(); buildSel(); ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); buildEdgeSel(); renderCard(); renderHint(); placeHandles(); return; }
     if (ui.edgeSel.size) { ui.edgeSel.clear(); buildEdgeSel(); }
@@ -238,6 +240,8 @@ function alongUpdate() {
   setOv('along', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide })));
 }
 
+const roadCtx = { edgeAt: (x, z, p) => edgeAt(x, z, p), addDrawPoint: (g, e) => addDrawPoint(g, e), finishDraw: () => finishDraw(), snapPoint: (g, e, a, b) => snapPoint(g, e, a, b), clearSel: () => buildEdgeSel(), renderCard: () => { renderCard(); renderHint(); } };
+
 // ---------- drawing streets ----------
 function snapPoint(g, e, prev, prev2) {
   let [x, z] = g, label = null; const tol = 9 / Math.sqrt(camZoom());
@@ -273,7 +277,7 @@ function addDrawPoint(g, e) {
   if (pts.length && Math.hypot(s.p[0] - pts[pts.length - 1][0], s.p[1] - pts[pts.length - 1][1]) < 1.5) return;
   pts.push(s.p); ui.draw.snap = s.label; drawPreview(); renderDraw();
 }
-function drawLine() { const d = ui.draw; if (!d) return []; const p = d.cursor && d.pts.length ? [...d.pts, d.cursor] : d.pts.slice(); return ui.smooth && p.length > 2 ? smoothLine(p) : p; }
+function drawLine() { const d = ui.draw; if (!d) return []; const p = d.cursor && d.pts.length ? [...d.pts, d.cursor] : d.pts.slice(); return roadPath(p); }
 function drawPreview() {
   const p = drawLine(); if (p.length < 2) { setOv('draw', null); return; }
   const prof = PRESETS[ui.drawProf], h = rowWidth(prof) / 2, acc = new Acc();
@@ -282,10 +286,10 @@ function drawPreview() {
 }
 function finishDraw() {
   const d = ui.draw; if (!d || d.pts.length < 2) { toast('A street needs at least two points.'); return; }
-  const pts = ui.smooth && d.pts.length > 2 ? smoothLine(d.pts) : d.pts.slice();
+  const pts = roadPath(d.pts).slice(), raw = ROAD.mode === 'line' || ROAD.mode === 'curve' ? [d.pts[0], d.pts[1]] : d.pts;
   const id = uid('S'), name = ui.drawName.trim() || `New St ${LOG.filter((c) => c.op === 'street.add').length + 1}`;
   ui.draw = null; setOv('draw', null);
-  commit({ op: 'street.add', id, pts: pts.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]), raw: d.pts, prof: { k: ui.drawProf, els: structuredClone(PRESETS[ui.drawProf].els) }, name }, { label: `${name} built` });
+  commit({ op: 'street.add', id, pts: pts.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]), raw, prof: { k: ui.drawProf, els: structuredClone(PRESETS[ui.drawProf].els) }, name }, { label: `${name} built` });
   ui.drawName = '';
   setTool(ui.tool === 'roads' ? 'roads' : 'edit'); ui.edgeSel = new Set([...STATE.edges.values()].filter((e) => e.grp === id).map((e) => e.id)); buildEdgeSel(); renderCard();
 }
