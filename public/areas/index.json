@@ -27,7 +27,8 @@
    "built": "2026-11-09",
    "lots": 1300,
    "parcels": "city",
-   "bg": "wh-topanga.bg.json"
+   "bg": "wh-topanga.bg.json",
+   "infra": "wh-topanga.infra.json"
   },
   {
    "id": "canoga-park",
@@ -45,7 +46,8 @@
    "built": "2026-11-09",
    "lots": 965,
    "parcels": "city",
-   "bg": "canoga-park.bg.json"
+   "bg": "canoga-park.bg.json",
+   "infra": "canoga-park.infra.json"
   },
   {
    "id": "chatsworth",
@@ -63,7 +65,8 @@
    "built": "2026-11-09",
    "lots": 1000,
    "parcels": "city",
-   "bg": "chatsworth.bg.json"
+   "bg": "chatsworth.bg.json",
+   "infra": "chatsworth.infra.json"
   },
   {
    "id": "northridge",
@@ -81,7 +84,8 @@
    "built": "2026-11-09",
    "lots": 900,
    "parcels": "city",
-   "bg": "northridge.bg.json"
+   "bg": "northridge.bg.json",
+   "infra": "northridge.infra.json"
   },
   {
    "id": "granada-hills",
@@ -99,7 +103,8 @@
    "built": "2026-11-09",
    "lots": 846,
    "parcels": "city",
-   "bg": "granada-hills.bg.json"
+   "bg": "granada-hills.bg.json",
+   "infra": "granada-hills.infra.json"
   },
   {
    "id": "reseda",
@@ -117,7 +122,8 @@
    "built": "2026-11-09",
    "lots": 1192,
    "parcels": "city",
-   "bg": "reseda.bg.json"
+   "bg": "reseda.bg.json",
+   "infra": "reseda.infra.json"
   },
   {
    "id": "encino",
@@ -135,7 +141,8 @@
    "built": "2026-11-09",
    "lots": 783,
    "parcels": "city",
-   "bg": "encino.bg.json"
+   "bg": "encino.bg.json",
+   "infra": "encino.infra.json"
   },
   {
    "id": "van-nuys",
@@ -153,7 +160,8 @@
    "built": "2026-11-09",
    "lots": 919,
    "parcels": "city",
-   "bg": "van-nuys.bg.json"
+   "bg": "van-nuys.bg.json",
+   "infra": "van-nuys.infra.json"
   },
   {
    "id": "panorama-city",
@@ -171,7 +179,8 @@
    "built": "2026-11-09",
    "lots": 872,
    "parcels": "city",
-   "bg": "panorama-city.bg.json"
+   "bg": "panorama-city.bg.json",
+   "infra": "panorama-city.infra.json"
   },
   {
    "id": "sherman-oaks",
@@ -189,7 +198,8 @@
    "built": "2026-11-09",
    "lots": 1083,
    "parcels": "city",
-   "bg": "sherman-oaks.bg.json"
+   "bg": "sherman-oaks.bg.json",
+   "infra": "sherman-oaks.infra.json"
   },
   {
    "id": "studio-city",
@@ -207,7 +217,8 @@
    "built": "2026-11-09",
    "lots": 1096,
    "parcels": "city",
-   "bg": "studio-city.bg.json"
+   "bg": "studio-city.bg.json",
+   "infra": "studio-city.infra.json"
   },
   {
    "id": "north-hollywood",
@@ -225,7 +236,8 @@
    "built": "2026-11-09",
    "lots": 629,
    "parcels": "city",
-   "bg": "north-hollywood.bg.json"
+   "bg": "north-hollywood.bg.json",
+   "infra": "north-hollywood.infra.json"
   }
  ]
 }

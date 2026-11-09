@@ -43,3 +43,12 @@ mkdir -p tools/pack/work   # raw downloads go here (git-ignored)
 6. Add the area to `public/areas/index.json` with `"status": "ready"` and `"pack": "<id>.json"`.
 
 LA County hosts (Assessor, building outlines) are not used.
+
+## Real infrastructure (`<id>.infra.json`)
+
+`infra.py` writes a sidecar with only what public data has, for the scan view: City of LA street lights and fire hydrants (maps.lacity.org), LA Metro bus stops with boardings, CEC transmission lines (kV, owner) and Overture power poles, lines and substations (OpenStreetMap). No water mains, gas or LADWP distribution lines exist as public data, so none are drawn. `build_area.py` runs it after the pack; the manifest entry gets `"infra": "<id>.infra.json"`.
+
+```sh
+python tools/pack/infra.py --all                     # refetch every area (needs maps.lacity.org and arcgis.com)
+python tools/pack/infra.py --all --raw DIR           # use pre-fetched <layer>-<id>.geojson + transmission-sfv.geojson
+```
