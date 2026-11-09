@@ -28,7 +28,7 @@ function approaches(n) {
       if (Math.abs(a) > TURN_DEPTH) continue;
       if (a < -LEFT_MIN) left = true; else if (a > LEFT_MIN) right = true; else thru = true;
     }
-    out.push({ i, bearing: lg.bearing, group: lg.group, rank: lg.item.rank, lanes: ins.length, left, right, thru });
+    out.push({ i, bearing: lg.bearing, group: lg.group, rank: n.ramp && lg.item.lk ? 1 : lg.item.rank, lanes: ins.length, left, right, thru });
   });
   return out;
 }

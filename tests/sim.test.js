@@ -189,8 +189,55 @@ test('gap acceptance counts time, not distance: a slow car 40 m out does not blo
   const mid = net.nodes.find((n) => n.legs.length === 4);
   const k = mid.conns.find((c) => c.type === 'S' && c.from.eid === 'W'); // main-road through movement
   for (const c of sim.cars.slice()) { c.seg.cars.splice(c.seg.cars.indexOf(c), 1); } sim.cars = [];
-  const car = { s: k.from.len - 40, v: 3, i: 0, wait: 0 }; k.from.cars.push(car);
+  const car = { s: k.from.len - 40, v: 3, i: 0, wait: 0, len: 4.4 }; k.from.cars.push(car);
   assert.equal(sim.gapClear(k, 4.2), true); // 40 m at 3 m/s is far longer than 4 s
   car.v = 14; assert.equal(sim.gapClear(k, 4.2), false); // under 3 s
   car.v = 0; car.wait = 10; car.s = k.from.len - 1; assert.equal(sim.gapClear(k, 4.2), true); // a long-standing queue is not arriving
+});
+
+// ---------- ramp terminals ----------
+test('a freeway ramp gives way to the surface street where they meet, and cars do not overlap', () => {
+  const edges = [
+    { id: 'A', p: [[-200, 0], [0, 0]], c: 'primary', els: MAIN }, { id: 'B', p: [[0, 0], [200, 0]], c: 'primary', els: MAIN },
+    { id: 'R', p: [[0, 0], [0, 200]], c: 'motorway', lk: 1, els: LOCAL }, // ramp ending at the street
+    { id: 'S', p: [[0, -200], [0, 0]], c: 'residential', els: LOCAL },
+  ];
+  const net = buildNet(edges, { bounds: [-210, -210, 210, 210], control: { '0,0': 'priority' } });
+  const mid = net.nodes.find((n) => n.legs.length === 4);
+  assert.ok(mid.ramp);
+  assert.equal(mid.rank, 4, 'the surface street decides the junction, not the ramp class');
+  for (const c of mid.conns.filter((q) => q.from.eid === 'R')) assert.equal(c.rank, 0, 'ramp traffic is the minor flow');
+  const out = mid.conns.filter((q) => q.from.eid === 'A' && q.type === 'S')[0];
+  assert.ok(out.pv > mid.conns.find((q) => q.from.eid === 'R').pv);
+  const sim = new Sim(6); sim.density = 1.6; sim.setNet(net);
+  assert.ok(run(sim, 300) > -0.5);
+  // ramp-only junctions (ramp meets freeway) keep free flow
+  const free = buildNet([{ id: 'F', p: [[-200, 0], [0, 0]], c: 'motorway', els: MAIN }, { id: 'G', p: [[0, 0], [200, 0]], c: 'motorway', els: MAIN }, { id: 'R2', p: [[0, 0], [0, 200]], c: 'motorway', lk: 1, els: LOCAL }], {});
+  assert.ok(!free.nodes.find((n) => n.legs.length === 3).ramp);
+});
+
+test('a car does not drive into a long vehicle that has left a short lane but still overlaps its end', () => {
+  const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] });
+  const sim = new Sim(1); sim.setNet(net);
+  const k = net.connectors.find((c) => c.to.len > 20), lane = k.to;
+  const out = { cars: [] }; lane.conns = [out]; // a short lane between close junctions: one onward connector
+  for (const c of sim.cars.slice()) c.seg.cars.splice(c.seg.cars.indexOf(c), 1); sim.cars = [];
+  assert.equal(sim.tail(lane), null);
+  out.cars.push({ s: 4, len: 10.5, v: 2.8 }); // a bus 4 m into the next connector: its tail is 6.5 m back inside `lane`
+  const t = sim.tail(lane);
+  assert.ok(Math.abs(t.pos - (lane.len - 6.5)) < 1e-9 && t.v === 2.8, `tail ${t && t.pos}`);
+  assert.equal(sim.roomFor(k, { len: 4.4, v: 5 }), lane.len - 6.5 >= 4.4 + 1.5 + 2);
+});
+
+test('a head car with nowhere to go does not hold up the road it crosses', () => {
+  const sim = new Sim(1); const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] }); sim.setNet(net);
+  const mid = net.nodes.find((n) => n.legs.length === 4);
+  const k = mid.conns.find((c) => c.type === 'S' && c.from.eid === 'W');
+  for (const c of sim.cars.slice()) c.seg.cars.splice(c.seg.cars.indexOf(c), 1); sim.cars = [];
+  k.to.cars.push({ s: k.to.len, len: 4.4, v: 0 }); k.to.cars.push({ s: k.to.len - 5.9, len: 4.4, v: 0 }); // exit lane is jammed solid
+  k.to.cars.push({ s: k.to.len - 11.8, len: 4.4, v: 0 }); k.to.cars.push({ s: k.to.len - 17.7, len: 4.4, v: 0 });
+  const head = { s: k.from.len - 2, v: 1.5, i: 0, wait: 0, len: 4.4, granted: null };
+  k.from.cars.push(head);
+  const full = sim.roomFor(k, head);
+  assert.equal(sim.gapClear(k, 4.2), full ? false : true);
 });
