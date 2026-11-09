@@ -20,6 +20,9 @@ from shapely import STRtree
 MIN_OPEN = 140        # m2 of open ground worth looking at
 MIN_COMMERCIAL = 220  # m2 for a lot with no aisle evidence
 EDGE_MARGIN = 1.5     # green strip kept at the lot edge
+AISLE_REACH = 9.0     # a parking bay is about 5.5 m deep beside an aisle: only ground this close to an aisle is paved
+MAX_BLOCK = 2500      # m2: no single recognised lot is bigger than this (real lots with this much are mapped)
+MAX_UNBACKED = 1400   # m2 for a lot recognised with no aisle at all
 BUILD_BUFFER = 1.2    # walkway room around a building
 
 
@@ -37,6 +40,7 @@ def infer(pack):
         (other if e.get('s') in ('driveway', 'alley') else aisle).append(LineString(e['p']))
     roads = [LineString(e['p']).buffer(e['w'] / 2, cap_style=2) for e in pack['edges'] if e['c'] == 'service' and e.get('n') is None]
     roads = unary_union(roads) if roads else Polygon()
+    reach = unary_union([l.buffer(AISLE_REACH) for l in aisle]) if aisle else Polygon()
     atree = STRtree(aisle) if aisle else None
     out, per = [], {}
     lots = [(lot, Polygon(lot['r']).buffer(0)) for lot in pack['lots'] if lot['lt'] in ('main', 'apts', 'multi', 'civic')]
@@ -64,14 +68,20 @@ def infer(pack):
             if atree is not None:
                 zone = q.buffer(3)
                 ev = sum(aisle[int(k)].intersection(zone).length for k in atree.query(zone))
-            ok = ev >= 15 or (kind == 'main' and q.area >= MIN_COMMERCIAL)
-            if not ok: continue
-            for r in _polys(q.buffer(-EDGE_MARGIN).difference(roads)):
-                if r.area < 25: continue
-                r = r.simplify(0.3); out.append([[round(x, 1), round(z, 1)] for x, z in list(r.exterior.coords)[:-1]])
-                for i in idx:
-                    ar = lots[i][1].intersection(r).area
-                    if ar > 5: per[lots[i][0]['id']] = per.get(lots[i][0]['id'], 0) + round(ar)
+            if ev >= 15:
+                q = q.intersection(reach)  # only the bays beside real aisles, never the hillside or lawn around them
+                q = q.buffer(-1.0).buffer(1.0)
+            elif kind == 'main' and MIN_COMMERCIAL <= q.area <= MAX_UNBACKED and q.area / max(q.length, 1) ** 2 > 0.03 and q.area <= 0.65 * gu.area:
+                pass  # compact open ground behind a commercial frontage, no aisle mapped
+            else:
+                continue
+            for part in _polys(q):
+                for r in _polys(part.buffer(-EDGE_MARGIN).difference(roads)):
+                    if r.area < 40 or r.area > MAX_BLOCK: continue
+                    r = r.simplify(0.3); out.append([[round(x, 1), round(z, 1)] for x, z in list(r.exterior.coords)[:-1]])
+                    for i in idx:
+                        ar = lots[i][1].intersection(r).area
+                        if ar > 5: per[lots[i][0]['id']] = per.get(lots[i][0]['id'], 0) + round(ar)
     return out, per
 
 
@@ -87,6 +97,7 @@ def apply(pack):
 if __name__ == '__main__':
     for path in sys.argv[1:]:
         P = json.load(open(path))
+        if 'buildings' not in P: continue  # not a pack (other tools keep side files here)
         n, m2 = apply(P)
         json.dump(P, open(path, 'w'), separators=(',', ':'))
         print(f'{path}: {n} recognised lots, {m2} m2 of paving added')

@@ -72,6 +72,8 @@ test('imported one-way streets and recognised paving are sane in every ready pac
     for (const e of ow) assert.equal(e.ow, 1, `${a.id} ${e.id}: one-way edges are stored along their direction of travel`);
     if (a.id === 'wh-topanga') assert.ok(ow.length >= 8, 'Topanga has one-way carriageways');
     for (const e of P.edges) if (e.sp) assert.ok(e.sp >= 5 && e.sp <= 85, `${a.id} ${e.id} speed`);
+    const shoelace = (r) => Math.abs(r.reduce((t, p, i) => t + p[0] * r[(i + 1) % r.length][1] - r[(i + 1) % r.length][0] * p[1], 0)) / 2;
+    for (const r of P.parkingInf || []) assert.ok(shoelace(r) <= 2500, `${a.id} recognised lot stays under 2500 m2`);
     for (const r of P.parkingInf || []) assert.ok(r.length >= 3 && r.every((p) => p.length === 2 && p.every(Number.isFinite)), `${a.id} paving ring`);
     const inf = new Set((P.lots || []).filter((l) => l.pvi).map((l) => l.id));
     assert.equal(inf.size > 0, (P.parkingInf || []).length > 0, `${a.id} lots carry pvi where paving was recognised`);

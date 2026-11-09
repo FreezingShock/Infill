@@ -79,7 +79,7 @@ const BLD = PACK.buildings;
 BLD.forEach((b) => { b.bb = bbox(b.r); });
 function mkLot(l) {
   const lot = { id: l.id, r: l.r, a: l.a || null, c: l.c, e: l.e, m2: l.m2, blk: l.blk, rd: l.rd, fp: l.fp, fd: l.fd, fr: l.fr, dp: l.dp, wd: l.wd,
-    lt: l.lt, z: l.z, yr: l.yr, st0: l.st, u0: l.u, b: l.b.slice(), sh: l.sh || [], sd: l.sd, flags: {}, pk: [], ain: l.ain || null, zr: l.zr || null, gp: l.gp || null, ys: l.ys || null };
+    lt: l.lt, z: l.z, yr: l.yr, st0: l.st, u0: l.u, b: l.b.slice(), sh: l.sh || [], sd: l.sd, flags: {}, pk: [], ain: l.ain || null, zr: l.zr || null, gp: l.gp || null, ys: l.ys || null, pvi: l.pvi || 0 };
   lot.bb = bbox(lot.r);
   lot.prog = inferProgram(lot);
   lot.base = { pl: lot.prog.pl, rf: lot.prog.rf }; // what the data chose, so looks can tell a player's palette pick from the default

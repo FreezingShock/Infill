@@ -173,7 +173,7 @@ function genAsBuilt(ctx) {
     ctx.floor += b.a * floors;
   }
   // paving from the data, striped where it is a real lot
-  for (const ring of lot.pk) { decal(ctx.d, ring, 0.3, COL.asphalt); ctx.park += Math.abs(area(ring)); if (lot.lt === 'parking' || Math.abs(area(ring)) > 400) stallsIn(ctx, ring, 0.55); }
+  for (const ring of lot.pk) { decal(ctx.d, ring, 0.3, COL.asphalt); ctx.park += Math.abs(area(ring)); if (lot.lt === 'parking' || Math.abs(area(ring)) > 400) stallsIn(ctx, ring, lot.pvi ? 0.28 : 0.55); } // recognised lots (not mapped) hold fewer cars
   if (lot.lt === 'parking' && !lot.pk.length) { decal(ctx.d, lot.r, 0.3, COL.asphalt); ctx.park += lot.m2; stallsIn(ctx, lot.r, 0.55); }
   if (!blds.length && !lot.sh.length && !lot.pk.length && lot.lt !== 'parking' && lot.lt !== 'civic') { decal(ctx.d, lot.r, 0.28, COL.dirt); yardTrees(ctx, Math.min(3, Math.round(lot.m2 / 300)), 1, [3]); }
   // yard trees by rule (no tree inventory in this pack yet)
