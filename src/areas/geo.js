@@ -1,5 +1,5 @@
 // Pure helpers for choosing and naming an area (no DOM, no THREE): shared by the picker and the tests.
-export const MAX_SIDE_M = 2600; // the pack builder refuses anything bigger, so the picker never offers it
+export const MAX_SIDE_M = 3400; // the pack builder refuses anything bigger, so the picker never offers it
 export const MIN_SIDE_M = 400;
 
 const kx = (lat) => Math.cos((lat * Math.PI) / 180) * 111320;

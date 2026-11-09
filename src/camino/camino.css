@@ -55,7 +55,6 @@
 [data-theme=camino] .skips { background: rgba(255, 68, 54, .1); border: 1px solid rgba(255, 68, 54, .5); border-radius: 2px; }
 [data-theme=camino] .modal { background: rgba(2, 4, 5, .55); }
 [data-theme=camino] .modal td, [data-theme=camino] .modal th { border-bottom: 1px solid var(--hair); }
-[data-theme=camino] .areas canvas { border: 1px solid var(--hair); border-radius: 2px; background: #0b1013; }
 [data-theme=camino] #app .clockbar .speeds, [data-theme=camino] #app .clockbar .gauges, [data-theme=camino] #app .clockbar .clockdock { border-left-color: var(--hair); }
 [data-theme=camino] #app .br .trafficchip { border-right-color: var(--hair); }
 [data-theme=camino] .clockbar .sky { border: 1px solid var(--hair-hi); }
@@ -128,9 +127,6 @@
 [data-theme=camino] #app .camswitch #camScan[aria-pressed=true]:hover { background: #63e6f1; color: var(--cyan-ink); }
 
 /* area picker panel (picker.css paints it cream by default) */
-[data-theme=camino] .loadarea { background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; color: var(--ink); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); }
-/* picker error text: picker.css paints it #a3321e (2.8:1 on glass); use the alert token (5.6:1) */
-[data-theme=camino] .loadarea .la-err { color: var(--alert); }
 
 /* scan switch ring */
 .camring { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--cyan); box-shadow: 0 0 24px rgba(47, 216, 232, .5); opacity: 0; pointer-events: none; z-index: 2; }
@@ -205,4 +201,4 @@ body.camdos-up .bd-tip { display: none !important; }
 
 @media (max-width: 760px) { .camdos { top: 12%; } .camdos .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .camdos .sheet { padding: 14px 14px 10px; } .camdos .tiles.big .tile b { font-size: 26px; } .camfps { display: none; } }
 @media (prefers-reduced-motion: reduce) { .camdos .sheet, .camdos .tile, .camdos .close i, .camring.go { animation: none; } .camdos.out .sheet > * { transition: none; } }
-[data-theme=camino] .loadarea select, [data-theme=camino] .la-bar, [data-theme=camino] .bd-tip { background: rgba(9, 12, 14, .85); color: var(--ink); border: 1px solid var(--hair); border-radius: 2px; box-shadow: none; }
+[data-theme=camino] .bd-tip { background: rgba(9, 12, 14, .85); color: var(--ink); border: 1px solid var(--hair); border-radius: 2px; box-shadow: none; }

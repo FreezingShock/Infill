@@ -2,13 +2,14 @@
 // intersections with signals, stop signs and priority roads, curb parking that fills and empties.
 // Pure JS with no THREE and no DOM, so it runs in a Web Worker and in node tests.
 import { rng, sampleAt } from './geom.js';
+import { stateAt } from './signals.js';
+import { deckHeight } from './net.js';
 
-const CAR_LEN = 4.4, STRIDE = 7;
+const NO_DECK = -999, CAR_LEN = 4.4, STRIDE = 8; // snapshot per vehicle: id, x, z, heading, vx, vz, look, height of the deck it drives on (NO_DECK = on the ground)
 // vehicle kinds: 0 sedan, 1 SUV, 2 pickup, 3 van, 4 bus. A look is colour (0..5) + 8 * kind.
 const LENS = [4.4, 4.7, 5.2, 5.0, 10.5];
 const kindOf = (look) => Math.floor(look / 8);
 const IDM = { a: 2.6, b: 3.4, T: 1.1, s0: 2.0 };
-const GREEN = 9, CYCLE = 12;
 const PARK_TIME = 1.4;
 // Junction behaviour (general rules, same at every junction in every area):
 const COMFORT = 2.2;      // m/s^2 used to plan slowing for a stop line or a turn
@@ -68,6 +69,7 @@ class Sim {
     if (atPortal && this.portals.length) { lane = this.portals[Math.floor(this.r() * this.portals.length)]; s = 1; }
     else { const x = this.r() * this.spawnW.at(-1); let i = this.spawnW.findIndex((w) => w >= x); if (i < 0) i = 0; lane = this.spawnLanes[i]; s = 6 + this.r() * (lane.len - 12); }
     if (!lane.conns.length && !atPortal) return false;
+    if (lane.leftOnly && this.r() < 0.75) return false; // a left-turn pocket is short and quiet
     for (const c of lane.cars) if (Math.abs(c.s - s) < 16) return false;
     const look = this.look(lane.rank >= 2), len = LENS[kindOf(look)];
     for (const c of lane.cars) if (Math.abs(c.s - s) < len + 9) return false;
@@ -87,10 +89,8 @@ class Sim {
   }
 
   // ---------- control ----------
-  green(node, group) {
-    const ph = Math.max(1, node.phases), t = (this.t + node.cycleOff) % (ph * CYCLE);
-    return Math.floor(t / CYCLE) === group % ph && (t % CYCLE) < GREEN;
-  }
+  // signal state of a movement: 0 red, 1 permissive green (yield), 2 protected green, 3 yellow (phasing lives in signals.js)
+  sig(conn) { const n = conn.node; return n.sig ? stateAt(n.sig, this.t + n.cycleOff, conn.leg, conn.mv) : 2; }
   yields(f, fd, car, d, k, conn) {
     if (k.pv !== conn.pv) return k.pv > conn.pv;
     const fa = f.arrive ?? Infinity, ca = car.arrive ?? Infinity;
@@ -118,12 +118,10 @@ class Sim {
     for (const k of conn.conflicts) if (k.reserved > 0) return false;
     const n = conn.node, need = GAP[conn.type] || GAP.S;
     if (n.control === 'signal') {
-      if (!this.green(n, conn.group)) return false;
-      // permissive turns on green give way to the oncoming flow that is also green
-      for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && this.green(n, k.group) && !this.gapClear(k, need)) return false;
+      const g = this.sig(conn); if (g !== 1 && g !== 2) return false;
+      // a permissive turn gives way to oncoming flow that is also green
+      if (g === 1) for (const k of conn.conflicts) if (k.from !== conn.from && (this.sig(k) === 1 || this.sig(k) === 2) && !this.gapClear(k, need)) return false;
     } else if (n.control !== 'none') {
-      // gap acceptance: give way to higher-priority traffic until it is far enough away in time, so the minor road
-      // moves as soon as a real gap opens and the major road does not have to brake for it
       for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && !this.gapClear(k, need)) return false;
       for (const k of conn.conflicts) {
         const f = k.from.cars[0]; if (!f || f === car || f.granted || f.plan !== k || !this.roomFor(k, f)) continue;
@@ -239,6 +237,7 @@ class Sim {
       if (s.state !== 1 || s.leaveAt > this.t) continue;
       const lane = s.lane; let clear = true;
       for (const c of lane.cars) if (c.s > s.s - 18 && c.s - c.len < s.s + 6) { clear = false; break; }
+      if (clear && s.s < 40) for (const cn of lane.from.conns) if (cn.to === lane && cn.cars.length) { clear = false; break; } // a car about to enter from the junction
       if (!clear || !lane.conns.length || this.cars.length >= this.target() * 1.1) { s.leaveAt = this.t + 3; continue; }
       s.state = 0;
       this.add(lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, 0, s.color ?? 0, s.lat, 150 + this.r() * 700);
@@ -270,7 +269,7 @@ class Sim {
     return { flow, curb };
   }
 
-  // ---------- output: [id, x, z, heading, vx, vz, colour] per vehicle ----------
+  // ---------- output: [id, x, z, heading, vx, vz, colour, deck height] per vehicle ----------
   snapshot() {
     const net = this.net; if (!net) return new Float32Array(0);
     const parked = net.slots.filter((s) => s.state === 1);
@@ -278,7 +277,7 @@ class Sim {
     let o = 0, wait = 0, sum = 0;
     const put = (id, seg, s, lat, v, color) => {
       const p = sampleAt(seg.pts, seg.cum, Math.max(0, s - LENS[kindOf(color)] / 2));
-      out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color;
+      out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color; out[o++] = NO_DECK;
     };
     // A moving car is posed by its two axles, which can lie on different segments (the lane it just left and the
     // connector it is on). That keeps the car continuous across handovers and turns its heading smoothly through a corner.
@@ -288,7 +287,7 @@ class Sim {
       let dx = f[0] - r[0], dz = f[1] - r[1]; const L = Math.hypot(dx, dz);
       if (L < 0.3) { dx = f[2]; dz = f[3]; } else { dx /= L; dz /= L; }
       const x = (f[0] + r[0]) / 2 - dz * c.lat, z = (f[1] + r[1]) / 2 + dx * c.lat;
-      out[o++] = c.id; out[o++] = x; out[o++] = z; out[o++] = Math.atan2(dx, dz); out[o++] = dx * c.v; out[o++] = dz * c.v; out[o++] = c.color;
+      out[o++] = c.id; out[o++] = x; out[o++] = z; out[o++] = Math.atan2(dx, dz); out[o++] = dx * c.v; out[o++] = dz * c.v; out[o++] = c.color; const dy = net.decks?.size ? deckHeight(net, c.seg.eid ?? c.seg.from?.eid, x, z) : NaN; out[o++] = Number.isFinite(dy) ? dy : NO_DECK;
     };
     for (const c of this.cars) { pose(c); sum += c.v; if (c.v < 0.3) wait++; }
     for (const s of parked) put(1e6 + s.ix, s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
@@ -297,4 +296,4 @@ class Sim {
   }
 }
 
-export { CAR_LEN, LENS, STRIDE, Sim };
+export { CAR_LEN, LENS, NO_DECK, STRIDE, Sim };

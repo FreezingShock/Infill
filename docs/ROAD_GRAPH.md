@@ -41,3 +41,23 @@ These come from the data (OSM class, speed, width, names, zoning frontage) plus 
 - **Lane lines never enter a box.** Lines are trimmed to the box plus 0.5 m on every priority leg.
 - **Pavement is exclusive.** Trees, props and footpaths are clipped or nudged by `roadwayIndex`; paths cross only at crosswalks.
 - **Not modelled yet:** left-turn pockets, hatching and arrows, left turns from a side street in the sim.
+
+## Levels, bridges and freeways (apply to every area on load)
+Planned once on the base city by `src/engine/levels.js` (`planLevels`), drawn by `src/app/bridges.js`, read by traffic through `src/tools/roads/deck.js`.
+
+| Where | Field | Meaning |
+| --- | --- | --- |
+| edge | `lv` | from the pack: `[[from, to, level]]`, metres along the edge; 1 = bridge, -1 = tunnel (tools/pack/levels.py) |
+| edge | `dk` | planned spans `{ a, b, L, h[], d }`: surface height at evenly spaced stations a..b; L = 1 bridge, -1 tunnel, 0 a graded stretch on the ground (freeways and ramps). Absent = draped on the ground |
+| edge | `dkp` | path length the deck was planned for; `spansOf(e)` ignores `dk` if an edit reshaped the edge |
+| edge | `l0`, `l1` | level of the start and end node for traffic (0 unless the deck carries on across that node) |
+
+Rules (never per road):
+- **Crossing without a shared node is grade separation.** The map splits roads at every real junction, so two paths that cross with no node are at different levels. The tagged span decides which is on top; untagged, a freeway or ramp passes over any other road, a ramp passes under its mainline, and two ordinary streets are left alone (a stray crossing is a data glitch).
+- **Freeways and ramps are graded, not draped.** One profile for the whole edge: the ground with bridge spans straightened, low-passed (the DEM is coarse and bumpy), at most 7 percent, both ends on the ground. The ground under the road bed is cut and filled to meet it, with side slopes blending back over 8 m. Bridges run straight between the profile's own heights at their two ends, so a deck always joins the road on either side.
+- **A deck** grades straight between the ground at its two ends (inferred decks run 16+ m each side of the crossing and never touch an edge end). A deck over a deck clears it by 6.2 m. A tunnel dips 6.5 m under the ground between its portals.
+- **The road below passes under.** The ground under a deck is cut away to 5.6 m clearance; the road beneath dips into the cut at an 8 percent approach grade and gets concrete retaining walls where the cut is deeper than a kerb. The cut lowers `HG` (the terrain grid) once at load, so every `elev` call agrees.
+- **Bridges are drawn** as slab (soffit and fascia), parapets (unless the profile has its own barrier), an abutment at each end and, on spans over 32 m, piers clear of the road beneath.
+- **Traffic follows levels.** The sim keys a node by place and level (`x,z` plus `^1` when elevated); an elevated end that shares a spot with a ground end is a different node, so nothing turns between levels. Cars carry their deck height in the snapshot (column 7 of `STRIDE`, NaN on the ground) and ride the deck.
+- **Freeways** (class `motorway`/`trunk`, ramps included) get `freewayProfile` in `engine/model.js`: concrete barrier on both outer edges (and a median barrier if the map has one two-way road), 1.0 m inner and 2.2 m outer shoulder, 3.5 m lanes, solid yellow edge line on the median side, solid white on the right, long dashes between lanes, no planted strips and no street trees. `src/app/roadside.js` plants natural, varied cover beside them (eucalyptus stands, oak and sycamore, dry scrub) from noise, thicker on slopes, never on pavement or lots. Two or more motorway-class legs meeting (merge or diverge) have no stop bars or crosswalks; a ramp yields by time gap.
+- Not built yet: a bridge continuing across several segments is graded per span (each rests on the ground at its own ends); footbridges and rail; terrain cut is not seen by the lot-geometry workers.

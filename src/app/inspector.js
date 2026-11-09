@@ -287,7 +287,7 @@ function renderEdge() {
   <div class="strip" role="group" aria-label="Street elements">${strip}</div>
   <div class="row" style="justify-content:space-between"><span class="note">New width ${row.toFixed(1)} m${row > cur + 0.3 ? ` · widens by ${(row - cur).toFixed(1)} m and clips the lots beside it` : row < cur - 0.3 ? ' · the spare width becomes planting' : ''}</span></div>
   ${profPick >= 0 ? `<div class="row"><b style="font:700 13px var(--display)">${EL[profDraft.els[profPick][0]]?.name || profDraft.els[profPick][0]}</b><span class="stepper"><button data-w="-0.2" aria-label="Narrower">−</button><b>${profDraft.els[profPick][1].toFixed(1)} m</b><button data-w="0.2" aria-label="Wider">+</button></span><button class="btn ghost small" id="elDel">Remove</button></div>` : '<div class="note">Click an element to resize or remove it.</div>'}
-  <div class="row"><select id="elAdd" aria-label="Add an element"><option value="">+ Add element…</option>${Object.entries(EL).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}</select></div>
+  <div class="row"><select id="elAdd" aria-label="Add an element"><option value="">+ Add element…</option>${Object.entries(EL).filter(([, v]) => !v.hide).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}</select></div>
   <h3>Presets</h3>
   <div class="row">${Object.entries(PRESETS).map(([k, p]) => `<button class="chipb ${profDraft.k === k ? 'on' : ''}" data-pre="${k}">${p.name}</button>`).join('')}</div>
   <div class="row"><button class="btn small" id="profApply">Apply to ${es.length} piece${es.length === 1 ? '' : 's'}</button><button class="btn ghost small" id="profReset">Reset</button></div>

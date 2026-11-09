@@ -32,7 +32,9 @@ def build(pack_path, out_path, work, get, ov, log=print):
     os.makedirs(work, exist_ok=True)
     log('Fetching surrounding streets and buildings')
     seg_p, bld_p = os.path.join(work, 'ring_seg.geojson'), os.path.join(work, 'ring_bld.geojson')
-    ov.fetch('transportation', 'segment', seg_p, ring); ov.fetch('buildings', 'building', bld_p, ring)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(2) as ex:  # the two layers are independent downloads
+        list(ex.map(lambda j: ov.fetch(*j), [('transportation', 'segment', seg_p, ring), ('buildings', 'building', bld_p, ring)]))
     # ---- terrain (AWS terrarium z14) sampled on a 40 m grid in local metres
     n = 2 ** Z
     tile = lambda lon, lat: (int((lon + 180) / 360 * n), int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n))

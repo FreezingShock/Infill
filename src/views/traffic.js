@@ -9,8 +9,10 @@ import { drivewaysByEdge } from '../engine/driveways.js';
 import { nodeControl } from '../tools/roads/graph.js';
 import { provide } from './providers.js';
 import { drivableEdges, keyOf } from '../sim/net.js';
-import { Sim, STRIDE } from '../sim/sim.js';
+import { NO_DECK, Sim, STRIDE } from '../sim/sim.js';
 import { advance, applyMessage } from '../sim/host.js';
+import { exportSignals } from '../sim/signals.js';
+import { setSignals, tickSignals } from './signals.js';
 
 const COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const MODES = [['Calm', 0.2], ['Normal', 0.4], ['Rush', 0.8]];
@@ -57,7 +59,7 @@ let backend = null;
 function startBackend() {
   try {
     const w = new Worker(new URL('../sim/worker.js', import.meta.url), { type: 'module' });
-    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); };
+    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); else if (e.data.type === 'sigs') setSignals(e.data.list); };
     w.onerror = () => { backend = localBackend(); if (st.netMsg) backend.post(st.netMsg); sendCfg(true); }; // fall back, and hand the new backend the street network it missed
     return { post: (m) => w.postMessage(m) };
   } catch (err) { return localBackend(); }
@@ -68,9 +70,9 @@ function localBackend() {
     const now = performance.now(), el = Math.min(0.25, (now - last) / 1000); last = now;
     if (!sim.net) return;
     const t0 = performance.now(); advance(sim, el, 2);
-    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0 }, ++tick % 20 === 1 ? sim.edgeStats() : null);
+    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0, t: sim.t }, ++tick % 20 === 1 ? sim.edgeStats() : null);
   }, 50);
-  return { post: (m) => applyMessage(sim, m) };
+  return { post: (m) => { applyMessage(sim, m); if (m.type === 'net') setSignals(exportSignals(sim.net)); } };
 }
 
 const live = { flow: null, curb: null };
@@ -143,13 +145,14 @@ function sendCfg(force) {
 function tickTraffic(now) {
   if (now - st.lastCfg > 1000) { st.lastCfg = now; sendCfg(false); }
   root.visible = st.on;
+  tickSignals(st.stats.t == null ? 0 : st.stats.t + Math.min(0.25, (now - st.snapT) / 1000));
   if (!st.on) return;
   const buf = st.snap, dt = Math.min(0.2, (now - st.snapT) / 1000);
   const nm = [0, 0, 0, 0, 0];
   for (let q = 0; q < st.mvN; q++) {
     const o = st.mvOff[q], k = Math.min(4, (buf[o + 6] | 0) >> 3), i = nm[k]++;
     if (i >= MOVING_CAP) continue;
-    writeCar(moving[k], i, buf[o + 1] + buf[o + 4] * dt, buf[o + 2] + buf[o + 5] * dt, buf[o + 3]);
+    writeCar(moving[k], i, buf[o + 1] + buf[o + 4] * dt, buf[o + 2] + buf[o + 5] * dt, buf[o + 3], buf[o + 7]);
   }
   for (const f of moving) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
   if (st.fresh) {
@@ -157,15 +160,16 @@ function tickTraffic(now) {
     for (let o = 0; o < buf.length; o += STRIDE) {
       if (buf[o] < 1e6) continue;
       const k = Math.min(4, (buf[o + 6] | 0) >> 3), i = np[k]++;
-      if (i < PARKED_CAP) writeCar(parked[k], i, buf[o + 1], buf[o + 2], buf[o + 3]);
+      if (i < PARKED_CAP) writeCar(parked[k], i, buf[o + 1], buf[o + 2], buf[o + 3], NO_DECK);
     }
     for (const f of parked) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
     st.fresh = false;
   }
 }
 // one car's matrix into both of its instanced meshes (body and trim share it)
-function writeCar(f, i, x, z, h) {
-  const c = Math.cos(h), s = Math.sin(h), y = elev(x, z) + 0.3, j = i * 16, A = f.a.instanceMatrix.array, B = f.b.instanceMatrix.array;
+function writeCar(f, i, x, z, h, deckY) {
+  const c = Math.cos(h), s = Math.sin(h), y = (deckY > NO_DECK / 2 ? deckY : elev(x, z)) + 0.3, j = i * 16, // on a bridge the car rides the deck, else the ground
+    A = f.a.instanceMatrix.array, B = f.b.instanceMatrix.array;
   A[j] = c; A[j + 1] = 0; A[j + 2] = -s; A[j + 3] = 0; A[j + 4] = 0; A[j + 5] = 1; A[j + 6] = 0; A[j + 7] = 0; A[j + 8] = s; A[j + 9] = 0; A[j + 10] = c; A[j + 11] = 0; A[j + 12] = x; A[j + 13] = y; A[j + 14] = z; A[j + 15] = 1;
   B.set(A.subarray(j, j + 16), j);
 }

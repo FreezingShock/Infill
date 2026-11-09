@@ -5,7 +5,10 @@ import { addBulbs } from '../engine/bulbs.js';
 import { drawPath } from '../tools/roads/divided.js';
 import { roadwayIndex } from '../tools/roads/roadway.js';
 import { medianPaths, plan as roadPlan, trimPath } from '../tools/roads/markings.js';
-import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
+import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, ey, inPoly, lineGeo, obox, offsetLine, ribbon, rng, setDeck } from '../engine/core.js';
+import { levelPlan } from '../engine/levels.js';
+import { barrierStrip, bridgeParts, cutWalls, deckFn } from './bridges.js';
+import { freewayTrees } from './roadside.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { DETAIL, chunkKey, lod } from '../engine/lod.js';
@@ -63,7 +66,7 @@ function lotObject(gens) {
 }
 
 // ---------- trees, cars ----------
-const TREE_COLS = [0x34602e, 0x3f6d31, 0x2d5530, 0x4a7a36, 0x3a6535, 0x2f5a3a, 0xb0602e, 0xc08a45].map((h) => new THREE.Color(h));
+const TREE_COLS = [0x34602e, 0x3f6d31, 0x2d5530, 0x4a7a36, 0x3a6535, 0x2f5a3a, 0xb0602e, 0xc08a45, 0x5f7a3a, 0x7d8f58, 0x7f8a6a, 0xa8964f, 0x3f5e30, 0x9ba368].map((h) => new THREE.Color(h)); // entries 8 and up: the natural palette beside freeways (roadside.js)
 const TREE_KINDS = (() => {
   const mk = (geo, y) => { geo.translate(0, y, 0); return geo; };
   return [
@@ -106,24 +109,27 @@ function buildRoads(S) {
   const YEL = C(0xe9c24a), WHITE = C(0xf5f2ea), DRIVE = C(0xcbc1b0), ASPH = { motorway: C(0x5f5a57), primary: C(0x66615d), secondary: C(0x6c6662), tertiary: C(0x75706a), residential: C(0x7d7771), unclassified: C(0x7d7771), service: C(0x8a837c), unknown: C(0x8a837c) };
   const E = [...S.edges.values()].sort((a, b) => (ROAD_ORDER[a.c] ?? 0) - (ROAD_ORDER[b.c] ?? 0));
   const RP = roadPlan(S, PACK.walks), RW = roadwayIndex(E);
+  const FW = (e) => e.c === 'motorway' || e.c === 'trunk';
   for (const pass of [0, 1]) for (const e of E) {
+    setDeck(deckFn(e)); // an edge on a bridge or in a tunnel is drawn at its own height (src/engine/levels.js)
     const P = drawPath(e), els = e.prof.els, row = rowWidth(e.prof), base = 0.26 + (ROAD_ORDER[e.c] ?? 0) * 0.02;
     if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, P, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : e.xmed ? ASPH.primary : ASPH[e.c] || ASPH.service); continue; }
     let o = -row / 2;
     let i0 = -1;
     for (const [k, w] of els) {
       i0++; const d = EL[k] || EL.lane, curb = !!d.curb;
+      if (k === 'barrier') { if (pass === 0) barrierStrip(acc, P, o, o + w, 0.85); o += w; continue; } // freeway concrete barrier: a real raised strip
       if ((pass === 0) === curb) {
-        const col = (k === 'lane' || k === 'turn' || k === 'park') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : ASPH[e.c]) : C(d.c);
+        const col = (k === 'lane' || k === 'turn' || k === 'park' || k === 'shoulder') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : k === 'shoulder' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.045) : ASPH[e.c]) : C(d.c);
         if (k === 'median') {
           ribbon(acc, P, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the median: openings and painted merges show it
           if (!e.nose) for (const seg of medianPaths(P, RP.info.get(e.id))) { // raised strips between the junction openings
             ribbon(acc, seg, o, o + w, base + 0.06, col);
-            if (i0 === 0) alongPts(offsetLine(seg, o), 14, (x, z) => trees.push([x, elev(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median
+            if (i0 === 0) alongPts(offsetLine(seg, o), 14, (x, z) => trees.push([x, ey(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median
           }
         } else {
           ribbon(acc, P, o, o + w, curb ? 0.16 : base, col);
-          if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(P, o + w / 2), 9, (x, z) => trees.push([x, elev(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
+          if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(P, o + w / 2), 9, (x, z) => trees.push([x, ey(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
         }
       }
       o += w;
@@ -138,8 +144,10 @@ function buildRoads(S) {
         if (k === 'turn') { ribbon(marks, mp, a + 0.1, a + 0.28, base + 0.16, YEL, 2); ribbon(marks, mp, b - 0.28, b - 0.1, base + 0.16, YEL, 2); }
         if ((k === 'lane' || k === 'bus') && (nk === 'lane' || nk === 'bus')) {
           if (!hasTurn && !e.oneway && Math.abs(b) < 0.6) { ribbon(marks, mp, b - 0.32, b - 0.14, base + 0.16, YEL, 2); ribbon(marks, mp, b + 0.14, b + 0.32, base + 0.16, YEL, 2); }
-          else dashed(marks, mp, b - 0.08, b + 0.08, base + 0.16, WHITE, 3, 6);
+          else dashed(marks, mp, b - 0.08, b + 0.08, base + 0.16, WHITE, 3, FW(e) ? 9 : 6);
         }
+        if (k === 'shoulder' && nk === 'lane') ribbon(marks, mp, b, b + 0.18, base + 0.16, i === 1 && e.oneway ? YEL : WHITE, 2); // freeway edge lines: yellow on the median side, white on the right
+        if (k === 'lane' && nk === 'shoulder') ribbon(marks, mp, b - 0.18, b, base + 0.16, WHITE, 2);
         const yel = e.nose ? [P] : medianPaths(P, R); // beside a median; along a painted merge it closes up into the double yellow
         if (k === 'median' && (nk === 'lane' || nk === 'turn')) for (const sg of yel) ribbon(marks, sg, b + 0.02, b + 0.2, base + 0.16, YEL, 2);
         if (nk === 'median' && (k === 'lane' || k === 'turn')) for (const sg of yel) ribbon(marks, sg, b - 0.2, b - 0.02, base + 0.16, YEL, 2);
@@ -149,6 +157,15 @@ function buildRoads(S) {
       }
     }
   }
+  setDeck(null);
+  for (const e of E) { setDeck(deckFn(e)); bridgeParts(acc, e, rowWidth(e.prof), (x, z, pad) => !!RW.hit(x, z, pad)); } // slab, parapets, abutments, piers (src/app/bridges.js)
+  setDeck(null);
+  const byId = new Map(E.map((q) => [q.id, q])), cut = new Set();
+  for (const k of levelPlan().stacks) { // the road that passes under a bridge runs in a cut: retaining walls on both sides
+    const lo = byId.get(k.lo), key = k.lo + ':' + Math.round(k.sl / 20); if (!k.ground || !lo || cut.has(key)) continue; cut.add(key);
+    cutWalls(acc, lo, rowWidth(lo.prof), k.sl - 75, k.sl + 75);
+  }
+  for (const t of freewayTrees(E, (q) => rowWidth(q.prof), (x, z) => { if (RW.hit(x, z, 1.4)) return true; const l = BASE_LOT_GRID.at(x, z); return !!l && (l.b.length > 0 || l.pk.length > 0); })) trees.push(t); // natural cover beside freeways, never rows of street trees (src/app/roadside.js)
   for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2), (x, z) => !!RW.hit(x, z, 0.4))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
   addBulbs(acc, S, ASPH.residential, C(EL.walk.c)); // cul-de-sac turnarounds (src/engine/bulbs.js)
   for (const l of RP.ladders) ribbon(marks, l.p, l.o1, l.o2, 0.5, WHITE, 2); // ladder crosswalks, set back from the box
@@ -257,13 +274,13 @@ function lampPools(lampMat) {
 }
 function buildProps() {
   const acc = new Acc(), glow = new Acc(), R = (x, z, a = 0, hw = 0.12, hd = 0.12) => ({ x, z, ux: Math.cos(a), uz: Math.sin(a), vx: -Math.sin(a), vz: Math.cos(a), hw, hd });
-  const POLE = C(0x5d5148), BOX = C(0x2b2420), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
+  const POLE = C(0x5d5148), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
   const RW = roadwayIndex([...BASE.edges.values()]);
   for (const [k, x0, z0] of PACK.props) {
-    const [x, z] = k === 'signal' ? [x0, z0] : RW.nudge(x0, z0); // street furniture stands on the sidewalk, never in a lane
+    if (k === 'signal') continue; // signals stand on corner mast arms built from the junctions (views/signals.js); the mapped points stay in the pack for the scan view
+    const [x, z] = RW.nudge(x0, z0); // street furniture stands on the sidewalk, never in a lane
     const y = elev(x, z);
-    if (k === 'signal') { obox(acc, R(x, z), y, 6, POLE); obox(acc, R(x, z, 0, 0.35, 0.3), y + 4.4, 1.2, BOX); obox(glow, R(x, z, 0, 0.12, 0.33), y + 5.1, 0.25, C(0x6fd36f), false); }
-    else if (k === 'lamp') { obox(acc, R(x, z), y, 7.5, POLE); obox(glow, R(x, z, 0, 0.45, 0.25), y + 7.2, 0.3, LAMP, false); }
+    if (k === 'lamp') { obox(acc, R(x, z), y, 7.5, POLE); obox(glow, R(x, z, 0, 0.45, 0.25), y + 7.2, 0.3, LAMP, false); }
     else if (k === 'bus') { obox(acc, R(x, z, 0, 1.6, 0.7), y + 2.4, 0.15, POLE); obox(glow, R(x - 0.0, z, 0, 1.5, 0.05), y, 2.3, SHEL, false); obox(acc, R(x, z + 0.4, 0, 0.08, 0.08), y, 2.4, POLE); }
     else if (k === 'bench') obox(acc, R(x, z, 0.3, 0.9, 0.3), y, 0.5, C(0xa8774d));
     else if (k === 'pole') obox(acc, R(x, z, 0, 0.14, 0.14), y, 9, C(0x8a6a4a));

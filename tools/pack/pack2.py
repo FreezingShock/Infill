@@ -39,15 +39,17 @@ edges = []
 for i, r in enumerate(P['roads']):
     a = node(r['p'][0]); b = node(r['p'][-1])
     g = r['c'] not in ('service', 'unknown') or r.get('s') == 'alley'
-    edges.append({'id': f'E{i}', 'a': a, 'b': b, 'p': r['p'], 'c': r['c'], 's': r.get('s'), 'n': r.get('n'), 'w': r['w'], 'g': 1 if g else 0, 'ow': r.get('ow'), 'sp': r.get('sp')})
+    edges.append({'id': f'E{i}', 'a': a, 'b': b, 'p': r['p'], 'c': r['c'], 's': r.get('s'), 'n': r.get('n'), 'w': r['w'], 'g': 1 if g else 0, 'ow': r.get('ow'), 'sp': r.get('sp'), **({'lv': r['lv']} if r.get('lv') else {})})
 graph = [e for e in edges if e['g'] and e['c'] != 'motorway']
 glines = [LineString(e['p']) for e in graph]
 gtree = STRtree(glines)
 
 # ---------- blocks (faces of the graph minus right-of-way) ----------
-blines = [LineString(e['p']) for e in edges if e['g']]
+import levels
+at_grade = lambda e: [q for q in levels.at_grade(LineString(e['p']), e.get('lv'))]  # a road over or under another does not cut the blocks of the one it crosses
+blines = [q for e in edges if e['g'] for q in at_grade(e)]
 polys = list(polygonize(unary_union(blines + [clip.exterior])))
-roadbuf = unary_union([LineString(e['p']).buffer(e['w'] / 2 + 1.5, cap_style=2) for e in edges if e['g']])
+roadbuf = unary_union([q.buffer(e['w'] / 2 + 1.5, cap_style=2) for e in edges if e['g'] for q in at_grade(e)])
 blocks = []
 for pg in polys:
     b = pg.difference(roadbuf)

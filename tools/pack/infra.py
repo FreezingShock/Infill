@@ -16,6 +16,7 @@ There are no public water mains, gas or LADWP distribution lines, so none are dr
 build_area.py calls build() after the pack is written. Coordinates match the pack: x east, z south, metres
 from pack['origin'], KY = 110540 like pack_v1.py.
 """
+from concurrent.futures import ThreadPoolExecutor
 import argparse, json, math, os, re, sys, time, urllib.parse, urllib.request
 from collections import OrderedDict
 
@@ -55,7 +56,7 @@ def arcgis(url, bbox, get, page=1000):
     return feats
 
 
-def _get(url, tries=4):
+def _get(url, tries=2):
     last = None
     for k in range(tries):
         try:
@@ -138,19 +139,23 @@ def convert(pack, raw, power_feats):
 def build(pack_path, out_path, get=_get, power_geojson=None, raw_dir=None, area_id=None, log=print):
     pack = json.load(open(pack_path))
     W, S, E, N = pack['bbox']; box = (W - PAD, S - PAD, E + PAD, N + PAD)
-    raw, failed = {}, []
     final = out_path[:-4] if out_path.endswith('.tmp') else out_path  # build_area writes to <name>.tmp and renames
     prev = json.load(open(final)) if os.path.exists(final) else None
-    for k, url in LAYERS.items():
+    failed = []
+
+    def one(item):  # the four layers are independent servers: ask them all at once
+        k, url = item
         try:
             if raw_dir:
                 f = os.path.join(raw_dir, 'transmission-sfv.geojson' if k == 'transmission' else f'{k}-{area_id}.geojson')
-                raw[k] = json.load(open(f))['features'] if os.path.exists(f) else []
+                feats = json.load(open(f))['features'] if os.path.exists(f) else []
             else:
-                raw[k] = arcgis(url, (box if k != 'transmission' else (W - 0.02, S - 0.02, E + 0.02, N + 0.02)), get)
-            log(f'{k}: {len(raw[k])} features')
+                feats = arcgis(url, (box if k != 'transmission' else (W - 0.02, S - 0.02, E + 0.02, N + 0.02)), get)
+            log(f'{k}: {len(feats)} features'); return k, feats
         except Exception as e:  # noqa: BLE001
-            log(f'{k} unavailable ({type(e).__name__}: {e})'); raw[k] = []; failed.append(k)
+            log(f'{k} unavailable ({type(e).__name__}: {e})'); failed.append(k); return k, []
+    with ThreadPoolExecutor(len(LAYERS)) as ex:
+        raw = dict(ex.map(one, LAYERS.items()))
     power = []
     if power_geojson and os.path.exists(power_geojson): power = json.load(open(power_geojson))['features']
     o = convert(pack, raw, power)

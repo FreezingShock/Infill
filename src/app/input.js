@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AREA, AREAS, PACK } from '../engine/pack.js';
+import { AREA, AREAS } from '../engine/pack.js';
 import { $, Acc, C, FT, X0, X1, Z0, Z1, area, clamp, decal, elev, esc, fmt, inPoly, nearestOnLine, polyLen, reduceMotion, ribbon, smoothLine } from '../engine/core.js';
 import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
 import { BASE, uid } from '../engine/commands.js';
@@ -16,7 +16,7 @@ import { tickTraffic } from '../views/traffic.js';
 import { ROAD, roadClick, roadHover, roadPath } from '../tools/roads/ui.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
 import { startGrowth } from '../game/zoning/driver.js';
-import { drawDraft, initPicker, proposeAt } from '../areas/picker.js';
+import { initPicker, openPicker, proposeAt } from '../areas/picker.js';
 import { initBackdrop } from '../areas/backdrop.js';
 import { rebaseNote } from '../areas/rebase.js';
 import { warmStart } from '../workers/warm.js';
@@ -413,46 +413,8 @@ handle.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') ui.split 
 // ---------- modals: area picker, credits, log, keys ----------
 function closeModals() { for (const id of ['areas', 'credits', 'logm', 'keysm']) $(id).hidden = true; }
 for (const [m, b] of [['credits', 'credClose'], ['logm', 'logClose'], ['keysm', 'keysClose']]) { $(b).onclick = () => ($(m).hidden = true); $(m).addEventListener('click', (e) => { if (e.target.id === m) $(m).hidden = true; }); }
-let areaPick = AREA.id;
 $('areaBtn').onclick = () => openAreas();
-$('areaGo').onclick = () => {
-  if (areaPick === AREA.id) { $('areas').hidden = true; save(); canvas.focus(); return; }
-  save(); location.search = '?area=' + encodeURIComponent(areaPick);
-};
-function openAreas() { areaPick = AREA.id; renderAreaList(); drawAreaMap(); $('areas').hidden = false; }
-function renderAreaList() {
-  const list = AREAS.areas;
-  $('alist').innerHTML = list.map((a) => `<button class="aitem${a.id === areaPick ? ' on' : ''}${a.status === 'ready' ? '' : ' planned'}" data-area="${esc(a.id)}" aria-pressed="${a.id === areaPick}"><b>${esc(a.name)}</b>${esc(a.sub || '')} · ${a.id === AREA.id ? 'loaded' : a.status === 'ready' ? 'ready' : 'needs a pack'}</button>`).join('');
-  $('alist').querySelectorAll('[data-area]').forEach((b) => (b.onclick = () => { areaPick = b.dataset.area; renderAreaList(); drawAreaMap(); }));
-  const pick = list.find((a) => a.id === areaPick), go = $('areaGo');
-  go.disabled = !pick || pick.status !== 'ready';
-  go.textContent = !pick ? 'Open' : pick.id === AREA.id ? `Back to ${pick.name}` : pick.status === 'ready' ? `Open ${pick.name}` : `${pick.name} needs a pack`;
-}
-// Area map colours: Camino's dark tokens (the canvas paints over its CSS).
-const MAP = { paper: '#0b1013', road: '#5b666d', major: '#2fd8e8', edge: '#e9eff1', on: '#2fd8e8', onFill: 'rgba(47,216,232,.22)', ready: 'rgba(60,224,122,.22)', idle: 'rgba(233,239,241,.06)', label: '#e9eff1', sub: '#8a99a3', font: 'Arimo, Helvetica, Arial, sans-serif', sans: 'Arimo, Helvetica, Arial, sans-serif' };
-function drawAreaMap() { // the Valley as a lon/lat frame with every area's rectangle; the loaded one shows its streets
-  const cv = $('areaMap'), g = cv.getContext('2d'), W = cv.width, H = cv.height, pad = 18;
-  const rb = AREAS.region?.bbox || AREA.bbox || [-118.68, 34.13, -118.33, 34.31], ky = 1 / Math.cos(((rb[1] + rb[3]) / 2) * Math.PI / 180);
-  const s = Math.min((W - 2 * pad) / (rb[2] - rb[0]), (H - 2 * pad) / ((rb[3] - rb[1]) * ky)), ox = (W - (rb[2] - rb[0]) * s) / 2, oy = (H - (rb[3] - rb[1]) * ky * s) / 2;
-  const LL = (lon, lat) => [ox + (lon - rb[0]) * s, oy + (rb[3] - lat) * ky * s];
-  g.fillStyle = MAP.paper; g.fillRect(0, 0, W, H);
-  g.lineWidth = 1;
-  // the loaded pack's streets, placed by its lon/lat origin (x east, z south, metres)
-  const o = PACK.origin, KX = Math.cos(o[1] * Math.PI / 180) * 111320, KY = 110540;
-  const M = (x, z) => LL(o[0] + x / KX, o[1] - z / KY);
-  g.lineCap = 'round';
-  for (const e of BASE.edges.values()) { if (!e.g) continue; g.strokeStyle = e.c === 'primary' ? MAP.major : MAP.road; g.lineWidth = e.c === 'primary' ? 1.6 : 0.7; g.beginPath(); e.p.forEach((p, i) => { const q = M(p[0], p[1]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
-  for (const a of AREAS.areas) {
-    if (!a.bbox) continue;
-    const p = LL(a.bbox[0], a.bbox[3]), q = LL(a.bbox[2], a.bbox[1]), on = a.id === areaPick;
-    g.setLineDash(a.status === 'ready' ? [] : [4, 3]); g.lineWidth = on ? 3 : 1.5; g.strokeStyle = on ? MAP.on : MAP.edge;
-    g.fillStyle = on ? MAP.onFill : a.status === 'ready' ? MAP.ready : MAP.idle;
-    g.fillRect(p[0], p[1], q[0] - p[0], q[1] - p[1]); g.strokeRect(p[0], p[1], q[0] - p[0], q[1] - p[1]);
-    g.setLineDash([]); g.fillStyle = MAP.label; g.font = `${on ? 700 : 500} ${on ? 13 : 11}px ${MAP.font}`; g.fillText(a.name, p[0], p[1] - 4);
-  }
-  drawDraft(g, LL);
-  g.font = `12px ${MAP.sans}`; g.fillStyle = MAP.sub; g.fillText(AREAS.region?.name || '', pad, H - 10); g.fillText('N ↑', W - 40, 22);
-}
+function openAreas() { openPicker(); }
 function openLog() {
   $('logList').innerHTML = LOG.length ? LOG.map((c, i) => `<li class="${i >= CUR ? 'undone' : ''}"><b>${i + 1}.</b> ${esc(describe(c))} <code>${esc(c.op)}</code></li>`).join('') : '<li>No edits yet. The city is the base pack.</li>';
   $('logm').hidden = false;
@@ -557,7 +519,7 @@ renderTools(); renderViews(); renderHint(); renderCard(); placeSplit();
 const start = (AREA.main && [...STATE.lots.values()].find((l) => (l.a || '').includes(AREA.main))) || STATE.lots.values().next().value;
 controls.target.set(start.c[0], start.e, start.c[1]); cam.position.copy(controls.target).add(CAM_OFF);
 resize(); cam.lookAt(controls.target); cam.updateMatrixWorld();
-initPicker({ AREA, AREAS, redraw: drawAreaMap });
+initPicker({ AREA, AREAS, save });
 initBackdrop({ scene, cam, canvas, onPick: proposeAt });
 if (!saved) openAreas();
 addEventListener('resize', resize);

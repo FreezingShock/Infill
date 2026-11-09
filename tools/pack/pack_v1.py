@@ -2,6 +2,7 @@ import json, math, os, sys
 from shapely.geometry import shape, box, Point, LineString, Polygon, MultiPolygon, MultiPoint
 from shapely.ops import polygonize, unary_union
 import shapely
+import levels
 from PIL import Image
 D = sys.argv[1]
 W,S,E,N = map(float, (sys.argv[3] if len(sys.argv) > 3 else '-118.6115,34.1590,-118.5990,34.1700').split(','))  # lon/lat box; default is the Woodland Hills pack
@@ -69,7 +70,7 @@ WID={'motorway':22,'primary':20,'secondary':14,'tertiary':11,'residential':9,'un
 roads=[]; walks=[]; blocklines=[]
 for f in seg['features']:
   p=f['properties']; cls=p.get('class'); sub=p.get('subclass')
-  g=tr(shape(f['geometry'])).intersection(clip)
+  full=tr(shape(f['geometry'])); g=full.intersection(clip)
   if g.is_empty: continue
   parts = list(g.geoms) if hasattr(g,'geoms') else [g]
   name=(p.get('names') or {}).get('primary')
@@ -88,11 +89,15 @@ for f in seg['features']:
       if ow and sub!='link' and sub!='driveway': w=OWW[cls]
       r={'c':cls,'s':sub,'n':name,'w':w,'p':pts}
       if ow: r['ow']=1
+      if full.geom_type=='LineString' and (p.get('road_flags') or p.get('level_rules')):  # bridges and tunnels: spans in metres along the edge (tools/pack/levels.py)
+        s0=full.project(Point(part.coords[0])); s1=full.project(Point(part.coords[-1])); lo=min(s0,s1)
+        sp=levels.part_spans(p,cls,sub,full.length,lo,lo+part.length,flip=(s1<s0)!=(ow==-1))
+        if sp: r['lv']=sp
       sp=speed_of(p)
       if sp: r['sp']=sp
       roads.append(r)
       if cls not in ('service','unknown') or sub=='alley':
-        blocklines.append((part,w))
+        blocklines.extend((q,w) for q in levels.at_grade(LineString(pts),r.get('lv')))
 # ---- blocks
 lines=unary_union([l for l,_ in blocklines]+[clip.exterior])
 polys=list(polygonize(lines))

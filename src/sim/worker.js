@@ -1,6 +1,7 @@
 // Web Worker host for the traffic sim: owns the Sim, steps it at a fixed 20 Hz and posts snapshots.
 import { Sim } from './sim.js';
 import { advance, applyMessage } from './host.js';
+import { exportSignals } from './signals.js';
 
 const sim = new Sim(7);
 let last = 0, cost = 0, timer = 0, n = 0;
@@ -16,5 +17,6 @@ function tick() {
 }
 onmessage = (e) => {
   applyMessage(sim, e.data);
+  if (e.data.type === 'net') postMessage({ type: 'sigs', list: exportSignals(sim.net) }); // heads and phase plans for the signal view
   if (!timer) { last = performance.now(); timer = setInterval(tick, 50); }
 };

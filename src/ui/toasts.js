@@ -9,6 +9,7 @@ const LEAVE_MS = 360; // matches the collapse transition in src/camino/notify.cs
 const KIND = {
   note: { tag: 'Notice', life: 4200, glyph: '<rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="4" width="4" height="4" fill="currentColor"/>' },
   done: { tag: 'Done', life: 3400, glyph: '<circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.9 6.1l1.4 1.4 2.8-2.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>' },
+  fail: { tag: 'Failed', life: 12000, glyph: '<circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 4.2l3.6 3.6M7.8 4.2L4.2 7.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' },
   warn: { tag: 'Hold', life: 5200, glyph: '<path d="M6 1.2l5.2 9.4H.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6 4.8v2.6M6 8.8v.2" stroke="currentColor" stroke-width="1.5"/>' },
 };
 
@@ -62,31 +63,36 @@ function dismiss(n) {
   setTimeout(() => n.row.remove(), LEAVE_MS);
 }
 
-function build(text, kind) {
+function build(text, kind, action) {
   const k = KIND[kind];
   const row = document.createElement('div');
   row.className = 'tn-row';
   row.setAttribute('role', 'none');
-  row.innerHTML = `<div class="tn" data-kind="${kind}">`
+  row.innerHTML = `<div class="tn${action ? ' has-act' : ''}" data-kind="${kind}">`
     + `<span class="tn-tag"><svg viewBox="0 0 12 12" aria-hidden="true">${k.glyph}</svg>${k.tag}</span>`
     + `<p class="tn-msg"></p>`
+    + (action ? `<button class="tn-act" type="button"></button>` : '')
     + `<button class="tn-x" type="button" aria-label="Dismiss notice"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>`
     + `<i class="tn-bar" aria-hidden="true"></i></div>`;
   row.querySelector('.tn-msg').textContent = text;
+  if (action) row.querySelector('.tn-act').textContent = action.label;
   return row;
 }
 
 // Show a notice. Same text as one already on screen just restarts that notice's timer.
-// opts.kind: 'note' | 'done' | 'warn'. Without it the kind is read from the text.
+// opts.kind: 'note' | 'done' | 'warn' | 'fail'. Without it the kind is read from the text.
+// opts.action { label, run }: a button on the notice (it also dismisses it). opts.life: milliseconds on screen.
 export function toast(msg, opts = {}) {
   host = host || document.getElementById('toast');
   if (!host) return;
   const text = String(msg), kind = KIND[opts.kind] ? opts.kind : kindOf(text);
   const twin = stack.find((n) => n.text === text && n.kind === kind);
-  if (twin) { arm(twin, KIND[kind].life); return; }
+  if (twin) { arm(twin, twin.life); return; }
 
-  const row = build(text, kind);
-  const n = { row, text, kind, bar: row.querySelector('.tn-bar'), timer: 0, left: KIND[kind].life, started: 0, hover: false };
+  const life = opts.life > 0 ? opts.life : KIND[kind].life;
+  const row = build(text, kind, opts.action);
+  const n = { row, text, kind, life, bar: row.querySelector('.tn-bar'), timer: 0, left: life, started: 0, hover: false };
+  row.querySelector('.tn-act')?.addEventListener('click', () => { dismiss(n); try { opts.action.run(); } catch { /* the action is the caller's */ } });
   row.querySelector('.tn-x').addEventListener('click', () => dismiss(n));
   row.addEventListener('mouseenter', () => hold(n, true));
   row.addEventListener('mouseleave', () => hold(n, false));
@@ -96,7 +102,7 @@ export function toast(msg, opts = {}) {
   stack.unshift(n);
   host.prepend(row);
   relayout();
-  arm(n, KIND[kind].life);
+  arm(n, life);
   void row.offsetHeight; // commit the collapsed state so the expand transition runs
   row.classList.add('in');
   while (stack.length > MAX) dismiss(stack[stack.length - 1]);
