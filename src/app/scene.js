@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
-import { streetTrees } from '../engine/streettrees.js';
+import { streetTreesAll } from '../engine/streettrees.js';
 import { Acc, C, HG, T, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
@@ -104,7 +104,6 @@ function buildRoads(S) {
       }
       o += w;
     }
-    if (pass === 1) { const w0 = els[0]?.[0] === 'walk' ? els[0][1] : 2.2; for (const t of streetTrees(e, w0, row)) trees.push(t); } // inventory-based street trees (src/engine/streettrees.js)
     if (pass === 1) { // markings
       let o2 = -row / 2; const pos = [];
       for (const [k, w] of els) { pos.push([k, o2, o2 + w]); o2 += w; }
@@ -122,6 +121,7 @@ function buildRoads(S) {
       }
     }
   }
+  for (const t of streetTreesAll(E, (e) => rowWidth(e.prof), (e) => (e.prof.els?.[0]?.[0] === 'walk' ? e.prof.els[0][1] : 2.2))) trees.push(t); // street trees: imagery crowns, else inventory density (src/engine/streettrees.js)
   const grp = new THREE.Group();
   const m1 = new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); m1.receiveShadow = true;
   const m2 = new THREE.Mesh(marks.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));

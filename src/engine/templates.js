@@ -3,6 +3,7 @@ import { Acc, C, FT, UP, area, clamp, decal, elev, fmt, inPoly, obb, obox, ofaca
 import { FLOOR_H, addedFloors, dressUse, useOf, useTotals } from './renovate.js';
 import { BLD, DREAM, PAL, fitRect, frameOf, liveBuildings, zfam, zrule } from './model.js';
 import { drawBuilding } from './looks.js';
+import { yardCanopy } from './streettrees.js';
 
 // =====================================================================
 // Programs -> geometry. A program is {t, st, rf, pl, sb, adu, trees, solar, fence, sd, dr}.
@@ -177,7 +178,8 @@ function genAsBuilt(ctx) {
   if (lot.lt === 'parking' && !lot.pk.length) { decal(ctx.d, lot.r, 0.3, COL.asphalt); ctx.park += lot.m2; stallsIn(ctx, lot.r, 0.55); }
   if (!blds.length && !lot.sh.length && !lot.pk.length && lot.lt !== 'parking' && lot.lt !== 'civic') { decal(ctx.d, lot.r, 0.28, COL.dirt); yardTrees(ctx, Math.min(3, Math.round(lot.m2 / 300)), 1, [3]); }
   // yard trees by rule (no tree inventory in this pack yet)
-  if (['house', 'multi', 'apts', 'civic'].includes(lot.lt)) yardTrees(ctx, clamp(Math.round(lot.m2 / (lot.lt === 'house' ? 300 : 420)), 0, 5));
+  const crowns = yardCanopy(lot); if (crowns) for (const t of crowns) ctx.trees.push(t); // trees read from the NAIP picture
+  else if (['house', 'multi', 'apts', 'civic'].includes(lot.lt)) yardTrees(ctx, clamp(Math.round(lot.m2 / (lot.lt === 'house' ? 300 : 420)), 0, 5));
   if (prog.trees) yardTrees(ctx, 4, 1.6);
   ctx.units = lot.lt === 'apts' || lot.lt === 'multi' ? Math.round(lot.u0 * k) : lot.u0;
   const tot = U && tally.length ? useTotals(prog, tally) : null; if (tot) { ctx.units = tot.homes; ctx.cost += tot.cost; }

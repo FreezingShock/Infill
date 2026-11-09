@@ -48,3 +48,15 @@ test('street trees follow the inventory sidecar and stay off streets that alread
   const e = { ...named[0], prof: { k: 'complete', els: [['walk', 3], ['trees', 1.6], ['lane', 3]] } };
   assert.equal(st.streetTrees(e, 3, 7.6).length, 0);
 });
+
+test('imagery crowns become yard trees and street trees', async () => {
+  const st = await import('../src/engine/streettrees.js');
+  const data = JSON.parse(fs.readFileSync(new URL(`../public/areas/${area.pack.replace('.json', '.canopy.json')}`, import.meta.url)));
+  assert.equal(st.setCanopy(data), true);
+  let yard = 0; for (const lot of BASE.lots.values()) yard += st.yardCanopy(lot).length;
+  assert.ok(yard > 500, `yard crowns ${yard}`);
+  const street = st.streetTreesAll([...BASE.edges.values()], (e) => e.prof.els.reduce((a, q) => a + q[1], 0), () => 2.2);
+  assert.ok(street.length > 100, `street crowns ${street.length}`);
+  for (const t of street) assert.ok(t.every(Number.isFinite));
+  st.setCanopy(null);
+});

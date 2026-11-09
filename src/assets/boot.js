@@ -12,6 +12,10 @@ export async function bootAssets(area, pack) {
       const st = await fetch(`areas/${area.pack.replace(/\.json$/, '.streets.json')}`);
       if (st.ok) (await import('../engine/streettrees.js')).setStreetTrees(await st.json());
     } catch (e) { console.warn('street trees skipped', e); }
+    try { // tree crowns read from NAIP
+      const cn = await fetch(`areas/${area.pack.replace(/\.json$/, '.canopy.json')}`);
+      if (cn.ok) (await import('../engine/streettrees.js')).setCanopy(await cn.json());
+    } catch (e) { console.warn('canopy skipped', e); }
     return ok;
   } catch (e) { console.warn('looks data skipped', e); return false; }
 }
