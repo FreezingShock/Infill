@@ -29,3 +29,6 @@ Seeded 9 Nov 2026 from the Infill project chat and from nate's Deepstack notes. 
 - Performance is a feature: measure cost before building, report numbers honestly.
 - Honest answers: real cause and fix, not a defence.
 - Fit one screen at 1280x720 and 375x667 where UI is involved.
+
+## Boot screen (2026-11-09)
+- nate likes the boot readout layout as is. He wants it pushed toward the surveillance-OS look: faint grid only in scattered patches that drift and fade (decorative, not the city map), scanlines, a slow scan band, corner brackets, numbered steps. Keep the reduce-motion path still.
