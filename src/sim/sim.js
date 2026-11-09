@@ -4,6 +4,8 @@
 import { rng, sampleAt } from './geom.js';
 import { stateAt } from './signals.js';
 import { deckHeight } from './net.js';
+import { Router } from './route.js';
+import { Demand } from './demand.js';
 
 const NO_DECK = -999, CAR_LEN = 4.4, STRIDE = 8; // snapshot per vehicle: id, x, z, heading, vx, vz, look, height of the deck it drives on (NO_DECK = on the ground)
 // vehicle kinds: 0 sedan, 1 SUV, 2 pickup, 3 van, 4 bus. A look is colour (0..5) + 8 * kind.
@@ -23,14 +25,14 @@ class Sim {
     this.r = rng(seed); this.t = 0; this.cars = []; this.nextId = 1; this.net = null;
     this.density = 1; this.maxCars = 900; this.parkedShare = 0.55; this.running = true; this.broken = 0;
     this.stats = { moving: 0, parked: 0, waiting: 0, avg: 0 };
-    this._leave = 0;
+    this._leave = 0; this.zones = null; this.hour = 14; this.demand = null; this.router = null; this.nodeById = new Map();
   }
 
   // ---------- network swap (street edits keep every car that still has its lane) ----------
   setNet(net) {
     const old = this.net, oldSlots = new Map();
     if (old) for (const s of old.slots) oldSlots.set(s.id, s);
-    this.net = net;
+    this.net = net; this.router = new Router(net); this.demand = new Demand(net, this.zones, this.router); this.nodeById = new Map(net.nodes.map((n) => [n.id, n]));
     this.segs = [...net.lanes, ...net.connectors];
     // cumulative weights for picking spawn lanes
     this.spawnLanes = net.lanes.filter((l) => l.len > 16); let w = 0; this.spawnW = this.spawnLanes.map((l) => (w += 1 + l.rank) );
@@ -43,7 +45,7 @@ class Sim {
       c.seg = seg; seg.cars.push(c);
       c.prev = null; c.hold = false;
       if (c.isConn) { c.plan = seg; seg.reserved++; seg.to.reserved++; c.granted = seg; }
-      else { c.plan = null; c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(seg); }
+      else { c.plan = null; c.granted = null; c.stopped = false; c.arrive = undefined; this.route(c, null); c.plan = this.choose(seg, c); }
       keep.push(c);
     }
     this.cars = keep;
@@ -58,32 +60,58 @@ class Sim {
     this.fill(0.8);
   }
 
-  target() { return Math.min(this.maxCars, Math.round(this.net.laneMeters / 34 * this.density)); }
+  // cars out on the road: from the dwellings and workplaces the lots supply, scaled by the hour, never more than the lanes hold
+  target() {
+    const cap = Math.min(this.maxCars, Math.round(this.net.laneMeters / 16));
+    return Math.max(4, Math.min(cap, Math.round(this.demand.want(this.hour) * this.density)));
+  }
+  setZones(zones) { this.zones = zones; if (this.net) this.demand = new Demand(this.net, zones, this.router); }
   fill(share) {
     const want = Math.round(this.target() * share);
-    for (let i = 0; i < want * 3 && this.cars.length < want; i++) this.spawn(false);
+    for (let i = 0; i < want * 3 && this.cars.length < want; i++) this.spawn(true);
   }
-  spawn(atPortal) {
-    if (!this.spawnLanes.length) return false;
-    let lane, s;
-    if (atPortal && this.portals.length) { lane = this.portals[Math.floor(this.r() * this.portals.length)]; s = 1; }
-    else { const x = this.r() * this.spawnW.at(-1); let i = this.spawnW.findIndex((w) => w >= x); if (i < 0) i = 0; lane = this.spawnLanes[i]; s = 6 + this.r() * (lane.len - 12); }
-    if (!lane.conns.length && !atPortal) return false;
+  // a new trip: it starts at its origin (a portal for through traffic, a home or a workplace otherwise); `enRoute` drops it
+  // somewhere along its route instead, so the first minute already looks like a city in motion
+  spawn(enRoute) {
+    const D = this.demand, R = this.router;
+    if (!D) return false;
+    const trip = D.pickTrip(this.hour, this.r); if (!trip) return false;
+    const tab = R.table(trip.dest);
+    let lane = R.bestOut(trip.origin, tab); if (!lane || lane.len < 14) return false;
+    if (enRoute) {
+      const path = [lane]; let cur = lane;
+      for (let i = 0; i < 80 && cur.to !== trip.dest; i++) { const c = R.next(cur, tab, () => 0); if (!c) break; cur = c.to; path.push(cur); }
+      lane = path[Math.floor(this.r() * path.length)];
+    }
+    if (lane.len < 14 || (!lane.conns.length && !lane.to.portal)) return false;
     if (lane.leftOnly && this.r() < 0.75) return false; // a left-turn pocket is short and quiet
-    for (const c of lane.cars) if (Math.abs(c.s - s) < 16) return false;
+    // a portal car enters at the edge; a home or workplace car pulls out somewhere along the block, so a busy origin does not stack up at one corner
+    const s = !enRoute && lane.from.portal ? 1 : 5 + this.r() * Math.max(1, lane.len - 10);
     const look = this.look(lane.rank >= 2), len = LENS[kindOf(look)];
     for (const c of lane.cars) if (Math.abs(c.s - s) < len + 9) return false;
-    this.add(lane, s, lane.speed * 0.5, look, 0, 150 + this.r() * 900);
+    this.add(lane, s, lane.speed * 0.5, look, 0, 1e9, trip.dest);
     return true;
   }
-  look(bus) { const r = this.r(), k = r < 0.46 ? 0 : r < 0.7 ? 1 : r < 0.82 ? 2 : r < 0.94 ? 3 : bus ? 4 : 0; return Math.floor(this.r() * 6) + 8 * k; }
-  add(lane, s, v, color, lat, trip) {
-    if (kindOf(color) === 4) trip = 1e9;
-    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: LENS[kindOf(color)], fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0, prev: null, hold: false };
-    c.plan = this.choose(lane); lane.cars.push(c); this.cars.push(c); return c;
+  // give a car a destination and the table that routes it there (buses shuttle between arterial stops)
+  route(c, dest) {
+    const D = this.demand;
+    if (kindOf(c.color) === 4) dest = D.busDest(this.r, c.dest);
+    else if (!dest && c.destId) dest = this.nodeById.get(c.destId);
+    if (!dest) dest = D.pickDest(c.seg.rank <= 1 ? 'H' : 'J', this.hour, this.r, c.seg.to) || D.busDest(this.r, null);
+    c.dest = dest; c.destId = dest ? dest.id : null; c.tab = dest ? this.router.table(dest) : null; c.arrived = false; c.garage = undefined;
   }
-  choose(lane) {
+  look(bus) { const r = this.r(), k = r < 0.46 ? 0 : r < 0.7 ? 1 : r < 0.82 ? 2 : r < 0.94 ? 3 : bus ? 4 : 0; return Math.floor(this.r() * 6) + 8 * k; }
+  add(lane, s, v, color, lat, trip, dest = null) {
+    if (kindOf(color) === 4) trip = 1e9;
+    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: LENS[kindOf(color)], fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0, prev: null, hold: false, dest: null, destId: null, tab: null, arrived: false, garage: undefined };
+    this.route(c, dest);
+    lane.cars.push(c); this.cars.push(c);
+    if (c.dest && lane.to === c.dest) this.arrive(c, lane);
+    c.plan = this.choose(lane, c); return c;
+  }
+  choose(lane, car) {
     const cs = lane.conns; if (!cs.length) return null;
+    if (car && car.tab) { const c = this.router.next(lane, car.tab, this.r); if (c) return c; }
     let tot = 0; const w = cs.map((c) => (tot += ({ S: 4, R: 1.6, L: 1.2, U: 1 }[c.type]) * (1 + c.to.rank * 0.5)));
     const x = this.r() * tot; return cs[w.findIndex((v) => v >= x)] || cs[0];
   }
@@ -169,6 +197,7 @@ class Sim {
       const ds = c.v * dt; c.s += ds; c.trip -= ds;
       if (c.lat) { const m = 1.7 * dt; c.lat = Math.abs(c.lat) <= m ? 0 : c.lat - Math.sign(c.lat) * m; }
       this.advance(c, dead);
+      if (c.garage !== undefined && !c.isConn && c.s >= c.garage && !c.park) dead.push(c);
     }
     if (dead.length) this.remove(dead);
     // parking: arrivals and departures
@@ -177,7 +206,7 @@ class Sim {
     if (this._leave <= 0) { this._leave = 0.5; this.departures(); }
     // keep traffic topped up; a few cars enter from the edges of the area
     const want = this.target();
-    for (let k = 0; k < 2 && this.cars.length < want; k++) this.spawn(this.r() < 0.3);
+    for (let k = 0; k < 2 && this.cars.length < want; k++) this.spawn(false);
   }
 
   accel(c) {
@@ -227,12 +256,23 @@ class Sim {
       } else {
         const tl = seg.to; seg.reserved--; tl.reserved--; c.s -= seg.len; seg.cars.splice(seg.cars.indexOf(c), 1);
         c.seg = tl; c.isConn = false; c.prev = seg; c.hold = false; tl.cars.push(c); c.i = tl.cars.length - 1;
-        c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(tl);
+        c.granted = null; c.stopped = false; c.arrive = undefined;
+        if (c.dest && tl.to === c.dest && !c.arrived) this.arrive(c, tl);
+        c.plan = this.choose(tl, c);
         if (c.trip < -200) { dead.push(c); return; }
         if (c.trip <= 0 && !c.park && tl.idx === 0 && tl.slots.length) this.seekSlot(c, 6);
       }
     }
     if (!c.isConn && c.trip <= 0 && !c.park && c.seg.idx === 0 && c.seg.slots.length && this.r() < 0.02) this.seekSlot(c, c.s + 14);
+  }
+  // the last lane of a trip: a bus moves on to its next stop; a car through-traffic leaves at the portal; the rest park at the
+  // curb if there is a free slot, or turn into a driveway part way along the lane
+  arrive(c, tl) {
+    if (kindOf(c.color) === 4) { this.route(c, null); return; }
+    c.arrived = true;
+    if (tl.to.portal) return;
+    if (tl.idx === 0 && tl.slots.length && this.r() < 0.6) { c.trip = 0; this.seekSlot(c, 6); }
+    if (!c.park) c.garage = tl.len * (0.3 + 0.45 * this.r());
   }
   seekSlot(c, from) {
     const lane = c.seg;
@@ -249,7 +289,7 @@ class Sim {
       if (clear && s.s < 40) for (const cn of lane.from.conns) if (cn.to === lane && cn.cars.length) { clear = false; break; } // a car about to enter from the junction
       if (!clear || !lane.conns.length || this.cars.length >= this.target() * 1.1) { s.leaveAt = this.t + 3; continue; }
       s.state = 0;
-      this.add(lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, 0, s.color ?? 0, s.lat, 150 + this.r() * 700);
+      this.add(lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, 0, s.color ?? 0, s.lat, 1e9);
     }
   }
   remove(dead) {
