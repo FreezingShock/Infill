@@ -1,0 +1,276 @@
+/* sfvOS Camino HUD, second pass: a bottom dock with popovers, a slim status strip, a folding City panel and
+   an inspector with folding sections. Loaded after camino.css, so every rule is html[data-theme=camino] #app ... to win
+   over the #app-scoped rules in layout.css and camino.css. Tokens come from camino.css. */
+html[data-theme=camino] #app {
+  --ease: cubic-bezier(.2, .8, .2, 1); --ease-io: cubic-bezier(.7, 0, .2, 1);
+  --panel: rgba(8, 11, 13, .74);
+}
+html[data-theme=camino] #app :is(#cdock, .card, .city, .clockbar, .hud, .br, .area-pl, .brand, .cd-pop) { background: var(--panel); border-color: var(--hair); box-shadow: 0 12px 34px rgba(0, 0, 0, .4); }
+
+/* ---- corner brackets: the ctOS frame, drawn in on load ---- */
+html[data-theme=camino] #app :is(#cdock, .card, .city, .clockbar, .hud, .br, .brand, .area-pl)::before {
+  content: ""; position: absolute; inset: -4px; pointer-events: none; z-index: 2; opacity: .75;
+  --c: rgba(242, 243, 241, .85);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 9px 1px, linear-gradient(var(--c), var(--c)) top left / 1px 9px,
+    linear-gradient(var(--c), var(--c)) top right / 9px 1px, linear-gradient(var(--c), var(--c)) top right / 1px 9px,
+    linear-gradient(var(--c), var(--c)) bottom left / 9px 1px, linear-gradient(var(--c), var(--c)) bottom left / 1px 9px,
+    linear-gradient(var(--c), var(--c)) bottom right / 9px 1px, linear-gradient(var(--c), var(--c)) bottom right / 1px 9px;
+  background-repeat: no-repeat;
+  animation: hudBrackets .7s var(--ease) backwards;
+}
+@keyframes hudBrackets { from { inset: 14px; opacity: 0; } to { inset: -4px; opacity: .75; } }
+
+/* ---- boot: groups reveal in a stagger ---- */
+html[data-theme=camino] #app :is(.tl > *, .tr > *, #cdock, .br, #rcol .city) { animation: hudBoot .55s var(--ease) backwards; }
+html[data-theme=camino] #app .tl > :nth-child(2) { animation-delay: .06s; } html[data-theme=camino] #app .tl > :nth-child(3) { animation-delay: .12s; }
+html[data-theme=camino] #app .tr > :nth-child(2) { animation-delay: .08s; }
+html[data-theme=camino] #app #cdock { animation-delay: .18s; } html[data-theme=camino] #app .br { animation-delay: .26s; } html[data-theme=camino] #app #rcol .city { animation-delay: .22s; }
+@keyframes hudBoot { from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(-6px); } to { opacity: 1; clip-path: inset(-12px); transform: none; } }
+
+/* ---- top left: sfvOS brand, one area card (area, change, search), then the advisor. Three cards, one width, one 8px gap ---- */
+html[data-theme=camino] #app .tl { gap: 8px; width: min(330px, calc(100% - 32px)); max-width: none; align-items: stretch; }
+html[data-theme=camino] #app .brand { padding: 8px 14px 8px 14px; gap: 10px; align-items: baseline; }
+html[data-theme=camino] #app .brand h1 { font-size: 20px; }
+html[data-theme=camino] #app .area-pl { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; gap: 0; }
+html[data-theme=camino] #app .area-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 8px 7px 14px; }
+html[data-theme=camino] #app .area-pl b { font: 600 12px/1.1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+html[data-theme=camino] #app .area-pl small { font: 500 9.5px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+html[data-theme=camino] #app .area-pl .btn { padding: 4px 9px; font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+/* the search lives inside the area card, under a hairline: always visible, full card width */
+html[data-theme=camino] #app .search { margin: 0; padding: 8px 8px 9px 8px; border-top: 1px solid var(--hair); }
+html[data-theme=camino] #app .search-row { gap: 6px; }
+html[data-theme=camino] #app .search input { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--hair); border-radius: 2px; background: rgba(233, 239, 241, .05) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%23e9eff1' stroke-width='1.5'/%3E%3Cpath d='M10.5 10.5L14 14' stroke='%23e9eff1' stroke-width='1.5'/%3E%3C/svg%3E") 10px center / 14px no-repeat; padding: 0 10px 0 32px; font: 500 12px var(--mono); letter-spacing: .02em; color: var(--ink); }
+html[data-theme=camino] #app .search input:focus { outline: none; border-color: var(--hair-hi); background-color: rgba(233, 239, 241, .09); }
+html[data-theme=camino] #app .search input::placeholder { color: var(--ink-soft); opacity: 1; }
+html[data-theme=camino] #app .search .btn { border-radius: 0; height: 32px; padding: 0 12px; }
+html[data-theme=camino] #app .results { margin: 0; padding: 4px; border-top: 1px solid var(--hair); }
+html[data-theme=camino] #app .results:empty { display: none; }
+
+/* ---- top right: one status strip ---- */
+html[data-theme=camino] #app .tr { gap: 6px; }
+html[data-theme=camino] #app .tr > .plaque { min-height: 46px; }
+/* the panel keeps a clear inset on all four sides (scrub line included) and its children never shrink or wrap, so nothing gets cut at the edge */
+html[data-theme=camino] #app .clockbar { gap: 12px; padding: 6px 14px 14px 12px; max-width: 100%; white-space: nowrap; }
+html[data-theme=camino] #app .clockbar > * { flex: none; }
+html[data-theme=camino] #app .clockbar .sky { width: 18px; height: 18px; border: 1px solid var(--hair-hi); }
+html[data-theme=camino] #app .clockbar .sky::after { inset: 3px; }
+html[data-theme=camino] #app .clockbar .when { min-width: 72px; gap: 3px; }
+html[data-theme=camino] #app .clockbar .when b { font: 500 16px/1 var(--mono); letter-spacing: -.01em; }
+html[data-theme=camino] #app .clockbar .when small { font: 500 9px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+html[data-theme=camino] #app .clockbar.paused .when b { opacity: 1; animation: hudBlink 1.4s steps(2, jump-none) infinite; }
+@keyframes hudBlink { 50% { opacity: .35; } }
+html[data-theme=camino] #app .clockbar .speeds { padding: 0; gap: 1px; background: none; border: 1px solid var(--hair); }
+html[data-theme=camino] #app .clockbar .spd { width: 26px; height: 24px; border-radius: 0; color: var(--ink-soft); }
+html[data-theme=camino] #app .clockbar .spd svg { width: 12px; height: 12px; }
+html[data-theme=camino] #app .clockbar .spd:hover { color: var(--ink); background: rgba(233, 239, 241, .1); }
+html[data-theme=camino] #app .clockbar .spd[aria-pressed=true] { background: var(--white); color: #050607; }
+html[data-theme=camino] #app .clockbar .gauges { gap: 10px; padding-left: 12px; }
+html[data-theme=camino] #app .clockbar .gauge small { font: 500 8.5px/1 var(--mono); letter-spacing: .16em; }
+html[data-theme=camino] #app .clockbar .gauge .meter { width: 44px; height: 3px; border: 0; background: rgba(233, 239, 241, .14); margin-top: 5px; }
+/* the scrub slider becomes a hairline along the bottom edge; it grows a handle when you reach for it */
+html[data-theme=camino] #app .clockbar .clockdock { position: absolute; left: 12px; right: 14px; bottom: 3px; top: auto; width: auto; height: 11px; padding: 0; border: 0; gap: 0; display: block; transform: none; }
+html[data-theme=camino] #app .clockbar .clockdock input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 11px; margin: 0; background: transparent; cursor: ew-resize; display: block; }
+html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--hair-hi); }
+html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-moz-range-track { height: 1px; background: var(--hair-hi); }
+html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 7px; height: 7px; margin-top: -3px; background: var(--cyan); transform: rotate(45deg) scale(.6); opacity: .8; transition: transform .2s var(--ease); }
+html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-moz-range-thumb { width: 7px; height: 7px; border: 0; border-radius: 0; background: var(--cyan); transform: rotate(45deg) scale(.6); }
+html[data-theme=camino] #app .clockbar:hover .clockdock input[type=range]::-webkit-slider-thumb, html[data-theme=camino] #app .clockbar .clockdock input[type=range]:focus-visible::-webkit-slider-thumb { transform: rotate(45deg) scale(1.3); opacity: 1; }
+html[data-theme=camino] #app .hud { gap: 0; padding: 0; }
+html[data-theme=camino] #app .hud .stat { min-width: 0; padding: 6px 14px; gap: 4px; border-left: 1px solid var(--hair); }
+html[data-theme=camino] #app .hud .stat:first-child { border-left: 0; }
+html[data-theme=camino] #app .hud .stat b { font: 500 15px/1 var(--mono); }
+html[data-theme=camino] #app .hud .stat b.tick { animation: hudTick .9s var(--ease); }
+@keyframes hudTick { 0% { color: var(--cyan); text-shadow: 0 0 12px rgba(47, 216, 232, .7); } 100% { color: inherit; text-shadow: none; } }
+html[data-theme=camino] #app .hud .stat small { font: 500 8.5px/1 var(--mono); letter-spacing: .16em; }
+
+/* ---- right column: City panel and the inspector ---- */
+html[data-theme=camino] #app .rcol { top: 74px; bottom: 74px; gap: 6px; width: 340px; }
+html[data-theme=camino] #app .city { padding: 0; border-top: 0; }
+html[data-theme=camino] #app .city h4 { margin: 0; padding: 9px 12px; gap: 10px; font: 600 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; cursor: pointer; justify-content: flex-start; user-select: none; position: relative; }
+html[data-theme=camino] #app .city h4::after { content: ""; width: 7px; height: 7px; margin-left: 4px; border-right: 1.5px solid var(--ink-soft); border-bottom: 1.5px solid var(--ink-soft); transform: rotate(45deg); transition: transform .3s var(--ease); order: 5; }
+html[data-theme=camino] #app .city:not(.min) h4::after { transform: rotate(-135deg) translate(-2px, -2px); }
+html[data-theme=camino] #app .city h4 small { font: 500 9px var(--mono); letter-spacing: .14em; margin-left: auto; color: var(--ink-soft); order: 3; }
+html[data-theme=camino] #app .city h4:hover { background: rgba(233, 239, 241, .04); }
+html[data-theme=camino] #app .city h4:focus-visible { outline: 1px solid var(--cyan); outline-offset: -2px; }
+html[data-theme=camino] #app .city .mini { display: inline-flex; gap: 3px; align-items: flex-end; height: 11px; }
+html[data-theme=camino] #app .city .mini i { width: 4px; height: calc(var(--v) * 11px); background: var(--cyan); transition: height .6s var(--ease); }
+html[data-theme=camino] #app .city:not(.min) .mini { opacity: .35; }
+html[data-theme=camino] #app .city h4 #gGrow.sw { order: 4; margin-left: 6px; position: relative; padding: 3px 8px 3px 24px; font: 500 9px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; border: 1px solid var(--hair-hi); background: transparent; color: var(--ink-soft); border-radius: 0; cursor: pointer; }
+html[data-theme=camino] #app .city h4 #gGrow.sw::before { content: ""; position: absolute; left: 6px; top: 50%; width: 10px; height: 4px; margin-top: -2px; background: rgba(233, 239, 241, .2); transition: background .2s; }
+html[data-theme=camino] #app .city h4 #gGrow.sw::after { content: ""; position: absolute; left: 6px; top: 50%; width: 5px; height: 8px; margin-top: -4px; background: var(--ink-soft); transition: transform .25s var(--ease), background .2s; }
+html[data-theme=camino] #app .city h4 #gGrow.sw[aria-pressed=true] { color: var(--cyan); border-color: var(--cyan); background: rgba(47, 216, 232, .08); }
+html[data-theme=camino] #app .city h4 #gGrow.sw[aria-pressed=true]::before { background: rgba(47, 216, 232, .35); }
+html[data-theme=camino] #app .city h4 #gGrow.sw[aria-pressed=true]::after { background: var(--cyan); transform: translateX(5px); }
+html[data-theme=camino] #app .city .dem, html[data-theme=camino] #app .city > .row { margin: 0; padding: 0 12px 10px; overflow: hidden; transition: max-height .35s var(--ease), opacity .25s, padding .3s; max-height: 160px; }
+html[data-theme=camino] #app .city .dem { grid-template-columns: 44px 1fr; gap: 8px 10px; padding-top: 2px; font: 500 9.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+html[data-theme=camino] #app .city.min .dem, html[data-theme=camino] #app .city.min > .row { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
+html[data-theme=camino] #app .city .bar { height: 5px; border: 0; border-radius: 0; background: rgba(233, 239, 241, .1); }
+html[data-theme=camino] #app .city .bar::before { width: 1px; background: var(--hair-hi); opacity: 1; }
+html[data-theme=camino] #app .city .bar i { background: var(--cyan); transition: left .6s var(--ease), width .6s var(--ease); }
+html[data-theme=camino] #app .city .bar i.neg { background: var(--gold); }
+html[data-theme=camino] #app .city > .row span { margin: 0; font: 500 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* the inspector card */
+html[data-theme=camino] #app .rcol .card { padding: 0; gap: 0; border-top: 2px solid var(--white); scrollbar-width: thin; scrollbar-color: var(--hair-hi) transparent; position: relative; }
+html[data-theme=camino] #app .rcol .card > * { margin-left: 14px; margin-right: 14px; }
+html[data-theme=camino] #app .rcol .card > .cd-head { margin: 0; padding: 12px 70px 10px 14px; position: relative; display: block; }
+html[data-theme=camino] #app .card .eyebrow { font: 500 9.5px/1 var(--mono); letter-spacing: .18em; color: var(--cyan); margin-bottom: 7px; }
+html[data-theme=camino] #app .card h2 { font: 700 19px/1.1 var(--display); letter-spacing: -.02em; }
+html[data-theme=camino] #app .card .alt { font: 500 10.5px/1.5 var(--mono); letter-spacing: .02em; color: var(--ink-soft); margin-top: 6px; }
+html[data-theme=camino] #app .card.scanin > :is(.cd-head, .cs, .facts, .row, .bd, .chips, .tabs, .kits) { animation: cardIn .45s var(--ease) backwards; }
+html[data-theme=camino] #app .card.scanin > :nth-child(2) { animation-delay: .05s; } html[data-theme=camino] #app .card.scanin > :nth-child(3) { animation-delay: .1s; }
+html[data-theme=camino] #app .card.scanin > :nth-child(4) { animation-delay: .15s; } html[data-theme=camino] #app .card.scanin > :nth-child(n+5) { animation-delay: .2s; }
+@keyframes cardIn { from { opacity: 0; transform: translateX(10px); clip-path: inset(0 0 0 100%); } to { opacity: 1; transform: none; clip-path: inset(-6px); } }
+html[data-theme=camino] #app .card.scanin::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--cyan); box-shadow: 0 0 14px 2px rgba(47, 216, 232, .6); animation: cardSweep .7s var(--ease-io) backwards; pointer-events: none; display: block; }
+@keyframes cardSweep { from { transform: translateY(0); opacity: 1; } to { transform: translateY(var(--sweep, 320px)); opacity: 0; } }
+html[data-theme=camino] #app .card .cd-ctr { position: absolute; right: 8px; top: 8px; display: flex; gap: 2px; }
+html[data-theme=camino] #app .card .cd-cb { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; color: var(--ink-soft); background: transparent; border: 1px solid transparent; border-radius: 0; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+html[data-theme=camino] #app .card .cd-cb:hover, html[data-theme=camino] #app .card .cd-cb.on { color: var(--ink); border-color: var(--hair-hi); background: rgba(233, 239, 241, .06); }
+html[data-theme=camino] #app .card .cd-cb:focus-visible { outline: 1px solid var(--cyan); }
+html[data-theme=camino] #app .card .cd-notes { padding: 8px 10px; border-left: 2px solid var(--cyan); background: rgba(47, 216, 232, .05); font: 400 11px/1.55 var(--body); color: var(--ink-soft); display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; animation: cardIn .3s var(--ease) backwards; }
+html[data-theme=camino] #app .card .cd-notes > * { margin: 0; padding: 0; border: 0; font: inherit; color: inherit; background: none; }
+html[data-theme=camino] #app .card.min > :not(.cd-head) { display: none; }
+html[data-theme=camino] #app .card.min { overflow: hidden; }
+html[data-theme=camino] #app .card.idle > .facts { margin-top: 0; }
+
+/* sections that fold */
+html[data-theme=camino] #app .card .cs { border-top: 1px solid var(--hair); }
+html[data-theme=camino] #app .card .cs-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 0; background: transparent; border: 0; border-radius: 0; cursor: pointer; color: var(--ink); text-align: left; }
+html[data-theme=camino] #app .card .cs-t { display: flex; align-items: baseline; flex: 1; gap: 10px; min-width: 0; font: 600 10.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+html[data-theme=camino] #app .card .cs-t small { font: 500 9px var(--mono); letter-spacing: .08em; text-transform: none; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-theme=camino] #app .card .cs-h svg { color: var(--ink-soft); flex: none; transition: transform .3s var(--ease), color .2s; transform: rotate(-90deg); }
+html[data-theme=camino] #app .card .cs-h:hover svg { color: var(--ink); }
+html[data-theme=camino] #app .card .cs.open > .cs-h svg { transform: none; color: var(--cyan); }
+html[data-theme=camino] #app .card .cs-h:focus-visible { outline: 1px solid var(--cyan); outline-offset: 1px; }
+html[data-theme=camino] #app .card .cs-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s var(--ease); }
+html[data-theme=camino] #app .card .cs.open > .cs-b { grid-template-rows: 1fr; }
+html[data-theme=camino] #app .card .cs.nt > .cs-b { transition: none; }
+html[data-theme=camino] #app .card .cs-in { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 9px; visibility: hidden; transition: visibility 0s .32s; }
+html[data-theme=camino] #app .card .cs.open > .cs-b > .cs-in { visibility: visible; transition-delay: 0s; overflow: visible; }
+html[data-theme=camino] #app .card .cs-in::after { content: ""; flex: none; height: 4px; }
+html[data-theme=camino] #app .card .cs.open > .cs-b > .cs-in > * { animation: cardIn .35s var(--ease) backwards; }
+html[data-theme=camino] #app .card .cs.open > .cs-b > .cs-in > :nth-child(2) { animation-delay: .04s; } html[data-theme=camino] #app .card .cs.open > .cs-b > .cs-in > :nth-child(n+3) { animation-delay: .08s; }
+html[data-theme=camino] #app .card > .row, html[data-theme=camino] #app .card > .btn, html[data-theme=camino] #app .card > .tabs { margin-top: 8px; margin-bottom: 8px; }
+html[data-theme=camino] #app .card .chipb { font: 500 11px var(--mono); letter-spacing: .02em; padding: 5px 9px; border-radius: 0; transition: background .15s, color .15s, border-color .15s; }
+html[data-theme=camino] #app .card .chipb:hover { border-color: var(--hair-hi); }
+html[data-theme=camino] #app .card .chipb.on { box-shadow: inset 2px 0 0 var(--cyan); }
+html[data-theme=camino] #app .card .row .btn, html[data-theme=camino] #app .card > .btn { font: 500 11px var(--mono); letter-spacing: .04em; }
+html[data-theme=camino] #app .card .src { padding-bottom: 12px; }
+html[data-theme=camino] #app .card > :last-child { margin-bottom: 12px; }
+html[data-theme=camino] #app .card .facts { margin-top: 4px; }
+
+/* ---- bottom left: the dock ---- */
+html[data-theme=camino] #app .cdock { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); z-index: 5; display: flex; align-items: center; gap: 0; padding: 4px; max-width: calc(100% - 32px); }
+html[data-theme=camino] #app .cd-seg { display: flex; align-items: center; gap: 2px; padding: 0 2px; }
+html[data-theme=camino] #app .cd-seg > :is(#tools, #camBar) { display: flex; flex-wrap: nowrap; gap: 2px; padding: 0; }
+html[data-theme=camino] #app .cd-sep { width: 1px; align-self: stretch; margin: 4px 4px; background: var(--hair); flex: none; }
+html[data-theme=camino] #app .cdock .tool { height: 34px; padding: 0 10px; gap: 8px; border-radius: 0; color: var(--ink-soft); background: transparent; border: 1px solid transparent; font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; transition: color .15s, background .15s, border-color .15s; position: relative; }
+html[data-theme=camino] #app .cdock .tool svg { width: 16px; height: 16px; }
+html[data-theme=camino] #app .cdock .tool:hover:not(:disabled) { color: var(--ink); background: rgba(233, 239, 241, .08); }
+html[data-theme=camino] #app .cdock .tool:disabled { opacity: .3; cursor: default; }
+html[data-theme=camino] #app .cdock .tool:focus-visible { outline: 1px solid var(--cyan); outline-offset: -1px; }
+/* drawing tools: icon only until picked, then the label slides in */
+html[data-theme=camino] #app .cdock #tools .tool { font-size: 0; gap: 0; width: 36px; padding: 0; justify-content: center; }
+html[data-theme=camino] #app .cdock #tools .tool kbd { display: none; }
+html[data-theme=camino] #app .cdock #tools .tool[aria-pressed=true] { width: auto; padding: 0 12px 0 10px; gap: 8px; font-size: 11px; background: var(--white); color: #050607; animation: toolIn .28s var(--ease) backwards; }
+html[data-theme=camino] #app .cdock #tools .tool[aria-pressed=true] svg { color: #050607; }
+@keyframes toolIn { from { opacity: .6; transform: scaleX(.8); transform-origin: left; } to { opacity: 1; transform: none; } }
+/* street / scan */
+html[data-theme=camino] #app .cdock .camswitch { gap: 0; border: 1px solid var(--hair); padding: 0; }
+html[data-theme=camino] #app .cdock .camswitch .tool { height: 30px; padding: 0 11px; font: 600 10.5px var(--mono); letter-spacing: .14em; }
+html[data-theme=camino] #app .cdock .camswitch .tool kbd { display: none; }
+html[data-theme=camino] #app .cdock .camswitch .tool[aria-pressed=true] { background: var(--white); color: #050607; }
+html[data-theme=camino] #app .cdock .camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); box-shadow: 0 0 18px rgba(47, 216, 232, .35); }
+html[data-theme=camino] #app .cdock .cd-ico { width: 34px; padding: 0; justify-content: center; }
+html[data-theme=camino] #app .cdock .cd-m[aria-expanded=true] { color: var(--ink); background: rgba(233, 239, 241, .1); border-color: var(--hair-hi); }
+html[data-theme=camino] #app .cdock .cd-m span { letter-spacing: .12em; }
+html[data-theme=camino] #app .cdock .cd-m::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 1px; background: var(--cyan); transform: scaleX(0); transition: transform .25s var(--ease); }
+html[data-theme=camino] #app .cdock .cd-m[aria-expanded=true]::after { transform: scaleX(1); }
+/* the readout above the dock */
+html[data-theme=camino] #app .cd-tip { position: absolute; left: 6px; bottom: calc(100% + 8px); display: flex; align-items: center; gap: 8px; padding: 5px 9px; background: var(--white); color: #050607; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .2s var(--ease); pointer-events: none; z-index: 8; }
+html[data-theme=camino] #app .cd-tip.on { opacity: 1; transform: none; }
+html[data-theme=camino] #app .cd-tip b { font-weight: 600; }
+html[data-theme=camino] #app .cd-tip kbd { font: 500 9px var(--mono); padding: 1px 4px; border: 1px solid rgba(0, 0, 0, .35); }
+
+/* popovers */
+html[data-theme=camino] #app .cd-menu { position: relative; }
+html[data-theme=camino] #app .cd-pop { position: absolute; left: 0; bottom: calc(100% + 12px); min-width: 230px; padding: 0; border: 1px solid var(--hair); border-top: 2px solid var(--white); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(8px); clip-path: inset(100% 0 0 0); transition: opacity .2s, transform .3s var(--ease), clip-path .32s var(--ease), visibility 0s .32s; z-index: 7; backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); }
+html[data-theme=camino] #app .cd-pop.open { opacity: 1; visibility: visible; pointer-events: auto; transform: none; clip-path: inset(-20px); transition-delay: 0s; }
+html[data-theme=camino] #app .cd-poph { display: flex; justify-content: space-between; padding: 9px 12px 8px; font: 600 9.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); border-bottom: 1px solid var(--hair); }
+html[data-theme=camino] #app .cd-poph kbd { font: 500 9px var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); padding: 0 4px; letter-spacing: 0; }
+html[data-theme=camino] #app .cd-pop :is(#infobar, #views) { display: flex; flex-direction: column; gap: 0; padding: 4px; flex-wrap: nowrap; background: none; border: 0; box-shadow: none; }
+html[data-theme=camino] #app .cd-pop .barlabel { display: none; }
+html[data-theme=camino] #app .cd-pop .tool { display: flex; width: 100%; height: 34px; padding: 0 10px 0 12px; justify-content: flex-start; font: 500 12px var(--display); letter-spacing: 0; text-transform: none; color: var(--ink); gap: 10px; position: relative; border: 0; border-radius: 0; background: transparent; }
+html[data-theme=camino] #app .cd-pop .tool svg { width: 15px; height: 15px; color: var(--ink-soft); }
+html[data-theme=camino] #app .cd-pop .tool kbd { margin-left: auto; font: 500 9.5px var(--mono); }
+html[data-theme=camino] #app .cd-pop .tool:hover { background: rgba(233, 239, 241, .08); }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] { background: rgba(47, 216, 232, .1); color: var(--ink); box-shadow: inset 2px 0 0 var(--cyan); }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] svg { color: var(--cyan); }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view])::after { content: "ON"; margin-left: auto; font: 600 8.5px var(--mono); letter-spacing: .14em; color: var(--cyan); }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] kbd { display: inline-block; color: var(--ink-soft); border-color: var(--hair); }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view]) kbd { margin-left: 8px; order: 3; }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view])::after { margin-left: 8px; order: 4; }
+html[data-theme=camino] #app #pView #vUndo, html[data-theme=camino] #app #pView #vRedo, html[data-theme=camino] #app #pView #vAdv, html[data-theme=camino] #app #pView #vKeys { display: none; }
+html[data-theme=camino] #app .cd-list { display: flex; flex-direction: column; padding: 4px; }
+html[data-theme=camino] #app .cd-row { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 9px 12px; background: transparent; border: 0; color: var(--ink); font: 500 12px var(--display); text-align: left; cursor: pointer; }
+html[data-theme=camino] #app .cd-row em { margin-left: auto; font: 500 9.5px var(--mono); font-style: normal; letter-spacing: .06em; color: var(--ink-soft); text-transform: uppercase; }
+html[data-theme=camino] #app .cd-row kbd { margin-left: auto; font: 500 9.5px var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); padding: 0 5px; }
+html[data-theme=camino] #app .cd-row:hover { background: rgba(233, 239, 241, .08); }
+html[data-theme=camino] #app .cd-row:focus-visible { outline: 1px solid var(--cyan); outline-offset: -1px; }
+
+/* hint, legend and the advanced tray stack above the dock */
+html[data-theme=camino] #app .bl { left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 52px); max-width: min(560px, calc(100% - 32px)); gap: 6px; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+html[data-theme=camino] #app .bl > :is(.hint, .legend, #advbar) { flex: none; width: fit-content; max-width: 100%; }
+html[data-theme=camino] #app .hint { padding: 8px 12px 8px 12px; font: 400 11.5px/1.5 var(--body); color: var(--ink-soft); gap: 4px; border-left: 2px solid var(--cyan); animation: cardIn .3s var(--ease) backwards; }
+html[data-theme=camino] #app .hint b { font: 600 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink); margin-right: 8px; }
+html[data-theme=camino] #app #advbar { padding: 4px; gap: 2px; animation: cardIn .3s var(--ease) backwards; flex-wrap: wrap; }
+html[data-theme=camino] #app #advbar .barlabel { font: 600 9px var(--mono); letter-spacing: .18em; color: var(--cyan); padding: 0 10px 0 8px; align-self: center; }
+html[data-theme=camino] #app #advbar .tool { height: 30px; padding: 0 9px; font: 500 11px var(--display); border-radius: 0; gap: 7px; }
+html[data-theme=camino] #app #advbar .tool kbd { margin-left: 2px; }
+html[data-theme=camino] #app .legend { padding: 10px 14px; gap: 8px; }
+html[data-theme=camino] #app .legend b { font: 600 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); }
+html[data-theme=camino] #app .legend p { font-size: 11.5px; }
+html[data-theme=camino] #app .legend .ramp i { height: 5px; border: 0; }
+html[data-theme=camino] #app .legend .chipb { font: 500 10.5px var(--mono); border-radius: 0; }
+
+/* ---- bottom right: the status line ---- */
+html[data-theme=camino] #app .br { padding: 4px 4px 4px 10px; gap: 10px; align-items: center; }
+html[data-theme=camino] #app .br .trafficchip { gap: 6px; padding: 0 10px 0 0; border-right: 1px solid var(--hair); }
+html[data-theme=camino] #app .br .trafficchip .tool { height: 30px; padding: 0 10px; border-radius: 0; font: 600 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); border: 1px solid var(--hair); background: transparent; position: relative; }
+html[data-theme=camino] #app .br .trafficchip #trfOn { padding-left: 24px; }
+html[data-theme=camino] #app .br .trafficchip #trfOn::before { content: ""; position: absolute; left: 9px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--ink-soft); }
+html[data-theme=camino] #app .br .trafficchip #trfOn[aria-pressed=true] { color: var(--ink); border-color: var(--hair-hi); background: transparent; }
+html[data-theme=camino] #app .br .trafficchip #trfOn[aria-pressed=true]::before { background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: hudPulse 2.4s ease-in-out infinite; }
+@keyframes hudPulse { 50% { opacity: .45; } }
+html[data-theme=camino] #app .br .trafficchip .tool:hover { color: var(--ink); background: rgba(233, 239, 241, .08); }
+html[data-theme=camino] #app .br .trafficchip .n { min-width: 0; font: 500 10.5px var(--mono); letter-spacing: .02em; color: var(--ink); white-space: nowrap; }
+html[data-theme=camino] #app .br .scalebar { font: 500 9.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+html[data-theme=camino] #app .br .compass { width: 30px; height: 30px; background: transparent; border-color: var(--hair); }
+html[data-theme=camino] #app .br .compass svg { width: 22px; height: 22px; }
+html[data-theme=camino] #app .br .camfps { width: 52px; overflow: hidden; white-space: nowrap; transition: width .35s var(--ease), color .2s; cursor: default; }
+html[data-theme=camino] #app .br:hover .camfps { width: 190px; color: var(--ink); }
+
+/* ---- transient bits ---- */
+html[data-theme=camino] #app .delta { top: 70px; padding: 8px 14px; font: 500 12px var(--mono); letter-spacing: .06em; background: var(--panel); border-radius: 0; border-top: 2px solid var(--cyan); }
+html[data-theme=camino] #app .asbuilt-tag { top: 70px; font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+
+/* ---- smaller screens ---- */
+@media (max-width: 1180px) {
+  html[data-theme=camino] #app .br .scalebar, html[data-theme=camino] #app .br .camfps { display: none; }
+  html[data-theme=camino] #app .cdock .cd-m span { display: none; }
+  html[data-theme=camino] #app .cdock .cd-m { width: 34px; padding: 0; justify-content: center; }
+}
+@media (max-width: 980px) {
+  html[data-theme=camino] #app .br .trafficchip .n { display: none; }
+  html[data-theme=camino] #app .tr .hud { display: none; }
+}
+@media (max-width: 760px) {
+  html[data-theme=camino] #app .cdock { left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom, 0px)); max-width: none; flex-wrap: wrap; }
+  html[data-theme=camino] #app .cd-pop { position: fixed; left: 8px; right: 8px; bottom: 64px; }
+  html[data-theme=camino] #app .bl { left: 8px; bottom: 64px; }
+  html[data-theme=camino] #app .rcol { bottom: 70px; left: 8px; right: 8px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme=camino] #app * { animation-duration: .001s !important; animation-delay: 0s !important; transition-duration: .001s !important; transition-delay: 0s !important; }
+}

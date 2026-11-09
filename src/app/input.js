@@ -1,0 +1,612 @@
+import * as THREE from 'three';
+import { AREA, AREAS, PACK } from '../engine/pack.js';
+import { $, Acc, C, FT, X0, X1, Z0, Z1, area, clamp, decal, elev, esc, fmt, inPoly, nearestOnLine, polyLen, reduceMotion, ribbon, smoothLine } from '../engine/core.js';
+import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
+import { BASE, uid } from '../engine/commands.js';
+import { CAM_OFF, MAT, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
+import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
+import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, forgetSave, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
+import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
+import { createOrbit } from './orbit.js';
+import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
+import { createCaminoSky } from '../camino/sky.js';
+import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
+import { clock, setHour, tickClock } from '../game/clock.js';
+import { tickTraffic } from '../views/traffic.js';
+import { ROAD, roadClick, roadHover, roadPath } from '../tools/roads/ui.js';
+import { itemById, preview, previewText, progAfter } from './palette.js';
+import { startGrowth } from '../game/zoning/driver.js';
+import { drawDraft, initPicker, proposeAt } from '../areas/picker.js';
+import { initBackdrop } from '../areas/backdrop.js';
+import { rebaseNote } from '../areas/rebase.js';
+import { warmStart } from '../workers/warm.js';
+
+// =====================================================================
+// Tools and input
+// =====================================================================
+const ICONS = {
+  select: '<path d="M3 2l10 6-4 1 3 5-2 1-3-5-3 3z" fill="currentColor"/>',
+  box: '<rect x="2" y="3" width="12" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.5 1.5"/>',
+  lasso: '<path d="M8 2c4 0 6 2 6 4s-3 4-6 4-6-1.5-6-4S4 2 8 2zM5 10c-1 2 0 4 2 4" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  brush: '<circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="2" fill="currentColor"/>',
+  along: '<path d="M1 11c4-6 9-6 14-2" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="3" y="2" width="3" height="3" fill="currentColor"/><rect x="9" y="1" width="3" height="3" fill="currentColor"/>',
+  draw: '<path d="M2 14L14 2M2 14l1-4 3 3z" fill="currentColor" stroke="currentColor" stroke-width="1.6"/>',
+  edit: '<path d="M1 12h14M1 6h14" stroke="currentColor" stroke-width="2"/><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="11" cy="6" r="2" fill="currentColor"/>',
+  area: '<path d="M2 2h12v12H2z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.2"/>',
+  zone: '<path d="M2 14l3-1 8-8-2-2-8 8z" fill="currentColor"/><path d="M10 14h5" stroke="currentColor" stroke-width="2"/>',
+  build: '<path d="M2 14V7l5-4 5 4v7z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v6M9 5h6" stroke="currentColor" stroke-width="2"/>',
+  roads: '<path d="M4 15L7 1M12 15L9 1" stroke="currentColor" stroke-width="1.8"/><path d="M8 3v2M8 8v2M8 13v2" stroke="currentColor" stroke-width="1.6"/>',
+  doze: '<path d="M1 13h10v-4H6L4 6H1z" fill="currentColor"/><path d="M11 6l4 2v6h-3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="3.5" cy="14" r="1.5" fill="currentColor"/><circle cx="8.5" cy="14" r="1.5" fill="currentColor"/>',
+};
+// Five everyday tools; the precise selection tools live in the Advanced drawer
+const TOOLS = [['select', 'Look', 'V'], ['build', 'Build', 'P'], ['roads', 'Roads', 'G'], ['doze', 'Bulldoze', 'X']];
+const ADV_TOOLS = [['box', 'Box', 'R'], ['lasso', 'Lasso', 'L'], ['brush', 'Brush', ''], ['along', 'Along street', 'J'], ['edit', 'Edit streets', 'K'], ['area', 'New area', 'U'], ['zone', 'Paint zones', 'Z']];
+const DRAG_TOOLS = new Set(['box', 'lasso', 'brush', 'along', 'zone', 'build', 'doze']);
+const toolBtn = ([k, n, key]) => `<button class="tool" data-tool="${k}" aria-pressed="${ui.tool === k}" title="${n}${key ? ` (${key})` : ''}"><svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[k]}</svg>${n}${key ? `<kbd>${key}</kbd>` : ''}</button>`;
+function renderTools() {
+  $('tools').innerHTML = TOOLS.map(toolBtn).join('');
+  $('advbar').hidden = !ui.adv;
+  $('advbar').innerHTML = `<span class="barlabel">Advanced</span>${ADV_TOOLS.map(toolBtn).join('')}<button class="tool" id="vLines" aria-pressed="${ui.lotsOn}" title="Show lot lines">Lot lines</button><button class="tool" id="vLog" title="Every edit, export and import">Edit log · ${CUR}</button><button class="tool" id="vCred">Credits</button>`;
+  for (const bar of ['tools', 'advbar']) $(bar).querySelectorAll('[data-tool]').forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+  $('vLines').onclick = () => toggleView('lines'); $('vLog').onclick = openLog; $('vCred').onclick = () => ($('credits').hidden = false);
+}
+function setTool(t, keepArea) {
+  if (ui.tool === 'area' && t !== 'area' && !keepArea) { ui.area = null; setOv('area', null); }
+  if (t !== 'draw' && t !== 'roads') ui.draw = null;
+  clearTimeout(pendingClick); ui.pick = []; ghostLots(null);
+  ui.tool = t; ui.areaDraw = null;
+  const drag = DRAG_TOOLS.has(t);
+  controls.mouseButtons.LEFT = drag ? -1 : THREE.MOUSE.PAN; controls.mouseButtons.RIGHT = drag ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  controls.touches.ONE = drag ? -1 : THREE.TOUCH.PAN;
+  if (t !== 'edit' && t !== 'roads' && t !== 'select') { ui.edgeSel.clear(); buildEdgeSel(); }
+  setOv('brush', null); setOv('draw', null); setOv('along', null); setOv('zonepaint', null); setOv('pick', null); setHover(null); hoverLot = null;
+  renderTools(); renderHint(); renderCard(); placeHandles();
+  if (t === 'area' && ui.area) areaPreview();
+  canvas.style.cursor = t === 'select' ? '' : t === 'draw' || t === 'roads' || t === 'area' ? 'crosshair' : drag ? 'cell' : 'pointer';
+}
+function renderHint() {
+  const h = $('hint'), t = ui.tool;
+  const txt = {
+    select: null,
+    build: `<b>Build · ${esc(itemById(ui.item)?.name || 'pick something')}</b> Click a lot, or drag across lots, to apply it. Shift-drag for a rectangle, double-click for a whole block. Right-drag pans. <span class="hov" id="hHover"></span>`,
+    doze: '<b>Bulldoze</b> Click or drag across lots to clear them to grass. Click a street piece to remove it. Shift-drag for a rectangle, double-click for a whole block. <span class="hov" id="hHover"></span>',
+    roads: ui.draw && ui.draw.pts.length ? '<b>Roads</b> Click to add points; double-click or Enter to finish, Backspace removes a point, Esc cancels.' : '<b>Roads</b> Click open ground to start a new street. Click an existing street to change it; Shift-click starts a new street from it.',
+    box: '<b>Box</b> Drag a rectangle. Shift adds, Alt removes. Right-drag pans.',
+    lasso: '<b>Lasso</b> Draw a loop around lots. Shift adds, Alt removes.',
+    brush: `<b>Paint brush</b> Hold and sweep to add lots, Alt to remove. Wheel sets the size (${fmt(ui.brushR * FT)} ft).`,
+    along: `<b>Along a street</b> Press on a street and drag along it to pick every lot that fronts that stretch. <label class="check"><input type="checkbox" id="hBoth" ${ui.alongBoth ? 'checked' : ''}> Both sides of the street</label>`,
+    draw: '<b>Draw street</b> Click points; double-click or Enter to finish. Drag to pan.',
+    edit: '<b>Edit streets</b> Click a street to change its cross-section, Shift-click for more pieces, Delete removes it.',
+    area: ui.area ? '<b>New area</b> Adjust the pattern in the panel, then build it.' : '<b>New area</b> Click around the land to clear (a parking lot, a block, the edge of town). Click the first point or double-click to close. Or select lots and use Lot ▸ Clear for new area.',
+    zone: `<b>Paint zones</b> Sweep over lots to give them a zone, then fill them with matching templates. <span class="row"><select id="hZone" aria-label="Zone to paint">${ZONE_CODES.map((z) => `<option ${ui.zonePaint === z ? 'selected' : ''}>${z}</option>`).join('')}</select><button class="btn small" id="hFill">Fill painted lots</button></span>`,
+  }[t];
+  h.hidden = !txt; if (!txt) return; h.innerHTML = txt;
+  const b = $('hBoth'); if (b) b.onchange = () => (ui.alongBoth = b.checked);
+  const z = $('hZone'); if (z) z.onchange = () => (ui.zonePaint = z.value);
+  const f = $('hFill'); if (f) f.onclick = () => { const ids = selIds(); if (!ids.length) return toast('Paint some lots first.'); commit({ op: 'fill', lots: ids, sd: uid('f'), dr: ui.dream ? 1 : 0 }, { anim: ids, label: `Filled ${fmt(ids.length)} lots by zone` }); };
+}
+
+// ---------- picking ----------
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function setRay(e) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, cam); }
+function groundAt(e) { // walk the view ray down onto the terrain; hit-testing uses 2D lots, not meshes
+  setRay(e); const o = ray.ray.origin, d = ray.ray.direction; let h = controls.target.y, x = 0, z = 0;
+  for (let k = 0; k < 6; k++) { const t = (h - o.y) / d.y; x = o.x + d.x * t; z = o.z + d.z * t; h = elev(clamp(x, X0, X1), clamp(z, Z0, Z1)); }
+  return [x, z];
+}
+function screenOf(x, y, z) { const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [(v.x + 1) / 2 * r.width, (1 - v.y) / 2 * r.height]; }
+function edgeAt(x, z, pad = 4, onlyGraph = true) {
+  let best = null;
+  for (const e of STATE.edges.values()) { if (onlyGraph && !e.g) continue; const bb = e.bb; if (x < bb[0] - 30 || x > bb[2] + 30 || z < bb[1] - 30 || z > bb[3] + 30) continue; const q = nearestOnLine(e.p, x, z); const lim = rowWidth(e.prof) / 2 + pad; if (q.d < lim && (!best || q.d < best.d)) best = { e, d: q.d, q }; }
+  return best;
+}
+const modeOf = (e) => (e.altKey ? 'remove' : e.shiftKey ? 'add' : 'replace');
+
+let down = null, drag = null;
+canvas.addEventListener('pointerdown', (e) => {
+  down = { x: e.clientX, y: e.clientY, b: e.button, t: performance.now() };
+  if (e.button !== 0) return;
+  const t = ui.tool;
+  if (DRAG_TOOLS.has(t)) {
+    canvas.setPointerCapture(e.pointerId);
+    const r = canvas.getBoundingClientRect(), p = [e.clientX - r.left, e.clientY - r.top];
+    if ((t === 'build' || t === 'doze') && e.shiftKey) drag = { t: 'box', a: p, b: p, mode: 'add', apply: t };
+    else if (t === 'build' || t === 'doze') { const g = groundAt(e); drag = { t: 'lots', apply: t, got: new Set(), last: g, moved: false }; pickAt(g); }
+    else if (t === 'box') drag = { t, a: p, b: p, mode: modeOf(e) };
+    else if (t === 'lasso') drag = { t, pts: [p], mode: modeOf(e) };
+    else if (t === 'brush' || t === 'zone') { drag = { t, mode: e.altKey ? 'remove' : 'add', got: new Set() }; paintAt(e); }
+    else if (t === 'along') { const g = groundAt(e), hit = edgeAt(g[0], g[1], 12); if (!hit) { toast('Press on a street, then drag along it.'); drag = null; return; } drag = { t, e: hit.e, path: [g], mode: modeOf(e), got: new Set() }; alongUpdate(); }
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  const t = ui.tool;
+  if (drag) {
+    const r = canvas.getBoundingClientRect(), p = [e.clientX - r.left, e.clientY - r.top];
+    if (drag.t === 'box') { drag.b = p; drawSvg(); }
+    else if (drag.t === 'lasso') { const l = drag.pts[drag.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 4) drag.pts.push(p); drawSvg(); }
+    else if (drag.t === 'brush' || drag.t === 'zone') paintAt(e);
+    else if (drag.t === 'along') { drag.path.push(groundAt(e)); alongUpdate(); }
+    else if (drag.t === 'lots') { const g = groundAt(e), a = drag.last, n = Math.ceil(Math.hypot(g[0] - a[0], g[1] - a[1]) / 2); for (let k = 1; k <= n; k++) pickAt([a[0] + (g[0] - a[0]) * k / n, a[1] + (g[1] - a[1]) * k / n]); drag.last = g; if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) drag.moved = true; }
+    return;
+  }
+  if (e.buttons) return;
+  const g = groundAt(e);
+  if (t === 'build' || t === 'doze') { const l = IDX && IDX.at(g[0], g[1]); setHover(l ? l.id : null); hoverPreview(l); if (!l && t === 'doze') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'not-allowed' : 'cell'; } else canvas.style.cursor = 'cell'; return; }
+  if (t === 'roads' && !(ui.draw && ui.draw.pts.length) && !e.shiftKey) { const hit = edgeAt(g[0], g[1]); if (hit) { setOv('draw', null); canvas.style.cursor = 'pointer'; return; } canvas.style.cursor = 'crosshair'; }
+  if (t === 'roads') { if (roadHover(g, e, roadCtx)) return; hoverDraw(g, e); return; }
+  if (t === 'brush' || t === 'zone') brushRing(g);
+  if (t === 'draw' || (t === 'area' && !ui.area)) { hoverDraw(g, e); return; }
+  if (t === 'edit') { const hit = edgeAt(g[0], g[1]); canvas.style.cursor = hit ? 'pointer' : ''; return; }
+  const l = IDX && IDX.at(g[0], g[1]); setHover(l ? l.id : null);
+});
+canvas.addEventListener('pointerup', (e) => {
+  const moved = down ? Math.hypot(e.clientX - down.x, e.clientY - down.y) : 99;
+  if (drag) { const d = drag; drag = null; finishDrag(d, e); return; }
+  if (!down || down.b !== 0 || moved > 6) return;
+  const g = groundAt(e), t = ui.tool;
+  if (t === 'select') { const l = IDX.at(g[0], g[1]); if (!l) { const hit = edgeAt(g[0], g[1]); if (hit) { ui.sel.clear(); buildSel(); ui.edgeSel = e.shiftKey ? new Set([...ui.edgeSel, hit.e.id]) : new Set([hit.e.id]); clearProfDraft(); buildEdgeSel(); renderCard(); return; } if (!e.shiftKey) setSel([]); return; } if (e.altKey) setSel([l.id], 'remove'); else if (e.shiftKey) { if (ui.sel.has(l.id)) setSel([l.id], 'remove'); else setSel([l.id], 'add'); } else setSel([l.id]); }
+  else if (t === 'edit') { const hit = edgeAt(g[0], g[1]); if (!hit) { ui.edgeSel.clear(); } else if (e.shiftKey) { if (ui.edgeSel.has(hit.e.id)) ui.edgeSel.delete(hit.e.id); else ui.edgeSel.add(hit.e.id); } else ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); ui.sel.clear(); buildSel(); buildEdgeSel(); renderCard(); }
+  else if (t === 'draw') addDrawPoint(g, e);
+  else if (t === 'roads') {
+    if (roadClick(g, e, roadCtx)) return;
+    const hit = !(ui.draw && ui.draw.pts.length) && !e.shiftKey ? edgeAt(g[0], g[1]) : null;
+    if (hit) { ui.draw = null; setOv('draw', null); ui.sel.clear(); buildSel(); ui.edgeSel = new Set([hit.e.id]); clearProfDraft(); buildEdgeSel(); renderCard(); renderHint(); placeHandles(); return; }
+    if (ui.edgeSel.size) { ui.edgeSel.clear(); buildEdgeSel(); }
+    addDrawPoint(g, e); renderHint();
+  }
+  else if (t === 'area' && !ui.area) addAreaPoint(g, e);
+});
+canvas.addEventListener('dblclick', (e) => {
+  const g = groundAt(e);
+  if (ui.tool === 'select') { const l = IDX.at(g[0], g[1]); if (!l || l.blk < 0) return; const ids = [...STATE.lots.values()].filter((x) => x.blk === l.blk).map((x) => x.id); setSel(ids, e.shiftKey ? 'add' : 'replace'); toast(`Whole block: ${ids.length} lots.`); }
+  else if (ui.tool === 'build' || ui.tool === 'doze') { clearTimeout(pendingClick); const l = IDX.at(g[0], g[1]); if (!l || l.blk < 0) return; applyTo(ui.tool, [...STATE.lots.values()].filter((x) => x.blk === l.blk).map((x) => x.id), 'whole block'); }
+  else if (ui.tool === 'draw' || (ui.tool === 'roads' && ui.draw && ui.draw.pts.length)) { if (ui.draw) ui.draw.pts.pop(); finishDraw(); }
+  else if (ui.tool === 'area' && ui.areaDraw) { ui.areaDraw.pts.pop(); closeArea(); }
+});
+canvas.addEventListener('wheel', (e) => {
+  if ((ui.tool === 'brush' || ui.tool === 'zone') && !e.ctrlKey) { e.preventDefault(); e.stopImmediatePropagation(); ui.brushR = clamp(ui.brushR * (e.deltaY > 0 ? 0.88 : 1.14), 4, 120); brushRing(groundAt(e)); renderHint(); }
+}, { capture: true, passive: false });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function finishDrag(d, e) {
+  const svg = $('osvg'); svg.innerHTML = '';
+  if (d.t === 'box' || d.t === 'lasso') {
+    let poly;
+    if (d.t === 'box') { const [x0, y0] = d.a, [x1, y1] = d.b; if (Math.abs(x1 - x0) < 4 && Math.abs(y1 - y0) < 4) { const g = groundAt(e), l = IDX.at(g[0], g[1]); if (l) setSel([l.id], d.mode === 'replace' ? 'replace' : d.mode); return; } poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]; }
+    else { if (d.pts.length < 3) return; poly = d.pts; }
+    const ids = [];
+    for (const l of STATE.lots.values()) { const [sx, sy] = screenOf(l.c[0], l.e, l.c[1]); if (inPoly(sx, sy, poly)) ids.push(l.id); }
+    if (d.apply) { applyTo(d.apply, ids); return; }
+    setSel(ids, d.mode); if (ids.length) toast(`${d.mode === 'remove' ? 'Removed' : 'Picked'} ${fmt(ids.length)} lots.`);
+  } else if (d.t === 'lots') {
+    const ids = [...d.got];
+    if (!ids.length) { if (d.apply === 'doze' && !d.moved) { const g = groundAt(e), hit = edgeAt(g[0], g[1]); if (hit) { ui.edgeSel = new Set([hit.e.id]); deleteEdges(); } } setOv('pick', null); return; }
+    if (d.moved) applyTo(d.apply, ids);
+    else { clearTimeout(pendingClick); pendingClick = setTimeout(() => applyTo(d.apply, ids), 230); } // wait: a double-click means the whole block
+  } else if (d.t === 'brush') { buildSel(); renderCard(); }
+  else if (d.t === 'zone') {
+    setOv('zonepaint', null);
+    const ids = [...d.got].filter((id) => { const l = STATE.lots.get(id); return l?.z !== ui.zonePaint || !l.gz; });
+    for (const id of d.got) ui.sel.add(id);
+    if (ids.length) commit({ op: 'rezone', lots: ids, z: ui.zonePaint, g: 1 }, { label: `Painted ${fmt(ids.length)} lots ${ui.zonePaint}` }); else { buildSel(); renderCard(); }
+  } else if (d.t === 'along') { setOv('along', null); setSel([...d.got], d.mode); toast(`${fmt(d.got.size)} lots front that stretch of ${d.e.n || 'the street'}.`); }
+}
+// ---------- Build and Bulldoze: lots under the pointer, like tiles ----------
+let pendingClick = 0, hoverLot = null;
+function pickAt(g) {
+  const l = IDX && IDX.at(g[0], g[1]); if (!l || drag.got.has(l.id)) return;
+  drag.got.add(l.id); ghostLots(null);
+  const acc = new Acc(), col = C(drag.apply === 'doze' ? 0xd04a32 : 0x3e9fdc);
+  for (const id of drag.got) decal(acc, STATE.lots.get(id).r, 0.7, col, 16);
+  setOv('pick', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45, depthWrite: false })));
+}
+function applyTo(tool, ids, how) {
+  setOv('pick', null); ghostLots(null); hoverLot = null;
+  if (!ids.length) return;
+  const lots = ids.map((id) => STATE.lots.get(id)).filter(Boolean);
+  if (tool === 'doze') { commit({ op: 'apply', lots: lots.map((l) => l.id), t: 'lot.clear', p: {}, vary: 0, sd: uid('s'), dr: 1 }, { anim: ids, label: `Bulldozed ${fmt(lots.length)} lot${lots.length === 1 ? '' : 's'}${how ? ' · ' + how : ''}` }); return; }
+  applyItem(itemById(ui.item), lots, how);
+}
+function hoverPreview(l) {
+  if ((l && l.id) === hoverLot) return; hoverLot = l ? l.id : null;
+  const h = $('hHover'); if (!l) { ghostLots(null); if (h) h.textContent = ''; return; }
+  if (ui.tool === 'doze') { ghostLots(null); if (h) h.textContent = `· ${lotLabel(l)}`; return; }
+  const it = itemById(ui.item); if (!it) return;
+  const why = it.fits(l);
+  if (why) { ghostLots(null); if (h) h.textContent = `· ${lotLabel(l)}: ${why}`; return; }
+  const p = progAfter(it, l); ghostLots(p ? [[l, p]] : null);
+  if (h) h.textContent = `· ${lotLabel(l)}: ${previewText(preview(it, [l]))}`;
+}
+const lotLabel = (l) => l.a || LT[l.lt].name;
+
+function drawSvg() {
+  const svg = $('osvg'); if (!drag) { svg.innerHTML = ''; return; }
+  const st = 'fill="rgba(62,159,220,.15)" stroke="#2b2420" stroke-width="2" stroke-dasharray="6 4"';
+  if (drag.t === 'box') { const [x0, y0] = drag.a, [x1, y1] = drag.b; svg.innerHTML = `<rect x="${Math.min(x0, x1)}" y="${Math.min(y0, y1)}" width="${Math.abs(x1 - x0)}" height="${Math.abs(y1 - y0)}" ${st}/>`; }
+  else svg.innerHTML = `<path d="M${drag.pts.map((p) => p.join(',')).join('L')}Z" ${st}/>`;
+}
+function paintAt(e) {
+  const g = groundAt(e); brushRing(g); if (!IDX) return;
+  const ls = IDX.near(g[0], g[1], ui.brushR);
+  if (drag.t === 'brush') { for (const l of ls) { if (drag.mode === 'remove') ui.sel.delete(l.id); else ui.sel.add(l.id); } if (ls.size) buildSel(); }
+  else { for (const l of ls) drag.got.add(l.id); const acc = new Acc(); for (const id of drag.got) decal(acc, STATE.lots.get(id).r, 0.7, C(ZONE_COL[zfam(ui.zonePaint)]), 16); setOv('zonepaint', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false }))); }
+}
+function brushRing(g) { const acc = new Acc(), pts = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * Math.PI * 2; pts.push([g[0] + Math.cos(a) * ui.brushR, g[1] + Math.sin(a) * ui.brushR]); } ribbon(acc, pts, -0.35, 0.35, 1.2, C(ui.tool === 'zone' ? ZONE_COL[zfam(ui.zonePaint)] : 0x3e9fdc), 2); setOv('brush', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, depthTest: false }))); }
+function sideOf(edge, g) { const q = nearestOnLine(edge.p, g[0], g[1]); const a = edge.p[q.i], b = edge.p[q.i + 1]; return Math.sign((b[0] - a[0]) * (g[1] - a[1]) - (b[1] - a[1]) * (g[0] - a[0])) || 1; }
+function alongUpdate() {
+  const d = drag, name = d.e.n, path = d.path.length > 1 ? d.path : [d.path[0], [d.path[0][0] + 0.1, d.path[0][1]]];
+  d.got.clear();
+  for (const l of STATE.lots.values()) {
+    const e = STATE.edges.get(l.rd); if (!e) continue;
+    if (name ? e.n !== name : e.id !== d.e.id) continue;
+    if (nearestOnLine(path, l.fp[0], l.fp[1]).d > rowWidth(e.prof) / 2 + 14) continue;
+    if (!ui.alongBoth && sideOf(e, l.c) !== sideOf(e, d.path[0])) continue;
+    d.got.add(l.id);
+  }
+  const acc = new Acc(); ribbon(acc, path, -1.2, 1.2, 1.3, C(0xc4613b), 2); for (const id of d.got) decal(acc, STATE.lots.get(id).r, 0.7, C_SEL, 16);
+  setOv('along', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide })));
+}
+
+const roadCtx = { edgeAt: (x, z, p) => edgeAt(x, z, p), addDrawPoint: (g, e) => addDrawPoint(g, e), finishDraw: () => finishDraw(), snapPoint: (g, e, a, b) => snapPoint(g, e, a, b), clearSel: () => buildEdgeSel(), renderCard: () => { renderCard(); renderHint(); } };
+
+// ---------- drawing streets ----------
+function snapPoint(g, e, prev, prev2) {
+  let [x, z] = g, label = null; const tol = 9 / Math.sqrt(camZoom());
+  // nodes first, then edge midpoints, then anywhere on a street
+  let bn = -1, bd = tol; STATE.nodes.forEach((n, i) => { const d = Math.hypot(n[0] - x, n[1] - z); if (d < bd) { bd = d; bn = i; } });
+  if (bn >= 0) return { p: STATE.nodes[bn].slice(), label: 'intersection' };
+  for (const ed of STATE.edges.values()) { if (!ed.g) continue; const L = polyLen(ed.p); let acc = 0, mid = null; for (let i = 1; i < ed.p.length && !mid; i++) { const s = Math.hypot(ed.p[i][0] - ed.p[i - 1][0], ed.p[i][1] - ed.p[i - 1][1]); if (acc + s >= L / 2) { const t = (L / 2 - acc) / s; mid = [ed.p[i - 1][0] + (ed.p[i][0] - ed.p[i - 1][0]) * t, ed.p[i - 1][1] + (ed.p[i][1] - ed.p[i - 1][1]) * t]; } acc += s; } if (mid && Math.hypot(mid[0] - x, mid[1] - z) < tol * 0.8) return { p: mid, label: 'street midpoint' }; }
+  if (prev) {
+    const dx = x - prev[0], dz = z - prev[1], L = Math.hypot(dx, dz); let ang = Math.atan2(dz, dx);
+    const ref = prev2 ? Math.atan2(prev[1] - prev2[1], prev[0] - prev2[0]) : null;
+    const near = edgeAt(prev[0], prev[1], 3) || null, nearAng = near ? (() => { const a = near.e.p[near.q.i], b = near.e.p[near.q.i + 1]; return Math.atan2(b[1] - a[1], b[0] - a[0]); })() : null;
+    const angDiff = (a, b) => { let d = ((a - b) % Math.PI + Math.PI * 1.5) % Math.PI - Math.PI / 2; return d; };
+    if (e.shiftKey) { ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12); label = '15° step'; }
+    else {
+      const cands = []; if (nearAng != null) cands.push([nearAng + Math.PI / 2, '90° to the street'], [nearAng, 'along the street']); if (ref != null) cands.push([ref + Math.PI / 2, '90° turn'], [ref, 'straight on']);
+      const par = edgeAt(x, z, 70); if (par && par.e !== near?.e) { const a = par.e.p[par.q.i], b = par.e.p[par.q.i + 1]; cands.push([Math.atan2(b[1] - a[1], b[0] - a[0]), `parallel to ${par.e.n || 'a street'}`]); }
+      for (const [a, n] of cands) { const d = angDiff(ang, a); if (Math.abs(d) < 0.07) { ang -= d; label = n; break; } }
+    }
+    x = prev[0] + Math.cos(ang) * L; z = prev[1] + Math.sin(ang) * L;
+  }
+  const hit = edgeAt(x, z, 0); if (hit && hit.q.d < 3) { return { p: [hit.q.x, hit.q.z], label: 'onto ' + (hit.e.n || 'a street') }; }
+  return { p: [x, z], label };
+}
+function hoverDraw(g, e) {
+  const isDraw = ui.tool === 'draw' || ui.tool === 'roads', d = isDraw ? ui.draw : ui.areaDraw, pts = d ? d.pts : [];
+  const s = snapPoint(g, e, pts[pts.length - 1], pts[pts.length - 2]);
+  if (isDraw) { ui.draw = ui.draw || { pts: [] }; ui.draw.cursor = s.p; ui.draw.snap = s.label; drawPreview(); }
+  else { ui.areaDraw = ui.areaDraw || { pts: [] }; ui.areaDraw.cursor = s.p; areaDrawPreview(); }
+  const n = $('card').querySelector('.note:last-of-type'); void n;
+}
+function addDrawPoint(g, e) {
+  ui.draw = ui.draw || { pts: [] }; const pts = ui.draw.pts, s = snapPoint(g, e, pts[pts.length - 1], pts[pts.length - 2]);
+  if (pts.length && Math.hypot(s.p[0] - pts[pts.length - 1][0], s.p[1] - pts[pts.length - 1][1]) < 1.5) return;
+  pts.push(s.p); ui.draw.snap = s.label; drawPreview(); renderDraw();
+}
+function drawLine() { const d = ui.draw; if (!d) return []; const p = d.cursor && d.pts.length ? [...d.pts, d.cursor] : d.pts.slice(); return roadPath(p); }
+function drawPreview() {
+  const p = drawLine(); if (p.length < 2) { setOv('draw', null); return; }
+  const prof = PRESETS[ui.drawProf], h = rowWidth(prof) / 2, acc = new Acc();
+  ribbon(acc, p, -h, h, 1.0, C(0xc4613b), 3); ribbon(acc, p, -0.3, 0.3, 1.1, C(0x2b2420), 3);
+  setOv('draw', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })));
+}
+function finishDraw() {
+  const d = ui.draw; if (!d || d.pts.length < 2) { toast('A street needs at least two points.'); return; }
+  const pts = roadPath(d.pts).slice(), raw = ROAD.mode === 'line' || ROAD.mode === 'curve' ? [d.pts[0], d.pts[1]] : d.pts;
+  const id = uid('S'), name = ui.drawName.trim() || `New St ${LOG.filter((c) => c.op === 'street.add').length + 1}`;
+  ui.draw = null; setOv('draw', null);
+  commit({ op: 'street.add', id, pts: pts.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]), raw, prof: { k: ui.drawProf, els: structuredClone(PRESETS[ui.drawProf].els) }, name }, { label: `${name} built` });
+  ui.drawName = '';
+  setTool(ui.tool === 'roads' ? 'roads' : 'edit'); ui.edgeSel = new Set([...STATE.edges.values()].filter((e) => e.grp === id).map((e) => e.id)); buildEdgeSel(); renderCard();
+}
+function addAreaPoint(g, e) {
+  ui.areaDraw = ui.areaDraw || { pts: [] }; const pts = ui.areaDraw.pts, s = snapPoint(g, e, pts[pts.length - 1], pts[pts.length - 2]);
+  if (pts.length > 2) { const [sx, sy] = screenOf(pts[0][0], elev(pts[0][0], pts[0][1]), pts[0][1]), r = canvas.getBoundingClientRect(); if (Math.hypot(sx - (e.clientX - r.left), sy - (e.clientY - r.top)) < 14) { closeArea(); return; } }
+  pts.push(s.p); areaDrawPreview();
+}
+function areaDrawPreview() { const d = ui.areaDraw; if (!d) return; const p = d.cursor ? [...d.pts, d.cursor] : d.pts; if (p.length < 2) return; const acc = new Acc(); ribbon(acc, [...p, p[0]], -0.6, 0.6, 1.2, C(0xc4613b), 2); if (p.length > 2) decal(acc, p, 1.0, C(0xf2dfa2), 20); setOv('area', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }))); }
+function closeArea() {
+  const d = ui.areaDraw; ui.areaDraw = null; if (!d || d.pts.length < 3 || Math.abs(area(d.pts)) < 400) { setOv('area', null); return toast('Draw a bigger area: at least three points around about 4,000 ft².'); }
+  ui.area = { region: d.pts.map((p) => [p[0], p[1]]), pattern: 'grid', bs: 80, lw: 14, ld: 30, prof: 'slow', zone: 'mix', fill: true };
+  renderHint(); renderCard(); areaPreview();
+}
+
+// ---------- handles for reshaping drawn streets ----------
+function placeHandles() {
+  const box = $('labels'); box.querySelectorAll('.handle-dot').forEach((h) => h.remove());
+  if ((ui.tool !== 'edit' && ui.tool !== 'roads') || !ui.edgeSel.size) return;
+  const grp = STATE.edges.get([...ui.edgeSel][0])?.grp; if (!grp) return;
+  const cmd = LOG.slice(0, CUR).find((c) => c.op === 'street.add' && c.id === grp); if (!cmd) return;
+  const pts = (LOG.slice(0, CUR).filter((c) => c.op === 'street.move' && c.id === grp).pop()?.raw) || cmd.raw || cmd.pts;
+  pts.forEach((p, i) => {
+    const h = document.createElement('div'); h.className = 'handle-dot'; h.title = 'Drag to reshape'; h.dataset.i = i; box.appendChild(h);
+    h._p = p.slice();
+    h.onpointerdown = (ev) => { ev.stopPropagation(); h.setPointerCapture(ev.pointerId); controls.enabled = false; h._drag = true; };
+    h.onpointermove = (ev) => { if (!h._drag) return; const g = groundAt(ev); h._p = g; const np = pts.map((q, k) => (k === i ? g : q)); const line = ui.smooth && np.length > 2 ? smoothLine(np) : np; const acc = new Acc(); ribbon(acc, line, -4, 4, 1.0, C(0xc4613b), 3); setOv('draw', new THREE.Mesh(acc.geo(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }))); positionHandles(); };
+    h.onpointerup = () => { if (!h._drag) return; h._drag = false; controls.enabled = true; setOv('draw', null); const np = pts.map((q, k) => (k === i ? h._p : q)); const line = np.length > 2 ? smoothLine(np) : np; commit({ op: 'street.move', id: grp, pts: line.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]), raw: np }, { label: 'Street reshaped' }); ui.edgeSel = new Set([...STATE.edges.values()].filter((e) => e.grp === grp).map((e) => e.id)); buildEdgeSel(); renderCard(); };
+  });
+  positionHandles();
+}
+function positionHandles() { $('labels').querySelectorAll('.handle-dot').forEach((h) => { const p = h._p; const [x, y] = screenOf(p[0], elev(p[0], p[1]) + 1, p[1]); h.style.left = x + 'px'; h.style.top = y + 'px'; }); }
+
+// ---------- keys ----------
+const panKeys = new Set(); // W A S D held: pan along the ground relative to the view
+window.addEventListener('keyup', (e) => panKeys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => panKeys.clear());
+const panV = new THREE.Vector3();
+function panStep(dt, dist) {
+  if (!panKeys.size || anim) return;
+  const fx = controls.target.x - cam.position.x, fz = controls.target.z - cam.position.z, L = Math.hypot(fx, fz) || 1;
+  const dx = fx / L, dz = fz / L; // forward on the ground; right is (-dz, dx)
+  const f = (panKeys.has('w') ? 1 : 0) - (panKeys.has('s') ? 1 : 0), r = (panKeys.has('d') ? 1 : 0) - (panKeys.has('a') ? 1 : 0);
+  if (!f && !r) return;
+  const v = dist * 0.9 * dt / Math.hypot(f, r);
+  panV.set(dx * f - dz * r, 0, dz * f + dx * r).multiplyScalar(v);
+  controls.target.add(panV); cam.position.add(panV);
+}
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('input, select, textarea')) { if (e.key === 'Escape') e.target.blur(); return; }
+  const k = e.key.toLowerCase();
+  if (!(e.ctrlKey || e.metaKey || e.altKey) && 'wasd'.includes(k) && k.length === 1) { panKeys.add(k); e.preventDefault(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Escape') { if (!$('areas').hidden || !$('credits').hidden || !$('logm').hidden || !$('keysm').hidden) { closeModals(); return; } if (ui.draw && ui.draw.pts.length) { ui.draw = null; setOv('draw', null); renderCard(); return; } if (ui.areaDraw || ui.area) { ui.areaDraw = null; ui.area = null; setOv('area', null); renderCard(); renderHint(); return; } if (ui.edgeSel.size) { ui.edgeSel.clear(); buildEdgeSel(); renderCard(); return; } setSel([]); return; }
+  if (e.key === 'Enter' && (ui.tool === 'draw' || ui.tool === 'roads') && ui.draw && ui.draw.pts.length) { finishDraw(); return; }
+  if (e.key === 'Enter' && ui.tool === 'area' && ui.areaDraw) { closeArea(); return; }
+  if (e.key === 'Backspace' && (ui.tool === 'draw' || ui.tool === 'roads') && ui.draw && ui.draw.pts.length) { ui.draw.pts.pop(); drawPreview(); renderDraw(); e.preventDefault(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && (ui.tool === 'edit' || ui.tool === 'roads' || ui.tool === 'select') && ui.edgeSel.size) { e.preventDefault(); deleteEdges(); return; }
+  const tool = [...TOOLS, ...(ui.adv ? ADV_TOOLS : [])].find((t) => t[2] && t[2].toLowerCase() === k); if (tool) { setTool(tool[0]); return; }
+  if (k === 'b') toggleView('asbuilt'); else if (k === 'c') toggleView('split'); else if (k === 't') toggleView('color'); else if (k === 'n') toggleView('night');
+  else if (k === 'q' || k === 'e') { const off = cam.position.clone().sub(controls.target); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (k === 'q' ? 1 : -1) * Math.PI / 12); cam.position.copy(controls.target).add(off); }
+  else if (e.key === '[' || e.key === ']') { const off = cam.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.phi = clamp(sph.phi + (e.key === ']' ? 0.1 : -0.1), 0.12, 1.42); cam.position.copy(controls.target).add(off.setFromSpherical(sph)); }
+  else if (e.key === '?') { $('keysm').hidden = false; }
+});
+
+// ---------- view toggles ----------
+function renderViews() {
+  const B = (id, label, on, title) => `<button class="tool" id="${id}" aria-pressed="${on}" title="${title}">${label}</button>`;
+  $('views').innerHTML = B('vAsb', 'As-built <kbd>B</kbd>', ui.asbuilt, 'Show the neighbourhood as it is today') + B('vSplit', 'Compare <kbd>C</kbd>', ui.splitOn, 'Before / after slider') +
+    B('vColor', ['Colour lots', 'By lot type', 'By zone'][ui.color] + ' <kbd>T</kbd>', ui.color > 0, 'Colour lots by type or zone') + B('vNight', 'Night <kbd>N</kbd>', ui.night, 'Night lighting') +
+    `<button class="tool" id="vUndo" ${CUR ? '' : 'disabled'} title="Undo (Ctrl+Z)">Undo</button><button class="tool" id="vRedo" ${CUR < LOG.length ? '' : 'disabled'} title="Redo (Ctrl+Y)">Redo</button>` +
+    B('vAdv', 'Advanced', ui.adv, 'Precise selection tools, every lot setting, the edit log') + '<button class="tool" id="vKeys" title="Keys and mouse">?</button>';
+  const on = (id, f) => ($(id).onclick = f);
+  on('vAsb', () => toggleView('asbuilt')); on('vSplit', () => toggleView('split')); on('vColor', () => toggleView('color')); on('vNight', () => toggleView('night'));
+  on('vUndo', undo); on('vRedo', redo); on('vAdv', () => { ui.adv = !ui.adv; if (!ui.adv && ADV_TOOLS.some((t) => t[0] === ui.tool)) setTool('select'); renderTools(); renderViews(); renderCard(); }); on('vKeys', () => ($('keysm').hidden = false));
+  if (!$('advbar').hidden) renderTools();
+}
+let lampMat = null;
+const dock = mountClockDock($('app'), { onChange: () => { ui.night = lightAt(clock.hour).isNight; refreshLight(); renderViews(); } });
+let lightEnv = null, lastLightHour = -1;
+function refreshLight() {
+  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app'), sky: createCaminoSky(scene) };
+  lightEnv.lampMat = lampMat; lastLightHour = clock.hour;
+  const L = lightAt(clock.hour); applyLight(lightEnv, L); ui.night = L.isNight; sunDir.fromArray(L.dir);
+}
+const sunDir = new THREE.Vector3(0.5, 1, 0.4).normalize();
+function toggleView(k) {
+  if (k === 'asbuilt') { ui.asbuilt = !ui.asbuilt; if (ui.asbuilt) ui.splitOn = false; $('asbTag').hidden = !ui.asbuilt; }
+  else if (k === 'split') { ui.splitOn = !ui.splitOn; if (ui.splitOn) ui.asbuilt = false; $('asbTag').hidden = true; placeSplit(); }
+  else if (k === 'color') { ui.color = (ui.color + 1) % 3; buildColor(); }
+  else if (k === 'lines') { ui.lotsOn = !ui.lotsOn; if (ov.lines) ov.lines.visible = ui.lotsOn; renderTools(); }
+  else if (k === 'night') { ui.night = !ui.night; setHour(ui.night ? 22 : 14); dock.sync(); refreshLight(); }
+  placeSplit(); renderViews();
+}
+// Hooks for the command bar (src/camino/commandbar.js): each runs the same code as the matching button or key.
+export function pickTool(t) { if (ADV_TOOLS.some((x) => x[0] === t) && !ui.adv) { ui.adv = true; renderViews(); } setTool(t); }
+export function setLightHour(h) { setHour(h); ui.night = lightAt(h).isNight; dock.sync(); refreshLight(); renderViews(); }
+export function searchLots(q) { return search(q); }
+export function goToLot(l) { setTool('select'); setSel([l.id]); flyTo(l.c[0], l.c[1], Math.max(camZoom(), 3.4)); }
+const splitEl = $('split'), handle = $('splitHandle');
+function placeSplit() { splitEl.hidden = !ui.splitOn; splitEl.style.left = ui.split * 100 + '%'; handle.setAttribute('aria-valuenow', Math.round(ui.split * 100)); }
+handle.addEventListener('pointerdown', (e) => {
+  handle.setPointerCapture(e.pointerId);
+  const mv = (ev) => { const r = canvas.getBoundingClientRect(); ui.split = clamp((ev.clientX - r.left) / r.width, 0.05, 0.95); placeSplit(); };
+  const upf = () => { handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', upf); };
+  handle.addEventListener('pointermove', mv); handle.addEventListener('pointerup', upf);
+});
+handle.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') ui.split = Math.max(0.05, ui.split - 0.05); if (e.key === 'ArrowRight') ui.split = Math.min(0.95, ui.split + 0.05); placeSplit(); });
+
+// ---------- modals: area picker, credits, log, keys ----------
+function closeModals() { for (const id of ['areas', 'credits', 'logm', 'keysm']) $(id).hidden = true; }
+for (const [m, b] of [['credits', 'credClose'], ['logm', 'logClose'], ['keysm', 'keysClose']]) { $(b).onclick = () => ($(m).hidden = true); $(m).addEventListener('click', (e) => { if (e.target.id === m) $(m).hidden = true; }); }
+let areaPick = AREA.id;
+$('areaBtn').onclick = () => openAreas();
+$('areaGo').onclick = () => {
+  if (areaPick === AREA.id) { $('areas').hidden = true; save(); canvas.focus(); return; }
+  save(); location.search = '?area=' + encodeURIComponent(areaPick);
+};
+function openAreas() { areaPick = AREA.id; renderAreaList(); drawAreaMap(); $('areas').hidden = false; }
+function renderAreaList() {
+  const list = AREAS.areas;
+  $('alist').innerHTML = list.map((a) => `<button class="aitem${a.id === areaPick ? ' on' : ''}${a.status === 'ready' ? '' : ' planned'}" data-area="${esc(a.id)}" aria-pressed="${a.id === areaPick}"><b>${esc(a.name)}</b>${esc(a.sub || '')} · ${a.id === AREA.id ? 'loaded' : a.status === 'ready' ? 'ready' : 'needs a pack'}</button>`).join('');
+  $('alist').querySelectorAll('[data-area]').forEach((b) => (b.onclick = () => { areaPick = b.dataset.area; renderAreaList(); drawAreaMap(); }));
+  const pick = list.find((a) => a.id === areaPick), go = $('areaGo');
+  go.disabled = !pick || pick.status !== 'ready';
+  go.textContent = !pick ? 'Open' : pick.id === AREA.id ? `Back to ${pick.name}` : pick.status === 'ready' ? `Open ${pick.name}` : `${pick.name} needs a pack`;
+}
+// Area map colours: Camino's dark tokens (the canvas paints over its CSS).
+const MAP = { paper: '#0b1013', road: '#5b666d', major: '#2fd8e8', edge: '#e9eff1', on: '#2fd8e8', onFill: 'rgba(47,216,232,.22)', ready: 'rgba(60,224,122,.22)', idle: 'rgba(233,239,241,.06)', label: '#e9eff1', sub: '#8a99a3', font: 'Arimo, Helvetica, Arial, sans-serif', sans: 'Arimo, Helvetica, Arial, sans-serif' };
+function drawAreaMap() { // the Valley as a lon/lat frame with every area's rectangle; the loaded one shows its streets
+  const cv = $('areaMap'), g = cv.getContext('2d'), W = cv.width, H = cv.height, pad = 18;
+  const rb = AREAS.region?.bbox || AREA.bbox || [-118.68, 34.13, -118.33, 34.31], ky = 1 / Math.cos(((rb[1] + rb[3]) / 2) * Math.PI / 180);
+  const s = Math.min((W - 2 * pad) / (rb[2] - rb[0]), (H - 2 * pad) / ((rb[3] - rb[1]) * ky)), ox = (W - (rb[2] - rb[0]) * s) / 2, oy = (H - (rb[3] - rb[1]) * ky * s) / 2;
+  const LL = (lon, lat) => [ox + (lon - rb[0]) * s, oy + (rb[3] - lat) * ky * s];
+  g.fillStyle = MAP.paper; g.fillRect(0, 0, W, H);
+  g.lineWidth = 1;
+  // the loaded pack's streets, placed by its lon/lat origin (x east, z south, metres)
+  const o = PACK.origin, KX = Math.cos(o[1] * Math.PI / 180) * 111320, KY = 110540;
+  const M = (x, z) => LL(o[0] + x / KX, o[1] - z / KY);
+  g.lineCap = 'round';
+  for (const e of BASE.edges.values()) { if (!e.g) continue; g.strokeStyle = e.c === 'primary' ? MAP.major : MAP.road; g.lineWidth = e.c === 'primary' ? 1.6 : 0.7; g.beginPath(); e.p.forEach((p, i) => { const q = M(p[0], p[1]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
+  for (const a of AREAS.areas) {
+    if (!a.bbox) continue;
+    const p = LL(a.bbox[0], a.bbox[3]), q = LL(a.bbox[2], a.bbox[1]), on = a.id === areaPick;
+    g.setLineDash(a.status === 'ready' ? [] : [4, 3]); g.lineWidth = on ? 3 : 1.5; g.strokeStyle = on ? MAP.on : MAP.edge;
+    g.fillStyle = on ? MAP.onFill : a.status === 'ready' ? MAP.ready : MAP.idle;
+    g.fillRect(p[0], p[1], q[0] - p[0], q[1] - p[1]); g.strokeRect(p[0], p[1], q[0] - p[0], q[1] - p[1]);
+    g.setLineDash([]); g.fillStyle = MAP.label; g.font = `${on ? 700 : 500} ${on ? 13 : 11}px ${MAP.font}`; g.fillText(a.name, p[0], p[1] - 4);
+  }
+  drawDraft(g, LL);
+  g.font = `12px ${MAP.sans}`; g.fillStyle = MAP.sub; g.fillText(AREAS.region?.name || '', pad, H - 10); g.fillText('N ↑', W - 40, 22);
+}
+function openLog() {
+  $('logList').innerHTML = LOG.length ? LOG.map((c, i) => `<li class="${i >= CUR ? 'undone' : ''}"><b>${i + 1}.</b> ${esc(describe(c))} <code>${esc(c.op)}</code></li>`).join('') : '<li>No edits yet. The city is the base pack.</li>';
+  $('logm').hidden = false;
+}
+$('logExport').onclick = () => {
+  const txt = JSON.stringify({ kind: 'renovated-save', pack: `${AREA.id}.v2`, saved: new Date().toISOString(), log: LOG.slice(0, CUR), groups: ui.groups });
+  const ta = $('saveTxt'); ta.value = txt; ta.focus(); ta.select();
+  try { navigator.clipboard.writeText(txt).then(() => toast('Save file copied. Paste it into a .json file to keep it.'), () => toast('Save text is selected below; copy it with Ctrl+C.')); } catch (e) { toast('Save text is selected below; copy it with Ctrl+C.'); }
+};
+$('logPaste').onclick = () => { try { const d = JSON.parse($('saveTxt').value); if (!Array.isArray(d.log)) throw new Error('no log'); loadLog(d.log, d.groups || {}); $('logm').hidden = true; toast(`Loaded ${d.log.length} edits.`); } catch (e) { toast('Paste a Renovated save into the box first.'); } };
+$('logImport').onclick = () => $('file').click();
+$('file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const d = JSON.parse(await f.text()); if (!Array.isArray(d.log)) throw new Error('no log'); loadLog(d.log, d.groups || {}); $('logm').hidden = true; toast(`Loaded ${d.log.length} edits.${ui.lastInfo?.notes.length ? ' ' + ui.lastInfo.notes.length + ' no longer fit the base data and were flagged.' : ''}`); }
+  catch (err) { toast('That file is not a Renovated save.'); }
+});
+$('logClear').onclick = () => { loadLog([], ui.groups); $('logm').hidden = true; toast('Back to the base pack. Your saved groups are kept.'); };
+function loadLog(log, groups) { loadEdits(log); ui.groups = groups; ui.sel.clear(); ui.edgeSel.clear(); refresh(); save(); renderCard(); renderViews(); }
+// Reset town (Camino's More popover and "/" bar, after its confirm step): the area goes back to its as-built pack.
+// Edits, zoning and growth all live in the edit log, so an empty log clears them and the undo history with them.
+// Budget is worked out from the city, so it goes back too. Groups, Dream mode and the saved copy are cleared as well.
+export function resetTown() {
+  forgetSave();
+  loadEdits([]); ui.groups = {}; ui.sel.clear(); ui.edgeSel.clear(); ui.skipped = null;
+  if (ui.dream) { ui.dream = false; $('mReal')?.classList.add('on'); $('mDream')?.classList.remove('on'); $('mReal')?.setAttribute('aria-checked', 'true'); $('mDream')?.setAttribute('aria-checked', 'false'); }
+  refresh(); renderCard(); renderViews();
+  toast('Town reset to as-built. Edits, zoning, growth and undo history are cleared.');
+}
+$('mReal').onclick = () => setMode(false); $('mDream').onclick = () => setMode(true);
+function setMode(d) { ui.dream = d; $('mReal').classList.toggle('on', !d); $('mDream').classList.toggle('on', d); $('mReal').setAttribute('aria-checked', !d); $('mDream').setAttribute('aria-checked', d); save(); renderCard(); toast(d ? 'Dream mode: no setbacks, up to 8 storeys, any template on any lot.' : 'Real rules: simplified LA zoning for setbacks, height and uses.'); }
+
+// ---------- search ----------
+let hits = [], hi = 0;
+const ABBR = { st: 'street', ave: 'avenue', av: 'avenue', dr: 'drive', blvd: 'boulevard', rd: 'road', ln: 'lane', pl: 'place' };
+function search(q) {
+  const toks = q.toLowerCase().replace(/[.,]/g, ' ').split(/\s+/).filter(Boolean).map((t) => ABBR[t] || t); if (!toks.length) return [];
+  const out = []; for (const l of STATE.lots.values()) { if (!l.a) continue; const k = l.a.toLowerCase(); if (toks.every((t) => k.includes(t))) out.push(l); }
+  return out.sort((a, b) => (a.a.toLowerCase().startsWith(toks[0]) ? 0 : 1) - (b.a.toLowerCase().startsWith(toks[0]) ? 0 : 1) || parseInt(a.a) - parseInt(b.a)).slice(0, 6);
+}
+function renderResults() { const ul = $('results'); ul.innerHTML = hits.map((l, k) => `<li><button type="button" role="option" data-k="${k}" class="${k === hi ? 'active' : ''}">${esc(l.a)}<small>${LT[l.lt].name}</small></button></li>`).join(''); ul.querySelectorAll('button').forEach((b) => (b.onclick = () => choose(+b.dataset.k))); }
+function choose(k) { const l = hits[k]; if (!l) return; $('addr').value = l.a; hits = []; renderResults(); setTool('select'); setSel([l.id]); flyTo(l.c[0], l.c[1], Math.max(camZoom(), 3.4)); }
+$('addr').addEventListener('input', (e) => { hits = search(e.target.value); hi = 0; renderResults(); });
+$('addr').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, hits.length - 1); renderResults(); e.preventDefault(); } if (e.key === 'ArrowUp') { hi = Math.max(hi - 1, 0); renderResults(); e.preventDefault(); } if (e.key === 'Escape') { hits = []; renderResults(); } });
+$('searchForm').addEventListener('submit', (e) => { e.preventDefault(); if (!hits.length) hits = search($('addr').value); if (hits.length) choose(hi); else toast('No address like that in this pack. Try Celes St or Don Pio Dr.'); });
+
+// ---------- camera ----------
+const camZoom = () => zoomForDist(cam.position.distanceTo(controls.target));
+let anim = null;
+function flyTo(x, z, zoom) {
+  const from = controls.target.clone(), to = new THREE.Vector3(x, elev(x, z), z).add(cardShift(zoom)), z0 = camZoom(), off = cam.position.clone().sub(controls.target), t0 = performance.now(), dur = reduceMotion ? 1 : 900;
+  anim = (now) => { let k = Math.min((now - t0) / dur, 1); k = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; controls.target.lerpVectors(from, to, k); off.setLength(distForZoom(z0 + (zoom - z0) * k)); cam.position.copy(controls.target).add(off); if (k >= 1) anim = null; };
+}
+function cardShift(zoom) { if (canvas.clientWidth < 760) return new THREE.Vector3(); const viewW = viewHeightAt(distForZoom(zoom)) * cam.aspect, right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0); right.y = 0; right.normalize(); return right.multiplyScalar(viewW * 0.12); }
+
+// ---------- street labels ----------
+let labels = [], viewKey = '';
+function buildLabels() {
+  const box = $('labels'); box.querySelectorAll('.st-label').forEach((l) => l.remove()); labels = []; viewKey = '';
+  const best = new Map();
+  for (const e of STATE.edges.values()) { if (!e.n || !e.g || e.c === 'motorway') continue; const L = polyLen(e.p); if (!best.has(e.n) || best.get(e.n).L < L) best.set(e.n, { e, L }); }
+  for (const [n, { e, L }] of best) {
+    if (L < 50) continue;
+    let acc = 0, pt = e.p[0]; for (let i = 1; i < e.p.length; i++) { const s = Math.hypot(e.p[i][0] - e.p[i - 1][0], e.p[i][1] - e.p[i - 1][1]); if (acc + s >= L / 2) { const t = (L / 2 - acc) / s; pt = [e.p[i - 1][0] + (e.p[i][0] - e.p[i - 1][0]) * t, e.p[i - 1][1] + (e.p[i][1] - e.p[i - 1][1]) * t]; break; } acc += s; }
+    const el = document.createElement('span'); el.className = 'st-label' + (['primary', 'secondary'].includes(e.c) && !e.drawn ? ' major' : '') + (e.drawn ? ' new' : '');
+    el.textContent = n.replace(/ Street$/, ' St').replace(/ Avenue$/, ' Ave').replace(/ Drive$/, ' Dr').replace(/ Boulevard$/, ' Blvd').replace(/ Road$/, ' Rd'); box.appendChild(el);
+    labels.push({ el, v: new THREE.Vector3(pt[0], elev(pt[0], pt[1]) + 2, pt[1]), major: el.classList.contains('major') || e.drawn });
+  }
+}
+// The camera usually sits still, so the label and scale-bar DOM writes wait until the view actually moves.
+function viewMoved() {
+  const e = cam.matrixWorld.elements, w = canvas.clientWidth, h = canvas.clientHeight;
+  const k = e[12] + ',' + e[13] + ',' + e[14] + ',' + e[0] + ',' + e[2] + ',' + e[5] + ',' + cam.zoom + ',' + cam.right + ',' + cam.top + ',' + w + ',' + h + ',' + labels.length;
+  if (k === viewKey) return false; viewKey = k; return true;
+}
+function placeLabels() {
+  const w = canvas.clientWidth, h = canvas.clientHeight, v = new THREE.Vector3();
+  for (const l of labels) { v.copy(l.v).project(cam); const show = Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (l.major || camZoom() > 0.8); l.el.style.display = show ? '' : 'none'; if (show) l.el.style.transform = `translate(${Math.round((v.x + 1) / 2 * w)}px, ${Math.round((1 - v.y) / 2 * h)}px) translate(-50%, -50%)`; } // whole pixels: no shimmer while the camera glides
+}
+function updateScale() {
+  const per = viewHeightAt(cam.position.distanceTo(controls.target)) * cam.aspect / canvas.clientWidth, nice = [5, 10, 20, 25, 50, 100, 200, 250, 500];
+  let m = nice[0]; for (const n of nice) if (n / per <= 110) m = n;
+  $('scaleBar').style.width = m / per + 'px'; $('scaleTxt').textContent = `${m} m · ${fmt(m * FT)} ft`;
+  $('needle').style.transform = `rotate(${controls.getAzimuthalAngle()}rad)`;
+}
+
+// =====================================================================
+// Start
+// =====================================================================
+const [terrain, skirt] = buildTerrain();
+const walks = buildWalks(), props = buildProps(); lampMat = props.userData.lampMat; refreshLight();
+scene.add(terrain, skirt, walks, props, beforeW.group, world.group, overlays, helpers);
+await warmStart(BASE); // lot geometry builds on the worker pool while the loader shows progress
+beforeW.sync(BASE);
+const saved = load();
+if (saved && Array.isArray(saved.log) && saved.log.length) { loadEdits(saved.log); ui.groups = saved.groups || {}; if (saved.dream) setMode(true); }
+else if (saved) ui.groups = saved.groups || {};
+await warmStart(STATE); // saved edits: build their lots on the workers too (a no-op for a fresh start)
+setBasePark(Math.max(1, [...BASE.lots.values()].reduce((s, l) => s + genCached(l, BASE).park, 0)));
+refresh();
+renderTools(); renderViews(); renderHint(); renderCard(); placeSplit();
+const start = (AREA.main && [...STATE.lots.values()].find((l) => (l.a || '').includes(AREA.main))) || STATE.lots.values().next().value;
+controls.target.set(start.c[0], start.e, start.c[1]); cam.position.copy(controls.target).add(CAM_OFF);
+resize(); cam.lookAt(controls.target); cam.updateMatrixWorld();
+initPicker({ AREA, AREAS, redraw: drawAreaMap });
+initBackdrop({ scene, cam, canvas, onPick: proposeAt });
+if (!saved) openAreas();
+addEventListener('resize', resize);
+if (saved && saved.log && saved.log.length) toast(rebaseNote(saved, AREA, ui.lastInfo) || `Welcome back: ${saved.log.length} edits restored from this browser.`);
+
+let lastShadowZoom = 0, lastNow = performance.now();
+// Cinematic idle camera (src/app/orbit.js): bird's-eye turns around the area centre until the first input.
+const orbit = createOrbit({ cam, controls, canvas, elev, enabled: true, bounds: (() => { let cached = null; return () => cached || (cached = (() => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const l of STATE.lots.values()) { const [x, z] = l.c; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return a > c ? [X0, Z0, X1, Z1] : [a, b, c, d]; })()); })() });
+// Starts when the boot screen lifts, so a mouse wiggle or key press during loading cannot cancel it before it is seen.
+{ const root = document.documentElement, go = () => orbit.start(performance.now());
+  if (new URLSearchParams(location.search).has('orbitdebug')) console.log('[orbit] wired; reduceMotion =', reduceMotion, '; is-ready =', root.classList.contains('is-ready'));
+  if (root.classList.contains('is-ready')) go();
+  else { const mo = new MutationObserver(() => { if (root.classList.contains('is-ready')) { mo.disconnect(); go(); } }); mo.observe(root, { attributes: true, attributeFilter: ['class'] }); } }
+function frame(now) {
+  if (anim) { orbit.stop(); anim(now); }
+  orbit.tick(now);
+  controls.update(); tickRise(now); panStep(Math.min(0.05, (now - lastNow) / 1000 || 0), cam.position.distanceTo(controls.target));
+  const t = controls.target; t.x = clamp(t.x, X0, X1); t.z = clamp(t.z, Z0, Z1);
+  const dist = cam.position.distanceTo(t), polar = controls.getPolarAngle();
+  const nf = nearFar(dist, polar); if (Math.abs(nf.near - cam.near) > 0.05 || Math.abs(nf.far - cam.far) > 5) { cam.near = nf.near; cam.far = nf.far; cam.updateProjectionMatrix(); }
+  if (lightEnv) lightEnv.sky.follow(t, polar, Math.min(0.1, (now - lastNow) / 1000 || 0));
+  const fr = fogRange(dist, polar); scene.fog.near = fr.near; scene.fog.far = fr.far;
+  if (tickClock((now - lastNow) / 1000 || 0)) { if (Math.abs(clock.hour - lastLightHour) > 0.02) { const was = ui.night; refreshLight(); if (was !== ui.night) renderViews(); dock.sync(); } }
+  lastNow = now; tickTraffic(now);
+  sun.position.copy(t).addScaledVector(sunDir, SUN_DIST); sun.target.position.copy(t);
+  const zoom = zoomForDist(dist);
+  if (Math.abs(zoom - lastShadowZoom) / zoom > 0.04) { const half = Math.min(520, Math.max(70, 330 / zoom * 1.1)); Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 1600 }); sun.shadow.camera.updateProjectionMatrix(); lastShadowZoom = zoom; }
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (ui.splitOn) {
+    const sx = Math.round(w * ui.split); renderer.setScissorTest(true);
+    beforeW.group.visible = true; world.group.visible = false; overlays.visible = false; renderer.setScissor(0, 0, sx, h); renderer.setViewport(0, 0, w, h); renderer.render(scene, cam);
+    beforeW.group.visible = false; world.group.visible = true; overlays.visible = true; renderer.setScissor(sx, 0, w - sx, h); renderer.render(scene, cam);
+    renderer.setScissorTest(false);
+  } else { beforeW.group.visible = ui.asbuilt; world.group.visible = !ui.asbuilt; overlays.visible = !ui.asbuilt; renderer.render(scene, cam); }
+  if (viewMoved()) { placeLabels(); updateScale(); }
+  positionHandles();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+startGrowth();
+
+export {
+  buildLabels,
+  drawPreview,
+  finishDraw,
+  placeHandles,
+  renderHint,
+  renderTools,
+  renderViews,
+  setTool,
+  closeModals,
+  openAreas,
+  openLog,
+  toggleView,
+};

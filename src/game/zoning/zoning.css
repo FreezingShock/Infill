@@ -1,0 +1,13 @@
+.city { padding: 9px 14px; flex: none; width: 100%; font-size: 13px; }
+.city h4 { margin: 0 0 6px; font: 700 14px var(--display); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.city h4 small { font: 12px var(--body); color: var(--ink-soft); }
+.city .dem { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 6px 8px; margin: 0; }
+.city .bar { position: relative; height: 9px; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper-2); overflow: hidden; }
+.city .bar::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background: var(--ink-soft); opacity: .6; }
+.city .bar i { position: absolute; top: 0; bottom: 0; transition: left .6s, width .6s; background: var(--sage); }
+.city .bar i.neg { background: var(--terracotta); }
+.city .row { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.city .row button { border: 2px solid var(--ink); background: var(--paper); border-radius: 8px; padding: 3px 9px; font-size: 12px; cursor: pointer; color: var(--ink); }
+.city .row button[aria-pressed="true"] { background: var(--terracotta); color: var(--paper); }
+.city .row span { margin-left: auto; color: var(--ink-soft); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .city .bar i { transition: none; } }
