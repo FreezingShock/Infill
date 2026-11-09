@@ -62,13 +62,18 @@
 #areas .aitem.planned { border-style: dashed; }
 .bdg { font: 600 8.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; font-style: normal; padding: 4px 6px; border: 1px solid var(--hair); color: var(--ink-soft); }
 .bdg.loaded { color: var(--cyan); border-color: rgba(47, 216, 232, .5); } .bdg.ready { color: #3ce07a; border-color: rgba(60, 224, 122, .4); } .bdg.custom { color: var(--gold); border-color: rgba(242, 201, 76, .45); }
-.ap-detail { flex: none; border: 1px solid var(--hair); border-top: 2px solid var(--white); background: rgba(233, 239, 241, .03); padding: 12px 13px; position: sticky; bottom: 0; backdrop-filter: blur(10px); }
-.ap-dh { display: flex; align-items: center; justify-content: space-between; gap: 10px; } .ap-dh b { font: 700 16px/1.2 var(--display); letter-spacing: -.01em; }
-.ap-sub { margin: 3px 0 9px !important; font: 500 10px/1.4 var(--mono) !important; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
-.ap-detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0 0 11px; font: 500 11px/1.3 var(--mono); }
-.ap-detail dt { color: var(--ink-soft); letter-spacing: .12em; text-transform: uppercase; font-size: 9.5px; } .ap-detail dd { margin: 0; text-align: right; }
+/* The selected-area card is a docked footer over the list. The list scrolls underneath it, and the frosted glass
+   blurs it hard enough that its text reads as a soft texture, never as words colliding with the card. */
+.ap-detail { flex: none; position: sticky; bottom: 0; z-index: 2; margin: 4px -16px -16px; padding: 11px 16px 13px; border-top: 2px solid var(--white); border-bottom: 0; background: linear-gradient(180deg, rgba(9, 12, 14, .58) 0%, rgba(9, 12, 14, .84) 46%, rgba(9, 12, 14, .92) 100%); backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%); box-shadow: 0 -16px 30px -10px rgba(0, 0, 0, .55); }
+.ap-dh { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; } .ap-dh b { font: 700 15px/1.2 var(--display); letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-sub { margin: 2px 0 9px !important; font: 500 9.5px/1.4 var(--mono) !important; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ap-cols { display: grid; grid-template-columns: minmax(0, 1fr) 128px; gap: 14px; align-items: center; }
+.ap-detail dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font: 500 11px/1.3 var(--mono); }
+.ap-detail dt { color: var(--ink-soft); letter-spacing: .12em; text-transform: uppercase; font-size: 9.5px; line-height: 1.6; } .ap-detail dd { margin: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ap-acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.ap-acts .btn { text-decoration: none; display: inline-flex; align-items: center; } .ap-acts .btn.off, .ap-acts .btn[disabled] { opacity: .4; pointer-events: none; }
+.ap-cols .ap-acts { flex-direction: column; flex-wrap: nowrap; }
+.ap-acts .btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; } .ap-cols .ap-acts .btn { width: 100%; box-sizing: border-box; padding: 6px 8px; }
+.ap-acts .btn.off, .ap-acts .btn[disabled] { opacity: .4; pointer-events: none; }
 .btn.danger { color: var(--alert); border-color: rgba(255, 68, 54, .45); } .btn.danger.arm { background: var(--alert); color: #050607; border-color: var(--alert); }
 
 /* add an area */

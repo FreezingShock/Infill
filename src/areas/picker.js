@@ -130,9 +130,9 @@ function renderDetail() {
   const [k, t] = badge(a), [w, h] = a.bbox ? bboxSizeM(a.bbox) : [0, 0], ready = a.status === 'ready';
   const rows = [['Lots', ready ? Number(a.lots || 0).toLocaleString() : 'Not built'], ['Size', a.bbox ? `${Math.round(w)} × ${Math.round(h)} m` : ''], ['Parcels', a.parcels === 'city' ? 'City of LA' : a.parcels ? 'Estimated' : ''], ['Built', a.built || '']].filter((r) => r[1]);
   el.innerHTML = `<div class="ap-dh"><b>${esc(a.name)}</b><em class="bdg ${k}">${t}</em></div><p class="ap-sub">${esc(a.sub || '')}</p>
-    <dl>${rows.map(([x, y]) => `<dt>${x}</dt><dd>${esc(y)}</dd>`).join('')}</dl>
-    <div class="ap-acts">${ready ? `<button class="btn ghost small" data-act="refresh" ${devServer && !busy ? '' : 'disabled'} title="Re-pull the open data. Your edits carry over.">Refresh data</button><a class="btn ghost small${devServer ? '' : ' off'}" data-act="export" href="api/areas/export?id=${encodeURIComponent(a.id)}" download="${esc(a.id)}.sfvos-area.json" ${devServer ? '' : 'aria-disabled="true" tabindex="-1"'} title="Save this area as a file you can install elsewhere">Export</a>` : `<button class="btn ghost small" data-act="plan" ${devServer ? '' : 'disabled'}>Build this area</button>`}
-      ${a.custom && a.id !== ctx.AREA.id ? `<button class="btn ghost small danger" data-act="remove" ${devServer && !busy ? '' : 'disabled'}>Remove</button>` : ''}</div>`;
+    <div class="ap-cols"><dl>${rows.map(([x, y]) => `<dt>${x}</dt><dd title="${esc(y)}">${esc(y)}</dd>`).join('')}</dl>
+    <div class="ap-acts">${ready ?`<button class="btn ghost small" data-act="refresh" ${devServer && !busy ? '' : 'disabled'} title="Re-pull the open data. Your edits carry over.">Refresh data</button><a class="btn ghost small${devServer ? '' : ' off'}" data-act="export" href="api/areas/export?id=${encodeURIComponent(a.id)}" download="${esc(a.id)}.sfvos-area.json" ${devServer ? '' : 'aria-disabled="true" tabindex="-1"'} title="Save this area as a file you can install elsewhere">Export</a>` : `<button class="btn ghost small" data-act="plan" ${devServer ? '' : 'disabled'}>Build this area</button>`}
+      ${a.custom && a.id !== ctx.AREA.id ? `<button class="btn ghost small danger" data-act="remove" ${devServer && !busy ? '' : 'disabled'}>Remove</button>` : ''}</div></div>`;
   el.querySelectorAll('[data-act]').forEach((b) => (b.onclick = (e) => act(b, a, e)));
 }
 function act(btn, a, e) {
