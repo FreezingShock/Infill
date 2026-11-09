@@ -18,3 +18,13 @@ About 1.2 ms per lot, so a 2.6 km area (~6,000 lots) is roughly 7 s of frozen ta
 - If workers cannot start, the same lots build on the page in 12 ms slices.
 
 Each worker build logs `[infill] built N lots in X ms on K workers` to the console.
+
+## Area build time, 9 Nov 2026 (area picker overhaul)
+Canoga Park box (1.2 km, 965 lots), cloud box, sequential steps before vs parallel after. Infra layers failed (hosts blocked here) in both runs, so the real-network total on a PC will differ a little.
+| Step | Before | After |
+| --- | --- | --- |
+| Overture, 5 layers | 32 s | 6 s (with terrain and City of LA in the same window) |
+| City of LA, 7 datasets | 24 s | 1 s (overlapped) |
+| Pack, imagery, bulbs | 8 s | 7 s |
+| Backdrop + infrastructure | 105 s | 21 s (side by side) |
+| **Total** | **173 s** | **35 s** |

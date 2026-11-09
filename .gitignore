@@ -6,3 +6,4 @@ dist/
 tools/pack/work/
 __pycache__/
 .venv/
+/public/areas/custom/

@@ -6,6 +6,10 @@ const $ = (id) => document.getElementById(id);
 async function boot() {
   bootStep('Reading the area list');
   const manifest = await (await fetch('areas/index.json')).json();
+  try { // areas the player built or installed live in areas/custom (git-ignored); the file is optional
+    const cr = await fetch('areas/custom/index.json');
+    if (cr.ok && /json/.test(cr.headers.get('content-type') || '')) { const c = await cr.json(); for (const a of c.areas || []) if (!manifest.areas.some((x) => x.id === a.id)) manifest.areas.push({ ...a, custom: true }); }
+  } catch { /* no custom areas */ }
   const want = new URLSearchParams(location.search).get('area');
   const ready = manifest.areas.filter((a) => a.status === 'ready' && a.pack);
   const area = ready.find((a) => a.id === want) || ready.find((a) => a.id === manifest.default) || ready[0];
