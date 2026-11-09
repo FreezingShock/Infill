@@ -7,6 +7,7 @@ import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { BASE } from '../engine/commands.js';
 import { INK, MAT, toon } from './render.js';
+import { CAMINO } from '../camino/theme.js';
 
 // =====================================================================
 // Generated scene: never saved, rebuilt from programs. Lots merge into chunks.
@@ -61,6 +62,7 @@ const TREE_KINDS = (() => {
 })();
 const TRUNK = toon({ color: 0x7a5636 }), SHELL = new THREE.MeshBasicMaterial({ color: 0x2b2420, side: THREE.BackSide });
 const FOL = toon({ color: 0xffffff });
+SHELL.visible = !CAMINO; // Camino street view drops the ink outline around crowns
 const CAR_COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const CAR_BODY = new THREE.BoxGeometry(1.8, 1.0, 4.3).translate(0, 0.5, 0), CAR_TOP = new THREE.BoxGeometry(1.6, 0.75, 2.2).translate(0, 1.35, -0.2);
 function instTrees(list) {

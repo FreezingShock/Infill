@@ -1,0 +1,120 @@
+/* sfvOS Camino: dark frosted panels, Helvetica-style type, mono data labels, cyan accents.
+   Everything is scoped to html[data-theme=camino]; panel placement stays in src/styles/layout.css. */
+html[data-theme=camino] {
+  color-scheme: dark;
+  --paper: #0c1013; --paper-2: rgba(233, 239, 241, .07); --ink: #e9eff1; --ink-soft: #8a99a3;
+  --terracotta: #2fd8e8; --terracotta-dk: #1db8c7; --sage: #3ce07a; --sky: #2fd8e8; --gold: #f2c94c; --ok: #3ce07a; --warn: #ff4436;
+  --glass: rgba(9, 12, 14, .64); --hair: rgba(226, 238, 240, .14); --hair-hi: rgba(226, 238, 240, .3); --cyan: #2fd8e8; --cyan-ink: #031417; --alert: #ff4436; --white: #f2f3f1;
+  --display: "Helvetica Neue", Helvetica, "Arimo", Arial, sans-serif;
+  --body: "Helvetica Neue", Helvetica, "Arimo", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+[data-theme=camino] body { background: #05080a; color: var(--ink); -webkit-font-smoothing: antialiased; }
+[data-theme=camino] #app { background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 70%); }
+
+/* panels: frosted glass, hairline border, square corners, a white rule on top like a transit sign */
+[data-theme=camino] .plaque { background: var(--glass); border: 1px solid var(--hair); border-radius: 2px; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); color: var(--ink); }
+[data-theme=camino] .plaque::after { display: none; }
+[data-theme=camino] .card, [data-theme=camino] .modal > .plaque, [data-theme=camino] .legend { border-top: 3px solid var(--white); }
+[data-theme=camino] .brand { border-top: 3px solid var(--white); }
+[data-theme=camino] .brand h1 { font: 700 23px/1 var(--display); letter-spacing: -.02em; }
+[data-theme=camino] #app .brand span { display: inline; font: 500 10px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--cyan); }
+[data-theme=camino] .card h2, [data-theme=camino] .modal h2 { font: 700 21px/1.1 var(--display); letter-spacing: -.02em; }
+[data-theme=camino] .card h3, [data-theme=camino] .legend b, [data-theme=camino] .hint b, [data-theme=camino] .area-pl b { font-family: var(--display); letter-spacing: -.01em; }
+[data-theme=camino] .eyebrow, [data-theme=camino] .barlabel, [data-theme=camino] .stat small, [data-theme=camino] .gauge small, [data-theme=camino] .facts dt, [data-theme=camino] .catlabel, [data-theme=camino] .modal th { font-family: var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+[data-theme=camino] .eyebrow { color: var(--cyan); }
+[data-theme=camino] .stat b, [data-theme=camino] .facts dd, [data-theme=camino] .clockbar .when b { font-family: var(--mono); font-weight: 500; }
+
+/* controls */
+[data-theme=camino] .tool, [data-theme=camino] #app .tool, [data-theme=camino] #app .chipb, [data-theme=camino] #app .city .row button { border-radius: 2px; color: var(--ink); }
+[data-theme=camino] .tool:hover { background: rgba(233, 239, 241, .08); }
+[data-theme=camino] .tool[aria-pressed=true] { background: var(--white); color: #050607; }
+[data-theme=camino] .tool kbd, [data-theme=camino] .keys kbd { font: 500 9.5px/1.4 var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); border-radius: 0; background: transparent; }
+[data-theme=camino] .tool[aria-pressed=true] kbd { color: #384047; border-color: rgba(0, 0, 0, .25); }
+[data-theme=camino] .btn { border-radius: 2px; border: 1px solid var(--cyan); background: var(--cyan); color: var(--cyan-ink); box-shadow: none; font-weight: 600; }
+[data-theme=camino] .btn:hover { background: #63e6f1; }
+[data-theme=camino] .btn:active { transform: none; }
+[data-theme=camino] .btn.ghost { background: transparent; color: var(--ink); border-color: var(--hair-hi); }
+[data-theme=camino] .btn.ghost:hover { background: rgba(233, 239, 241, .08); }
+[data-theme=camino] .search input, [data-theme=camino] select, [data-theme=camino] .inp, [data-theme=camino] .kit, [data-theme=camino] .stepper button, [data-theme=camino] .aitem, [data-theme=camino] .log li, [data-theme=camino] .prog, [data-theme=camino] .chipb, [data-theme=camino] .compass { background: rgba(233, 239, 241, .05); color: var(--ink); border: 1px solid var(--hair); border-radius: 2px; }
+[data-theme=camino] .compass { border-radius: 50%; }
+[data-theme=camino] .compass path:first-child { fill: var(--cyan); stroke: #050607; }
+[data-theme=camino] .compass path:last-child { fill: #c9d2d6; stroke: #050607; }
+[data-theme=camino] .kit:hover, [data-theme=camino] .chipb:hover, [data-theme=camino] .results li button:hover, [data-theme=camino] .results li button.active { background: rgba(233, 239, 241, .1); }
+[data-theme=camino] .kit.on, [data-theme=camino] .chipb.on, [data-theme=camino] .aitem.on, [data-theme=camino] .tab.on, [data-theme=camino] .mode.on { background: var(--white); color: #050607; }
+[data-theme=camino] .tabs, [data-theme=camino] .speeds { background: rgba(233, 239, 241, .06); border-radius: 2px; }
+[data-theme=camino] .tab, [data-theme=camino] .spd, [data-theme=camino] .mode { border-radius: 2px; color: var(--ink-soft); }
+[data-theme=camino] .spd { color: var(--ink); }
+[data-theme=camino] .spd[aria-pressed=true] { background: var(--white); color: #050607; }
+[data-theme=camino] .facts div { background: rgba(233, 239, 241, .05); border-radius: 0; border-top: 2px solid var(--hair-hi); }
+[data-theme=camino] .meter, [data-theme=camino] .bd, [data-theme=camino] .strip { border: 1px solid var(--hair); border-radius: 0; background: rgba(233, 239, 241, .06); }
+[data-theme=camino] .legend .ramp i { border: 1px solid var(--hair); border-radius: 0; }
+[data-theme=camino] .ctrl input[type=range], [data-theme=camino] .check input, [data-theme=camino] .clockdock input[type=range] { accent-color: var(--cyan); }
+[data-theme=camino] .src { border-top: 1px solid var(--hair); font-family: var(--mono); font-size: 10.5px; }
+[data-theme=camino] .skips { background: rgba(255, 68, 54, .1); border: 1px solid rgba(255, 68, 54, .5); border-radius: 2px; }
+[data-theme=camino] .modal { background: rgba(2, 4, 5, .55); }
+[data-theme=camino] .modal td, [data-theme=camino] .modal th { border-bottom: 1px solid var(--hair); }
+[data-theme=camino] .areas canvas { border: 1px solid var(--hair); border-radius: 2px; background: #0b1013; }
+[data-theme=camino] #app .clockbar .speeds, [data-theme=camino] #app .clockbar .gauges, [data-theme=camino] #app .clockbar .clockdock { border-left-color: var(--hair); }
+[data-theme=camino] #app .br .trafficchip { border-right-color: var(--hair); }
+[data-theme=camino] .clockbar .sky { border: 1px solid var(--hair-hi); }
+[data-theme=camino] .scalebar { font-family: var(--mono); font-size: 10.5px; }
+[data-theme=camino] .scalebar i { border-color: var(--ink); border-width: 1px; }
+[data-theme=camino] .split::before { background: var(--white); width: 2px; }
+[data-theme=camino] .split .handle { border-radius: 2px; border: 1px solid var(--hair-hi); box-shadow: none; background: var(--glass); color: var(--ink); }
+[data-theme=camino] .split .tag { border-radius: 0; background: var(--white); color: #050607; font-family: var(--mono); }
+[data-theme=camino] .loading { background: #05080a; color: var(--ink); font: 500 13px var(--mono); letter-spacing: .2em; text-transform: uppercase; }
+[data-theme=camino] .delta .up { color: var(--ok); } [data-theme=camino] .delta .down { color: var(--warn); }
+
+/* street name labels from the app: quiet white text, no paper chips */
+[data-theme=camino] .st-label, [data-theme=camino] #app.night .st-label { background: rgba(5, 8, 10, .55); color: rgba(233, 239, 241, .9); border-radius: 0; font: 500 10.5px/1 var(--display); letter-spacing: .02em; }
+[data-theme=camino] .st-label.major { background: rgba(5, 8, 10, .7); border: 0; border-left: 2px solid var(--white); font: 600 11.5px/1 var(--display); }
+[data-theme=camino] .st-label.new { background: var(--cyan); color: var(--cyan-ink); border: 0; }
+[data-theme=camino].scan #app .st-label { opacity: 0; }
+
+/* Street / Scan switch */
+.camswitch { gap: 2px; }
+.camswitch .tool { font: 600 12px var(--display); letter-spacing: .02em; padding: 7px 12px; }
+.camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); }
+
+/* scan switch ring */
+.camring { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--cyan); box-shadow: 0 0 24px rgba(47, 216, 232, .5); opacity: 0; pointer-events: none; z-index: 2; }
+.camring.go { animation: camRing .85s cubic-bezier(.2, .7, .2, 1) 1; }
+.camring.off { border-color: var(--white); box-shadow: 0 0 24px rgba(255, 255, 255, .3); }
+@keyframes camRing { 0% { opacity: .9; transform: scale(.2); } 100% { opacity: 0; transform: scale(48); } }
+
+/* callout tags (scan view) */
+#camTags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; contain: strict; }
+.ctag { position: absolute; left: 0; top: 0; will-change: transform; margin: -26px 0 0 0; padding: 5px 7px 5px 8px; background: var(--white); color: #050607; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
+.ctag::after { content: ""; position: absolute; left: 0; top: 100%; border-left: 7px solid var(--white); border-bottom: 7px solid transparent; }
+.ctag i { font-style: normal; color: #5d6a70; margin-left: 6px; }
+.ctag.cy { background: var(--cyan); color: var(--cyan-ink); } .ctag.cy::after { border-left-color: var(--cyan); } .ctag.cy i { color: #0b5a62; }
+.ctag.red { background: var(--alert); color: #fff; } .ctag.red::after { border-left-color: var(--alert); } .ctag.red i { color: #ffd6d1; }
+.ctag.road { background: none; color: rgba(233, 239, 241, .88); font: 600 12px/1 var(--display); letter-spacing: .02em; text-transform: none; padding: 0; margin: -6px 0 0 -30px; text-shadow: 0 1px 3px #000; }
+.ctag.road::after { display: none; }
+.bullet { display: inline-grid; place-items: center; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: #050607; color: var(--white); font: 700 9px/1 var(--display); letter-spacing: 0; }
+.ctag.cy .bullet { background: var(--cyan-ink); color: var(--cyan); }
+
+/* area dossier on load */
+.camdos { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(600px, calc(100vw - 32px)); z-index: 6; cursor: pointer; color: var(--ink); }
+.camdos .band { display: flex; align-items: flex-end; gap: 14px; }
+.camdos .band i { flex: 1; height: 22px; background: var(--white); clip-path: inset(0 100% 0 0); animation: camBand .6s cubic-bezier(.7, 0, .2, 1) .05s forwards; }
+.camdos .band h2 { margin: 0; font: 700 clamp(32px, 4vw, 50px)/.9 var(--display); letter-spacing: -.03em; color: var(--white); text-shadow: 0 2px 18px rgba(0, 0, 0, .6); white-space: nowrap; }
+.camdos .meta { display: grid; grid-template-columns: auto 1fr 1fr; gap: 0 18px; margin-top: 10px; padding: 12px 14px 14px; background: var(--glass); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); border: 1px solid var(--hair); animation: camIn .4s cubic-bezier(.2, .8, .2, 1) .25s both; }
+.camdos .idx { font: 700 13px/1 var(--display); border-top: 2px solid var(--white); padding-top: 6px; min-width: 40px; }
+.camdos .col { display: grid; align-content: start; border-top: 2px solid var(--white); }
+.camdos .col div { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
+.camdos .col b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+.camdos .foot { grid-column: 2 / -1; margin-top: 8px; font: 500 9px var(--mono); letter-spacing: .12em; color: var(--ink-soft); text-transform: uppercase; }
+.camdos.out { animation: camOut .45s cubic-bezier(.7, 0, .2, 1) forwards; }
+@keyframes camBand { to { clip-path: inset(0 0 0 0); } }
+@keyframes camIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes camOut { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 100% 0 0); } }
+
+/* FPS readout */
+.camfps { font: 500 10px/1 var(--mono); letter-spacing: .08em; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.camfps.slow { color: var(--gold); }
+
+@media (max-width: 760px) { .camdos { top: 14%; } .camdos .meta { grid-template-columns: 1fr 1fr; } .camdos .idx { display: none; } .camdos .foot { grid-column: 1 / -1; } .camfps { display: none; } }
+@media (prefers-reduced-motion: reduce) { .camdos .band i { animation: none; clip-path: none; } .camdos .meta, .camring.go { animation: none; } }
+[data-theme=camino] .loadarea select, [data-theme=camino] .la-bar, [data-theme=camino] .bd-tip { background: rgba(9, 12, 14, .85); color: var(--ink); border: 1px solid var(--hair); border-radius: 2px; box-shadow: none; }

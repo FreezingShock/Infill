@@ -9,6 +9,8 @@ import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSe
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { createSky } from '../views/sky.js';
+import { CAMINO } from '../camino/theme.js';
+import { createCaminoSky } from '../camino/sky.js';
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
 import { clock, setHour, tickClock } from '../game/clock.js';
 import { tickTraffic } from '../views/traffic.js';
@@ -379,7 +381,7 @@ let lampMat = null;
 const dock = mountClockDock($('app'), { onChange: () => { ui.night = lightAt(clock.hour).isNight; refreshLight(); renderViews(); } });
 let lightEnv = null, lastLightHour = -1;
 function refreshLight() {
-  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app'), sky: createSky(scene) };
+  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app'), sky: (CAMINO ? createCaminoSky : createSky)(scene) };
   lightEnv.lampMat = lampMat; lastLightHour = clock.hour;
   const L = lightAt(clock.hour); applyLight(lightEnv, L); ui.night = L.isNight; sunDir.fromArray(L.dir);
 }
@@ -505,7 +507,7 @@ function buildLabels() {
 }
 function placeLabels() {
   const w = canvas.clientWidth, h = canvas.clientHeight, v = new THREE.Vector3();
-  for (const l of labels) { v.copy(l.v).project(cam); const show = Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (l.major || camZoom() > 0.8); l.el.style.display = show ? '' : 'none'; if (show) l.el.style.transform = `translate(${(v.x + 1) / 2 * w}px, ${(1 - v.y) / 2 * h}px) translate(-50%, -50%)`; }
+  for (const l of labels) { v.copy(l.v).project(cam); const show = Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (l.major || camZoom() > 0.8); l.el.style.display = show ? '' : 'none'; if (show) l.el.style.transform = `translate(${Math.round((v.x + 1) / 2 * w)}px, ${Math.round((1 - v.y) / 2 * h)}px) translate(-50%, -50%)`; } // whole pixels: no shimmer while the camera glides
 }
 function updateScale() {
   const per = viewHeightAt(cam.position.distanceTo(controls.target)) * cam.aspect / canvas.clientWidth, nice = [5, 10, 20, 25, 50, 100, 200, 250, 500];

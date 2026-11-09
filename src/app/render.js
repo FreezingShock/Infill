@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { $ } from '../engine/core.js';
+import { CAMINO } from '../camino/theme.js';
 import { FOV, MAX_DIST, MAX_POLAR, MIN_DIST, MIN_POLAR, distForZoom } from './camera.js';
 // ---------- renderer, camera, controls ----------
 const canvas = $('view');
@@ -31,7 +32,7 @@ function resize() {
 // ---------- toon look ----------
 const grad = new THREE.DataTexture(new Uint8Array([130, 130, 130, 255, 185, 185, 185, 255, 228, 228, 228, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat);
 grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;
-const toon = (o) => new THREE.MeshToonMaterial({ gradientMap: grad, ...o });
+const toon = (o) => (CAMINO ? new THREE.MeshStandardMaterial({ roughness: 0.86, metalness: 0, ...o }) : new THREE.MeshToonMaterial({ gradientMap: grad, ...o })); // Camino: lit like a real city (src/camino/look.js)
 const INK = new THREE.LineBasicMaterial({ color: 0x2b2420 });
 const hemi = new THREE.HemisphereLight(0xeaf3ff, 0x8a7a5a, 1.15);
 const sun = new THREE.DirectionalLight(0xfff1d6, 2.1);
