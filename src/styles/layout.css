@@ -30,6 +30,24 @@
 #app .br .trafficchip::after { display: none; }
 #app .br { gap: 12px; }
 
+/* ---- one visual system: shared panel rhythm, titles, eyebrow labels, dividers ---- */
+#app .legend, #app .hint, #app .city, #app .advisor { padding: 10px 14px; }
+#app .legend b, #app .hint b, #app .city h4 { font: 700 14px/1.2 var(--display); }
+#app .city h4 small, #app .card h3 small { font: 11px var(--body); color: var(--ink-soft); }
+#app .barlabel { font: 10px var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-soft); padding: 0 8px 0 6px; }
+#app .tool, #app .chipb, #app .city .row button { border-radius: 8px; }
+#app .city .row button { font: 12px var(--body); padding: 4px 10px; }
+#app .tr > .plaque { min-height: 58px; display: flex; align-items: center; }
+#app .clockbar { gap: 14px; }
+#app .clockbar > * + * { position: relative; }
+#app .clockbar .speeds, #app .clockbar .gauges { padding-left: 14px; border-left: 1.5px dashed rgba(43,36,32,.3); }
+#app .clockbar .speeds { padding: 3px 3px 3px 3px; border-left: 0; }
+#app .clockbar .clockdock { padding-left: 14px; border-left: 1.5px dashed rgba(43,36,32,.3); }
+#app .br .trafficchip { padding-right: 14px; border-right: 1.5px dashed rgba(43,36,32,.3); }
+#app .hud .stat { min-width: 60px; }
+#app .toast { bottom: 24px; }
+#app .advisor p { font-size: 12.5px; }
+
 @media (max-width: 1280px) { #app .clockbar .gauges { display: none; } }
 @media (max-width: 1100px) { #app .clockbar .clockdock input[type=range] { width: 80px; } #app .br .trafficchip .n { display: none; } }
 @media (max-width: 980px) {
