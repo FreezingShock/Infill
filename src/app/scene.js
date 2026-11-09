@@ -88,13 +88,13 @@ function instCars(list) {
   a.castShadow = true; grp.add(a, b); return grp;
 }
 
-// A median half that narrows to a point along the drawn path (e.nose). The axis side stays put, the lane side closes in.
-function noseMedian(acc, path, o, w, first, e, y, col, d0 = 0) {
+// The painted buffer where a divided road's median ends and the two-way road begins: a flush lens that narrows to a point.
+// This draws one white edge line of it along the drawn path (e.nose); the other half of the lens is the partner carriageway's.
+function noseLine(marks, path, o, w, first, e, y, col, d0 = 0) {
   const P = densify(path, 2), N = offsetLine(P, 1); let d = d0;
   const at = (i, off) => { const x = P[i][0] + (N[i][0] - P[i][0]) * off, z = P[i][1] + (N[i][1] - P[i][1]) * off; return [x, elev(x, z) + y, z]; };
-  const span = () => { const k = w * medianKeep(e, d); return first ? [o, o + k] : [o + w - k, o + w]; };
-  const ranges = P.map((_, i) => { if (i) d += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); return span(); });
-  for (let i = 0; i < P.length - 1; i++) { const a = ranges[i], b = ranges[i + 1]; if (a[1] - a[0] < 0.02 && b[1] - b[0] < 0.02) continue; acc.quad(at(i, a[0]), at(i, a[1]), at(i + 1, b[1]), at(i + 1, b[0]), col, UP); }
+  const offs = P.map((q, i) => { if (i) d += Math.hypot(q[0] - P[i - 1][0], q[1] - P[i - 1][1]); const k = w * medianKeep(e, d); return first ? o + k : o + w - k; });
+  for (let i = 0; i < P.length - 1; i++) { if (offs[i] === (first ? o : o + w) && offs[i + 1] === (first ? o : o + w)) continue; marks.quad(at(i, offs[i] - 0.09), at(i, offs[i] + 0.09), at(i + 1, offs[i + 1] + 0.09), at(i + 1, offs[i + 1] - 0.09), col, UP); }
 }
 // ---------- streets from cross-section profiles ----------
 const ROAD_ORDER = { service: 0, unknown: 0, unclassified: 1, residential: 1, tertiary: 2, secondary: 3, primary: 4, motorway: 5 };
@@ -104,9 +104,8 @@ function buildRoads(S) {
   const E = [...S.edges.values()].sort((a, b) => (ROAD_ORDER[a.c] ?? 0) - (ROAD_ORDER[b.c] ?? 0));
   const RP = roadPlan(S, PACK.walks), RW = roadwayIndex(E);
   for (const pass of [0, 1]) for (const e of E) {
-    if (e.xmed) continue; // the median continues across a closed opening
     const P = drawPath(e), els = e.prof.els, row = rowWidth(e.prof), base = 0.26 + (ROAD_ORDER[e.c] ?? 0) * 0.02;
-    if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, P, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : ASPH[e.c] || ASPH.service); continue; }
+    if (e.prof.k === 'plain') { if (pass === 1) ribbon(acc, P, -row / 2, row / 2, e.s === 'driveway' ? 0.2 : base, e.s === 'driveway' ? DRIVE : e.xmed ? ASPH.primary : ASPH[e.c] || ASPH.service); continue; }
     let o = -row / 2;
     let i0 = -1;
     for (const [k, w] of els) {
@@ -115,8 +114,7 @@ function buildRoads(S) {
         const col = (k === 'lane' || k === 'turn' || k === 'park') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : ASPH[e.c]) : C(d.c);
         const mpath = k === 'median' && RP.info.get(e.id) ? trimPath(P, RP.info.get(e.id).mt0, RP.info.get(e.id).mt1) : P; // medians stop short of each junction
         if (mpath !== P || (k === 'median' && e.nose)) ribbon(acc, P, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the part where the median stops or narrows
-        if (k === 'median' && e.nose) noseMedian(acc, mpath, o, w, i0 === 0, e, base + 0.06, C(EL.median.c), RP.info.get(e.id)?.mt0 || 0); // narrows to a point, pavement stays one width
-        else ribbon(acc, mpath, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col);
+        if (!(k === 'median' && e.nose)) ribbon(acc, mpath, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col); // a nosed median is painted, not raised: see the markings below
         if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(mpath, o + w / 2), 9, (x, z) => trees.push([x, elev(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
         if (k === 'median' && i0 === 0 && !e.nose) alongPts(offsetLine(mpath, o), 14, (x, z) => trees.push([x, elev(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median, not in the nose
       }
@@ -134,6 +132,7 @@ function buildRoads(S) {
           if (!hasTurn && !e.oneway && Math.abs(b) < 0.6) { ribbon(marks, mp, b - 0.32, b - 0.14, base + 0.16, YEL, 2); ribbon(marks, mp, b + 0.14, b + 0.32, base + 0.16, YEL, 2); }
           else dashed(marks, mp, b - 0.08, b + 0.08, base + 0.16, WHITE, 3, 6);
         }
+        if (k === 'median' && e.nose) noseLine(marks, mm, a, b - a, i === 0, e, base + 0.16, WHITE, R?.mt0 || 0);
         if (k === 'median' && (nk === 'lane' || nk === 'turn')) ribbon(marks, mm, b + 0.02, b + 0.2, base + 0.16, YEL, 2); // yellow beside a median
         if (nk === 'median' && (k === 'lane' || k === 'turn')) ribbon(marks, mm, b - 0.2, b - 0.02, base + 0.16, YEL, 2);
         if (k === 'bike' && (nk === 'lane' || nk === 'park' || nk === 'turn')) ribbon(marks, mp, b - 0.12, b + 0.04, base + 0.16, WHITE, 3);

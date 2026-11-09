@@ -152,11 +152,11 @@ function markDivided(S) {
   return pairs.length + tapers.length;
 }
 
-// Where a residential street meets a divided arterial, the median continues across: the short piece that bridged the two
-// carriageways is not a road. Cars on the side street can only turn right in and right out (nothing crosses or turns left),
-// which falls out of the graph because the two carriageways no longer connect through it. Collectors and up keep their opening.
+// Where a residential street meets a divided arterial, the short piece that bridges the two carriageways is the junction box:
+// paved as part of the arterial, and drivable only for turns off the arterial (a left into the side street from a pocket at the
+// median nose). Cars on the side street cannot cross it or turn left across Topanga: they turn right in and right out.
+// Collectors and up keep a full opening.
 function closeMedianOpenings(S) {
-  S.mclosed = {};
   const div = (n) => [...S.edges.values()].filter((q) => q.g && q.divided && !q.xmed && (q.a === n || q.b === n));
   for (const c of S.edges.values()) {
     if (!c.g || c.divided || c.xmed || c.s === 'driveway' || polyLen(c.p) > 22) continue;
@@ -164,7 +164,7 @@ function closeMedianOpenings(S) {
     if (!da.some((x) => db.some((y) => x !== y && x.n && x.n === y.n))) continue;
     const others = [...S.edges.values()].filter((q) => q !== c && q.g && !q.divided && (q.a === c.a || q.b === c.a || q.a === c.b || q.b === c.b));
     if (!others.length || others.some((q) => rankOf(q) > 1)) continue;
-    c.xmed = 1; S.mclosed[c.a] = 1; S.mclosed[c.b] = 1;
+    c.xmed = 1; c.prof = { k: 'plain', els: [['lane', Math.max(7, c.w || 9)]] };
   }
 }
 

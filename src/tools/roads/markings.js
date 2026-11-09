@@ -65,7 +65,6 @@ function analyse(S) {
       es.forEach((q, j) => { if (j === i) return; const d = dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]; if (Math.abs(d) < 0.8) box = Math.max(box, rowWidth(q.prof) / 2); });
       // a main road meeting only minor streets has priority: its lines run through, nothing crosses it
       const rk = rankOf, priority = rk(e) >= 2 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 1);
-      if (priority && S.mclosed?.[n]) { get(e); return; } // the median runs straight across a closed opening: no gap, no nose
       if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); legs.push({ e, n, atEnd, D: box + 2.2, priority: true }); return; }
       const D = box + 2.2, len = polyLen(e.p);
       if (len < 2 * (D + CW_HALF + BAR_GAP) + 4) { const r = get(e); if (atEnd) r.t1 = len; else r.t0 = len; return; } // a short link inside the box: no markings at all
@@ -79,7 +78,7 @@ function analyse(S) {
 
 // median nose: quarter disc at the end of each carriageway's half-median
 function noseFor(e, atEnd, D, len, z, noses) {
-  const m = z.find((q) => q.k === 'median'); if (!m) return;
+  const m = z.find((q) => q.k === 'median'); if (!m || e.nose) return; // a nosed median is painted, it has no raised end
   const first = z[0] === m, axis = first ? m.a : m.b, v = first ? 1 : -1, nd = atEnd ? len - (D + CW_HALF + NOSE_GAP + NOSE_R) : D + CW_HALF + NOSE_GAP + NOSE_R, Q = at(e.p, nd);
   const nx = -Q.tz, nz = Q.tx; // right of a to b
   noses.push({ c: [Q.x + nx * axis, Q.z + nz * axis], u: atEnd ? [Q.tx, Q.tz] : [-Q.tx, -Q.tz], v: [nx * v, nz * v], r: NOSE_R, e });

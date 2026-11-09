@@ -27,7 +27,7 @@ const CONTROLS = {
 const BIG = new Set(['motorway', 'trunk', 'primary', 'secondary']);
 
 function nodeEdges(S, n) {
-  const out = []; for (const e of S.edges.values()) if (e.g && !e.xmed && (e.a === n || e.b === n)) out.push(e); return out;
+  const out = []; for (const e of S.edges.values()) if (e.g && !e.xmed && (e.a === n || e.b === n)) out.push(e); return out; // the box between a divided road's carriageways is not a leg
 }
 function nearestNode(S, x, z, tol) {
   let b = -1, bd = tol; S.nodes.forEach((p, i) => { const d = Math.hypot(p[0] - x, p[1] - z); if (d < bd) { bd = d; b = i; } }); return b;

@@ -211,17 +211,20 @@ test('swerves: sharp corners on arterials round off, endpoints stay on their nod
   for (const e of BASE.edges.values()) { if (!e.g) continue; assert.ok(e.p.every((q) => q.every(Number.isFinite))); assert.deepEqual(e.p[0], BASE.nodes[e.a]); assert.deepEqual(e.p.at(-1), BASE.nodes[e.b]); }
 });
 
-test('Avenue San Luis onto Topanga: the median runs across, and the sim only allows right turns in and out', async () => {
+test('Avenue San Luis onto Topanga: side-street traffic only turns right, Topanga traffic may turn left into the street', async () => {
   const { buildNet, drivableEdges } = await import('../src/sim/net.js');
-  assert.ok(BASE.edges.get('E115').xmed, 'the bridge over the median is closed');
-  assert.ok(![...drivableEdges(BASE.edges)].some((e) => e.id === 'E115'), 'and is not a road for traffic');
+  assert.ok(BASE.edges.get('E115').xmed, 'the box between the carriageways is marked');
   const net = buildNet(drivableEdges(BASE.edges), {});
+  let leftsIn = 0;
   for (const id of [129, 145]) {
     const nd = net.nodes.find((n) => Math.hypot(n.x - BASE.nodes[id][0], n.z - BASE.nodes[id][1]) < 1);
-    const sideStreet = nd.conns.filter((c) => c.from.eid === 'E103' || c.from.eid === 'E152' || c.to.eid === 'E103' || c.to.eid === 'E152');
-    assert.ok(sideStreet.length >= 2, 'side street is connected');
-    for (const c of sideStreet) assert.equal(c.type, 'R', `${c.from.eid}>${c.to.eid} must be a right turn`);
+    const out = nd.conns.filter((c) => c.from.eid === 'E103' || c.from.eid === 'E152');
+    assert.ok(out.length >= 1, 'side street can leave');
+    for (const c of out) assert.equal(c.type, 'R', `${c.from.eid}>${c.to.eid}: leaving San Luis is a right turn, no crossing, no left`);
+    assert.ok(!nd.conns.some((c) => (c.from.eid === 'E103' || c.from.eid === 'E152') && c.to.eid === 'E115'), 'nothing crosses the box from the side street');
+    leftsIn += nd.conns.filter((c) => c.to.eid === 'E115' && (c.from.eid === 'E114' || c.from.eid === 'E117')).length;
   }
+  assert.ok(leftsIn >= 1, 'Topanga traffic can turn into San Luis through the box');
 });
 
 test('lane count is a property of the class: every Topanga carriageway and merge piece has the same lanes', () => {

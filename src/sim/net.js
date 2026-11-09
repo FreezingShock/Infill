@@ -46,7 +46,7 @@ function buildNet(edges, opts = {}) {
     if (!lay.fwd.length && !lay.bwd.length) continue;
     const a = node(e.p[0]), b = node(e.p[e.p.length - 1]);
     if (a === b) continue;
-    const item = { e, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
+    const item = { e, xm: e.xm, dv: e.dv, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
     a.legs.push({ item, end: 0 }); b.legs.push({ item, end: 1 });
     list.push(item);
   }
@@ -115,6 +115,10 @@ function buildNet(edges, opts = {}) {
         const m = group.length;
         const idx = type === 'R' ? 0 : type === 'L' ? m - 1 : type === 'U' ? 0 : Math.min(m - 1, Math.round(L.n > 1 ? (L.idx / (L.n - 1)) * (m - 1) : 0));
         const M = group[idx];
+        // the box between the carriageways of a divided road: only the arterial's own traffic may enter it (left turns into the side street); side-street traffic cannot cross
+        const fi = n.legs.find((q) => q.item.e.id === L.eid)?.item, ti = n.legs.find((q) => q.item.e.id === M.eid)?.item;
+        if (ti?.xm && !fi?.dv) continue;
+        if (fi?.xm && ti?.dv) continue;
         made.push({ L, M, type, ang: ang2 });
       }
       // lane use: outer lane right/straight, inner lane left/straight (single lane takes everything)
@@ -161,8 +165,8 @@ function connectorPath(L, M, type) {
 function drivableEdges(edgeMap) {
   const out = [];
   for (const e of edgeMap.values()) {
-    if (!e.g || e.xmed || e.s === 'driveway' || !e.prof) continue; // xmed: median opening closed, not a road
-    out.push({ id: e.id, p: e.p, c: e.c, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
+    if (!e.g || e.s === 'driveway' || !e.prof) continue;
+    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
   }
   inferDivided(out);
   return out;
