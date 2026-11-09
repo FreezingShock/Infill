@@ -57,6 +57,14 @@ const PRESETS = {
 };
 const WALKABLE = new Set(['complete', 'diet', 'slow', 'woonerf', 'ped']);
 function defaultProfile(e) {
+  if (!e.oneway) return defaultProfile2(e);
+  // one-way from the map data (a carriageway of a divided road, a ramp, a one-way street): lanes all one way, no centre turn lane
+  if (e.c === 'motorway') { const n = Math.max(2, Math.round((e.w - 2.5) / 3.6)); return { k: 'asbuilt', els: Array.from({ length: n }, () => ['lane', (e.w - 2.5) / n]).concat([['trees', 1.2]]) }; }
+  if (e.c === 'service' || e.c === 'unknown' || e.s === 'link') return e.w >= 6.5 ? { k: 'asbuilt', els: [['lane', e.w / 2], ['lane', e.w / 2]] } : defaultProfile2(e);
+  const n = e.c === 'primary' ? 3 : e.c === 'secondary' ? 2 : 1, pk = e.c === 'primary' ? 2 : 2.2;
+  return { k: 'asbuilt', els: [['walk', 2.2], ['park', pk], ...Array.from({ length: n }, () => ['lane', 3.3]), ['park', pk], ['walk', 2.2]] };
+}
+function defaultProfile2(e) {
   const w = e.w;
   if (e.c === 'primary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2], ['lane', 3.25], ['lane', 3.25], ['turn', w - 17], ['lane', 3.25], ['lane', 3.25], ['park', 2], ['walk', 2.2]] };
   if (e.c === 'secondary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2.5], ['lane', (w - 5) / 2], ['lane', (w - 5) / 2], ['park', 2.5], ['walk', 2.2]] };
@@ -84,14 +92,19 @@ function inferProgram(lot) {
   const pr = { t: 'asb', st: lot.st0 || 1, rf: big || lot.lt === 'main' || lot.lt === 'apts' ? 'flat' : roof, pl: big ? pick(r, ['white', 'sand', 'cream']) : pick(r, pals), sd: lot.sd };
   return pr;
 }
-function mkEdge(e) { const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, g: e.g, grp: null }; E.prof = defaultProfile(E); E.bb = bbox(E.p); return E; }
+function mkEdge(e) {
+  const E = { id: e.id, a: e.a, b: e.b, p: e.p, c: e.c, s: e.s || null, n: e.n || null, w: e.w, g: e.g, grp: null };
+  if (e.ow) E.oneway = 1; // from the map data: travel runs along p (src/tools/roads may refine it)
+  if (e.sp) E.speed = e.sp; // posted mph
+  E.prof = defaultProfile(E); E.bb = bbox(E.p); return E;
+}
 function buildBase() {
   const S = { lots: new Map(), edges: new Map(), nodes: PACK.nodes.map((n) => n.slice()), blocks: PACK.blocks.map((r) => r), demo: new Set(), ctrl: {}, rounds: {}, seq: 0, notes: [] };
   for (const l of PACK.lots) S.lots.set(l.id, mkLot(l));
   for (const e of PACK.edges) S.edges.set(e.id, mkEdge(e));
   markDivided(S);
   // as-built paving: Overture parking polygons clipped to each lot
-  const PK = PACK.parking.map((r) => ({ r, bb: bbox(r) }));
+  const PK = PACK.parking.concat(PACK.parkingInf || []).map((r) => ({ r, bb: bbox(r) })); // mapped lots + lots recognised from open ground (tools/pack/recognize.py)
   for (const lot of S.lots.values()) {
     for (const p of PK) {
       if (p.bb[0] > lot.bb[2] || p.bb[2] < lot.bb[0] || p.bb[1] > lot.bb[3] || p.bb[3] < lot.bb[1]) continue;

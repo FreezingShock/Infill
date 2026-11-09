@@ -23,7 +23,10 @@
     34.17
    ],
    "pack": "wh-topanga.json",
-   "status": "ready"
+   "status": "ready",
+   "built": "2026-11-09",
+   "lots": 1300,
+   "parcels": "city"
   },
   {
    "id": "canoga-park",
@@ -175,7 +178,7 @@
    "pack": "sherman-oaks.json",
    "status": "ready",
    "built": "2026-11-09",
-   "lots": 1077,
+   "lots": 1083,
    "parcels": "city"
   },
   {
@@ -209,7 +212,7 @@
    "pack": "north-hollywood.json",
    "status": "ready",
    "built": "2026-11-09",
-   "lots": 617,
+   "lots": 629,
    "parcels": "city"
   }
  ]

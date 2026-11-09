@@ -27,14 +27,19 @@ ring = lambda g: [[R(a), R(b)] for a, b in list(g.exterior.coords)[:-1]]
 # ---------- road graph ----------
 nodes = {}; node_list = []
 def node(pt):
-    k = (round(pt[0] * 2) / 2, round(pt[1] * 2) / 2)
-    if k not in nodes: nodes[k] = len(node_list); node_list.append([R(pt[0]), R(pt[1])])
-    return nodes[k]
+    # ends of neighbouring segments land within a metre or two of each other: share one node
+    for dx in (0, -1, 1):
+        for dz in (0, -1, 1):
+            k = (round(pt[0] / 2.4) + dx, round(pt[1] / 2.4) + dz)
+            for j in nodes.get(k, ()):
+                if math.hypot(node_list[j][0] - pt[0], node_list[j][1] - pt[1]) < 1.8: return j
+    k = (round(pt[0] / 2.4), round(pt[1] / 2.4)); nodes.setdefault(k, []).append(len(node_list)); node_list.append([R(pt[0]), R(pt[1])])
+    return len(node_list) - 1
 edges = []
 for i, r in enumerate(P['roads']):
     a = node(r['p'][0]); b = node(r['p'][-1])
     g = r['c'] not in ('service', 'unknown') or r.get('s') == 'alley'
-    edges.append({'id': f'E{i}', 'a': a, 'b': b, 'p': r['p'], 'c': r['c'], 's': r.get('s'), 'n': r.get('n'), 'w': r['w'], 'g': 1 if g else 0})
+    edges.append({'id': f'E{i}', 'a': a, 'b': b, 'p': r['p'], 'c': r['c'], 's': r.get('s'), 'n': r.get('n'), 'w': r['w'], 'g': 1 if g else 0, 'ow': r.get('ow'), 'sp': r.get('sp')})
 graph = [e for e in edges if e['g'] and e['c'] != 'motorway']
 glines = [LineString(e['p']) for e in graph]
 gtree = STRtree(glines)
@@ -260,11 +265,10 @@ if PREV and os.path.exists(PREV):
                 if O['lots'][i]['id'] in used: continue
                 ov = otree_geoms[i].intersection(pg).area
                 if ov > best and ov > 0.5 * min(pg.area, otree_geoms[i].area): best = ov; cand = int(i)
-        if cand is not None: l['id'] = O['lots'][cand]['id']; used.add(l['id']); reused['lots'] += 1
+        if cand is not None: l['id'] = O['lots'][cand]['id']; l['_m'] = 1; used.add(l['id']); reused['lots'] += 1
     top = max([int(l['id'][1:]) for l in O['lots'] if l['id'][1:].isdigit()] + [0])
-    taken = {l['id'] for l in out_lots if l['id'] in used}
     for l in out_lots:
-        if l['id'] in taken: continue
+        if l.pop('_m', None): continue
         top += 1; l['id'] = f'L{top}'
     eused = set(); etop = max([int(e['id'][1:]) for e in O['edges'] if e['id'][1:].isdigit()] + [0])
     oed = [(e, [to_new(*p) for p in e['p']]) for e in O['edges']]
@@ -282,6 +286,7 @@ if PREV and os.path.exists(PREV):
     for l in out_lots:
         if l.get('rd') in emap: l['rd'] = emap[l['rd']]
     print('stable ids:', reused, 'of', len(out_lots), 'lots,', len(edges), 'edges')
+import recognize  # noqa: E402
 pack = {'v': 2, 'origin': P['origin'], 'bbox': P['bbox'], 'terrain': T, 'nodes': node_list,
         'edges': [{k: v for k, v in e.items() if v is not None} for e in edges], 'walks': P['walks'], 'buildings': B, 'lots': out_lots,
         'blocks': [ring(b) for b in blocks], 'parking': [ring(p) for p in parking if p.geom_type == 'Polygon'],
@@ -289,6 +294,7 @@ pack = {'v': 2, 'origin': P['origin'], 'bbox': P['bbox'], 'terrain': T, 'nodes':
         'sources': P['sources'] | {'parking': 'Overture Maps base/infrastructure 2026-10-21.0 (from OSM)', 'props': 'Overture Maps base/infrastructure 2026-10-21.0', 'landuse': 'Overture Maps base/land_use 2026-10-21.0'}
         | ({'lots': 'City of LA BOE parcels (data.lacity.org qyra-qm2s, with LA County AIN), pulled ' + __import__('datetime').date.today().isoformat(), 'zoning': 'City of LA ZONING_PLY (data.lacity.org jjxn-vhan) and GENPLAN_PLY (c3g2-yzgc)',
             'addresses': 'City of LA addresses (data.lacity.org 4ca8-mxuh)', 'years': 'LADBS new-building permits with CofO (data.lacity.org), else estimated'} if REAL else {})}
+recognize.apply(pack)  # unmapped surface parking: pack['parkingInf'], lot['pvi']
 s = json.dumps(pack, separators=(',', ':'))
 open(OUT, 'w').write(s)
 from collections import Counter
