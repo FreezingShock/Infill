@@ -1,25 +1,48 @@
-# Working on Infill (read this first)
+# Working on sfvOS (read this first)
 
-Infill (the game is called Renovated) is a Vite + Three.js city builder on real San Fernando Valley map data. Many Claude threads work in parallel here, each on one workstream. Every PR merges into `integration` automatically once `npm run check` is green; localhost runs from `integration`. Roadmap and who owns what: [docs/ROADMAP.md](docs/ROADMAP.md). What nate likes: [docs/nate-preferences.md](docs/nate-preferences.md).
+sfvOS (repo and package still named Infill / "renovated") is a Vite + Three.js city game on real San Fernando Valley map data: a live city on real lots and streets, played through the **Camino** surveillance-OS interface. Many Claude threads work here in parallel. Everything merges into `integration`; nate plays `integration` on localhost.
 
-## Non-negotiables (from nate)
-- **No grid map.** Real lots and real streets stay. Editing should feel as easy as Cities: Skylines 2 / CityRT (few verbs, presets, paint and drag), never a grid.
-- **Realism of rules does not matter.** It is a toy: no assessor data, no real heights, no zoning law accuracy.
-- **Never test in a headless browser** (no Playwright, no Chromium screenshots). Check with `npm run check`, node tests and static scripts. nate plays it on localhost and sends feedback.
-- **The world is live.** Whatever area is loaded has cars, parked cars, turns and a clock. Sim state is derived, never saved; a save is the edit log.
+Reading order: this file, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (map, theme, recipes), [docs/ROADMAP.md](docs/ROADMAP.md) (who owns what), [docs/IMPORT.md](docs/IMPORT.md) (importer), [docs/nate-preferences.md](docs/nate-preferences.md) (taste). [docs/PLAN.md](docs/PLAN.md) is the original v3 plan, kept for history.
 
-## Workflow
-1. `git fetch origin integration` and branch from it. Rebase again before you push.
-2. One focused PR per feature, base `integration`. Small diffs merge cleanly.
-3. Before pushing run `npm run check` (lint + node tests + build). CI runs the same. Never skip or delete a test to get green.
-4. Open the PR ready (not draft) with the attribution block from your session context. Merge it into `integration` yourself once check passes (nate's standing rule: no need to wait for him). After a merge, tell nate in your thread what to try on localhost.
-5. If another thread's merge conflicts with you, keep both sides' intent. Never discard someone else's work.
+## nate's rules (non-negotiable)
+1. **Never test in a headless browser** (no Playwright, no Chromium, no screenshots). Verify with `npm run check`, node tests and static scripts. nate tests on localhost; end each PR thread by telling him what to try.
+2. **A reported fix is general.** If nate reports a bad spot, fix the recognition method and apply it to every area (rebuild all ready packs with `--refresh`), every recognition method and every area built later. Never patch one lot. The importer is the root to improve.
+3. **No grids.** Real lots and real streets stay. Editing should feel like Cities: Skylines 2 (few verbs, presets, paint and drag), never a grid map.
+4. **Scan view shows only real data** (mapped lights, hydrants, transmission, transit stops). No modeled or invented utilities there.
+5. **Names.** The game is **sfvOS**; the in-game OS/theme label is **Camino** (it replaced "Vantage"). Do not mass-rename the repo or package unless asked. Never use Ubisoft's "ctOS" name, logos or art.
+6. **No emoji in the UI** (cards, toasts, advisor). Use drawn SVG/CSS glyphs in the Camino style (see `SEV` in `src/ui/index.js`).
+7. **Realism of rules does not matter** (no assessor data, real heights or zoning accuracy). Realism of look and layout does.
+8. **The world is live.** A loaded area has cars, parked cars, turns and a clock. Sim state is derived and never saved; a save is the edit log.
+9. **Work in `C:\Users\natea\Infill`**, not Backbone, when touching nate's PC.
+10. **Models.** Big features use `claude-sonnet-5-5` at medium effort. Quick fixes (including small Camino theme fixes) use `claude-haiku-5-5` at high effort.
+11. **Camino is the only look.** The classic paper look is gone; build nothing for it.
 
-## Avoiding conflicts (module ownership)
-- New code goes in **new files in your own folder**, wired in with a one-line hook. Hot spots: `src/app/input.js` (frame loop, tools), `src/app/state.js` (edit log, commit), `src/app/scene.js` (world meshes), `src/main.js`. Touch them minimally; no drive-by reformatting, renames or reordering.
-- Folders: `src/sim/` traffic, parking and demand (pure, no THREE, runs in a worker); `src/areas/` area loading, versioning, picker, save migration; `src/tools/` editing tools (roads, lanes, zoning); `src/views/` overlays and info views; `src/game/` clock, economy, goals; `src/ui/` shared UI parts; `tools/pack/` pack builders (Python).
-- `src/engine/` is pure data and generation. Changes to a shared shape (pack, edit-log commands, `World`) are additive: new optional fields, tolerate missing ones. Announce a shape change to the coordinator before merging.
-- Saves: key `renovated.builder.<area>.v2` plus an edit log. Add fields additively; add a migration in `src/areas/` if a shape must change.
-- Tests: new files in `tests/`, named for the feature (`tests/sim.test.js`). Engine and sim tests run in plain node.
-- Don't edit `package.json` or the lockfile unless you need a dependency. Big refactors get their own PR, announced first, when few threads are in flight.
-- Colors and fonts: reuse `src/styles/nexus.css` tokens (cream paper, terracotta, ink outlines).
+## PR flow
+1. `git fetch origin integration`, branch from it (the session names your branch). Rebase again before pushing.
+2. One focused PR per feature, base `integration`, ready (not draft) unless told otherwise. Small diffs merge cleanly.
+3. Run `npm run check` (eslint + node tests + vite build). CI runs the same. Never skip, weaken or delete a test to get green.
+4. PR body starts with the attribution block from your session context. Add the requesting user as assignee and reviewer.
+5. **Merge into `integration` yourself once CI is green.** nate's standing rule: no waiting for him. Never push to `main`. If a merge conflicts, keep both sides' intent; never discard another thread's work.
+6. After merging, tell nate in your thread what to try on localhost (Windows: `git checkout integration`, `git pull`, `npm install`, `npm run dev`).
+7. When your PR merges, append a dated line to [docs/nate-preferences.md](docs/nate-preferences.md) if you learned anything about his taste, and add perf numbers to [docs/perf-baseline.md](docs/perf-baseline.md) if you added per-frame cost.
+
+## Folder ownership (new code goes in your own files)
+| Folder | Owns |
+| --- | --- |
+| `src/engine/` | pure data and generation (core, model, templates, commands, looks, renovate, bulbs, street trees). Runs in plain node and in workers. No DOM. |
+| `src/app/` | the running game: render, scene, state (edit log), input, camera, inspector, loader, store. **Hot spots:** `input.js`, `state.js`, `scene.js`, `src/main.js`. Touch minimally with a one-line hook; no drive-by reformatting or reordering. |
+| `src/sim/` | live traffic, parking, signals. Pure, no THREE, runs in a worker. |
+| `src/areas/` | area picker, backdrop, rebase of saves onto refreshed packs, geometry helpers. |
+| `src/tools/` | editing tools: `roads/` (draw, divided, lanes, intersection control), `renovate/`. |
+| `src/game/` | clock, growth, `zoning/`. |
+| `src/views/` | info views (traffic, parking, zones, happiness), light, sky, metrics, live-data `providers.js`. |
+| `src/ui/` | shared HUD parts, gauges, advisor. |
+| `src/camino/` | the Camino theme: look, sky, scan view, real infrastructure, dock/HUD, command bar, boot screen styles. |
+| `src/styles/` | `layout.css`, `hud.css` (shared layout; theme work goes in `src/camino/`). |
+| `src/workers/` | lot-geometry worker pool. `src/assets/` optional sidecar loading. |
+| `tools/pack/`, `tools/looks/` | Python importers and sidecar builders. `public/areas/` holds the output. |
+
+Rules of thumb: shared shapes (pack, edit-log commands, `World`, street profile) change **additively** with optional fields that tolerate absence; announce a shape change to the coordinator first. Saves are `renovated.builder.<area>.v2` plus an edit log; add a migration in `src/areas/` if a shape must change. Don't edit `package.json` or the lockfile unless you need a dependency. Big refactors go alone, announced first. Tests go in `tests/<feature>.test.js` and run in plain node.
+
+## Commands
+`npm run dev` (http://localhost:5173), `npm test`, `npm run check`, `npm run build`. Area: `?area=<id>`. Importer: `python tools/pack/build_area.py --id <id> --refresh`.

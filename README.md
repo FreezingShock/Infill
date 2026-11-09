@@ -1,8 +1,8 @@
-# Renovated
+# sfvOS
 
-A cozy city renovation game on real San Fernando Valley map data. Pick a neighborhood, then upgrade houses, repurpose commercial buildings, add streets, change lane layouts and parking, and (soon) watch traffic and parked cars respond.
+A live city game on real San Fernando Valley map data, played through the Camino interface (repo and package still named Infill / renovated). Pick a neighborhood, then upgrade houses, repurpose commercial buildings, add streets, change lane layouts and parking, and (soon) watch traffic and parked cars respond.
 
-The plan for where this is going is in [docs/PLAN.md](docs/PLAN.md).
+Contributors and Claude threads: start with [CLAUDE.md](CLAUDE.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md). The original plan is [docs/PLAN.md](docs/PLAN.md).
 
 ## Run it locally
 
