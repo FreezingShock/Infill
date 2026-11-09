@@ -22,7 +22,8 @@ function exec(S, cmd, info) {
     case 'apply': for (const id of cmd.lots) { const lot = L(id); if (!lot) continue; lot.prog = cmd.t === 'asb' ? inferProgram(lot) : { t: cmd.t, ...cmd.p, sd: cmd.vary ? hash32(cmd.sd + id) : hash32(cmd.sd), dr: cmd.dr ? 1 : 0 }; } break;
     case 'tweak': for (const id of cmd.lots) { const lot = L(id); if (!lot) continue; Object.assign(lot.prog, cmd.f); for (const k in cmd.f) if (cmd.f[k] === null) delete lot.prog[k]; } break;
     case 'bump': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog.st = clamp(storeysOf(lot) + cmd.d, 1, 8); } break;
-    case 'rezone': for (const id of cmd.lots) { const lot = L(id); if (lot) { lot.z = cmd.z; lot.zr = null; } } break;
+    case 'rezone': for (const id of cmd.lots) { const lot = L(id); if (lot) { lot.z = cmd.z; lot.zr = null; if (cmd.g) lot.gz = 1; } } break; // g: also a growth target (the city builds it as demand allows)
+    case 'grow': growLots(S, cmd); break;
     case 'restore': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog = inferProgram(lot); } break;
     case 'fill': for (const id of cmd.lots) { const lot = L(id); if (lot) lot.prog = zoneFill(lot, hash32(cmd.sd + id), cmd.dr); } break;
     case 'merge': mergeLots(S, cmd, info); break;
@@ -40,6 +41,16 @@ function zoneFill(lot, seed, dream) {
   const list = ZONE_FILL[zfam(lot.z)] || ZONE_FILL.R1, r = rng(seed), off = Math.floor(r() * list.length);
   for (let k = 0; k < list.length; k++) { const t = TPL[list[(k + off) % list.length]]; if (availability(t, lot, dream).ok) return { t: t.id, sd: seed, dr: dream ? 1 : 0 }; }
   return { t: lot.m2 > 300 ? 'pk.park' : 'cv.garden', sd: seed, dr: dream ? 1 : 0 };
+}
+// One day of city growth: `fill` lots get a first small building that suits their zone, `up` lots gain a storey.
+function growLots(S, cmd) {
+  for (const id of cmd.fill || []) {
+    const lot = S.lots.get(id); if (!lot) continue;
+    const want = ZONE_LT[zfam(lot.z)]; if (want) lot.lt = want;
+    lot.prog = zoneFill(lot, hash32(cmd.sd + id), 0);
+    const t = TPL[lot.prog.t]; if (t && t.st) lot.prog.st = t.st[0];
+  }
+  for (const id of cmd.up || []) { const lot = S.lots.get(id); if (lot) lot.prog.st = clamp(storeysOf(lot) + 1, 1, 8); }
 }
 function replay(log) {
   const S = structuredClone(BASE), info = { skipped: [], notes: [] };
@@ -322,6 +333,7 @@ function areaNew(S, cmd, info) {
 
 export {
   BASE,
+  ZONE_LT,
   areaNew,
   exec,
   replay,

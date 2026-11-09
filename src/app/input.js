@@ -11,6 +11,7 @@ import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './cam
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
 import { clock, setHour, tickClock } from '../game/clock.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
+import { startGrowth } from '../game/zoning/driver.js';
 
 // =====================================================================
 // Tools and input
@@ -176,9 +177,9 @@ function finishDrag(d, e) {
   } else if (d.t === 'brush') { buildSel(); renderCard(); }
   else if (d.t === 'zone') {
     setOv('zonepaint', null);
-    const ids = [...d.got].filter((id) => STATE.lots.get(id)?.z !== ui.zonePaint);
+    const ids = [...d.got].filter((id) => { const l = STATE.lots.get(id); return l?.z !== ui.zonePaint || !l.gz; });
     for (const id of d.got) ui.sel.add(id);
-    if (ids.length) commit({ op: 'rezone', lots: ids, z: ui.zonePaint }, { label: `Painted ${fmt(ids.length)} lots ${ui.zonePaint}` }); else { buildSel(); renderCard(); }
+    if (ids.length) commit({ op: 'rezone', lots: ids, z: ui.zonePaint, g: 1 }, { label: `Painted ${fmt(ids.length)} lots ${ui.zonePaint}` }); else { buildSel(); renderCard(); }
   } else if (d.t === 'along') { setOv('along', null); setSel([...d.got], d.mode); toast(`${fmt(d.got.size)} lots front that stretch of ${d.e.n || 'the street'}.`); }
 }
 // ---------- Build and Bulldoze: lots under the pointer, like tiles ----------
@@ -532,6 +533,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+startGrowth();
 
 export {
   buildLabels,
