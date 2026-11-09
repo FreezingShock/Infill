@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { scene, toon } from '../app/render.js';
 import { X0, X1, Z0, Z1, elev } from '../engine/core.js';
 import { clock } from '../game/clock.js';
+import { drivewaysByEdge } from '../engine/driveways.js';
 import { nodeControl } from '../tools/roads/graph.js';
 import { provide } from './providers.js';
 import { drivableEdges, keyOf } from '../sim/net.js';
@@ -114,6 +115,8 @@ function onSnap(buf, stats, edges) {
 function edgeKey(S) {
   const out = [];
   for (const e of S.edges.values()) if (e.g) out.push(e.id, e.p.length, e.p[0][0], e.p[0][1], e.p.at(-1)[0], e.p.at(-1)[1], e.prof.k, e.prof.els.length, e.prof.els.reduce((s, q) => s + q[1], 0).toFixed(1), e.oneway || 0, e.ring || 0, e.speed || 0);
+  let dn = 0, ds = 0; for (const l of S.lots.values()) if (l.dw) { dn++; ds += l.dw.es + l.dw.s; }
+  out.push('dw', dn, ds.toFixed(1));
   return out.join('|') + JSON.stringify(S.ctrl || {});
 }
 function syncTraffic(S) {
@@ -123,7 +126,7 @@ function syncTraffic(S) {
   const control = {};
   for (const e of S.edges.values()) if (e.g) for (const n of [e.a, e.b]) { if (n == null || !S.nodes[n]) continue; const k = keyOf(S.nodes[n]); if (control[k] === undefined) control[k] = nodeControl(S, n); }
   if (!backend) backend = startBackend();
-  st.netMsg = { type: 'net', edges: JSON.parse(JSON.stringify(drivableEdges(S.edges))), control, bounds: [X0, Z0, X1, Z1] };
+  st.netMsg = { type: 'net', edges: JSON.parse(JSON.stringify(drivableEdges(S.edges, drivewaysByEdge(S.lots.values())))), control, bounds: [X0, Z0, X1, Z1] };
   backend.post(st.netMsg);
   sendCfg(true);
 }

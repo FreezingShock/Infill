@@ -4,6 +4,7 @@ import { FLOOR_H, addedFloors, dressUse, useOf, useTotals } from './renovate.js'
 import { BLD, DREAM, PAL, fitRect, frameOf, liveBuildings, zfam, zrule } from './model.js';
 import { drawBuilding } from './looks.js';
 import { yardCanopy } from './streettrees.js';
+import { frontageRings } from './driveways.js';
 
 // =====================================================================
 // Programs -> geometry. A program is {t, st, rf, pl, sb, adu, trees, solar, fence, sd, dr}.
@@ -77,8 +78,17 @@ function yardTrees(ctx, n, margin = 2.2, kinds = [0, 0, 1]) {
   return placed;
 }
 function lotDecal(ctx, col, y = 0.32) { decal(ctx.d, ctx.lot.r, y, col); }
+function paintFrontage(ctx, F, o) { // the shared frontage rule (src/engine/driveways.js): lawn, walkway, driveway, curb cut
+  const rg = frontageRings(ctx.lot, F, o); if (!rg) return false;
+  for (const ring of rg.lawn) decal(ctx.d, ring, 0.31, COL.lawn);
+  if (rg.walk) decal(ctx.d, rg.walk, 0.35, COL.paving);
+  if (rg.drive) decal(ctx.d, rg.drive, 0.35, COL.pad);
+  if (rg.apron) decal(ctx.d, rg.apron, 0.37, COL.pad);
+  return true;
+}
 function driveway(ctx, fit, R) {
   if (!fit || fit.t0 < 2.5) return;
+  if (ctx.lot.dw && paintFrontage(ctx, fit.F, { te: fit.t0 - 0.2, lawn: false })) return;
   const F = fit.F, s = fit.s0 + fit.w - 2;
   const ring = [F.P(s - 1.5, 0), F.P(s + 1.5, 0), F.P(s + 1.5, fit.t0), F.P(s - 1.5, fit.t0)];
   decal(ctx.d, ring, 0.36, COL.pad); void R;
@@ -184,6 +194,7 @@ function genAsBuilt(ctx) {
   ctx.units = lot.lt === 'apts' || lot.lt === 'multi' ? Math.round(lot.u0 * k) : lot.u0;
   const tot = U && tally.length ? useTotals(prog, tally) : null; if (tot) { ctx.units = tot.homes; ctx.cost += tot.cost; }
   if (prog.adu) { const f = fitRect(lot, 7, 6, { front: ctx.sb.front + 6, side: 1.2, rear: 1.2 }, { pref: 'rear', avoid: ctx.avoid, minScale: 0.75, gap: 2.5 }); if (f) { mass(ctx, f.R, 1, 'shed', 'sage', { noFloor: true }); ctx.units += 1; ctx.cost += 260000; } else ctx.warn = 'No room for an ADU behind the existing house'; }
+  if (lot.dw && blds.length) paintFrontage(ctx, frameOf(lot), {}); // every house lot: front yard, walkway, driveway and curb cut
   if (prog.fence && prog.fence !== 'none') fenceAround(ctx, prog.fence);
   return true;
 }

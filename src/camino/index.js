@@ -17,11 +17,13 @@ import './hud2.css';
 import { mountFps, mountKeys, mountSwitch, mountTitle, showDossier } from './hud.js';
 import { mountCommandBar } from './commandbar.js';
 
+import { driveCuts } from '../engine/driveways.js';
+import { frameOf } from '../engine/model.js';
 const AREA = globalThis.__RENOVATED_AREA__ || {};
 let D = null;
 if (AREA.infra) { try { const r = await fetch(`areas/${AREA.infra}`); if (r.ok) D = await r.json(); } catch { /* sidecar is optional */ } }
 const lamps = PACK.props.filter((p) => p[0] === 'lamp').map(([, x, z]) => [x, z]);
-const I = layoutInfra(D, lamps, [X0 - 60, Z0 - 60, X1 + 60, Z1 + 60], { buildings: PACK.buildings, edges: PACK.edges, roadway: roadwayIndex([...BASE.edges.values()]), cuts: PACK.driveCuts });
+const I = layoutInfra(D, lamps, [X0 - 60, Z0 - 60, X1 + 60, Z1 + 60], { buildings: PACK.buildings, edges: PACK.edges, roadway: roadwayIndex([...BASE.edges.values()]), cuts: (PACK.driveCuts || []).concat(driveCuts(BASE.lots.values(), frameOf)) });
 const infra = buildInfra(I); scene.add(infra.group);
 initScan({ infra, I });
 

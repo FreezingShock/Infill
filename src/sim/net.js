@@ -8,7 +8,7 @@ import { bezier, cubic, cumLen, offsetLine, pathsCross, trimLine } from './geom.
 const RANK = { motorway: 5, primary: 4, secondary: 3, tertiary: 2, residential: 1, unclassified: 1, service: 0, unknown: 0 };
 const SPEED = { motorway: 19, primary: 14, secondary: 12, tertiary: 10.5, residential: 8.5, unclassified: 8.5, service: 5, unknown: 5 };
 const DRIVE_EL = new Set(['lane', 'bus', 'shared', 'drive']);
-const SLOT_LEN = 6.2, SLOT_END = 9;
+const SLOT_LEN = 6.2, SLOT_END = 9, CUT_PAD = 0.7; // CUT_PAD: clearance each side of a driveway mouth
 const keyOf = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
 
 // Lane offsets (metres right of the edge centerline) per travel direction, outer lane first.
@@ -71,7 +71,17 @@ function buildNet(edges, opts = {}) {
       if (!lane || lane.len < SLOT_END * 2 + SLOT_LEN) continue;
       const lat = dir > 0 ? P.off - lane.off : lane.off - P.off; // metres to the right of travel
       if (Math.abs(lat) > 6 || Math.abs(lat) < 0.8) continue;
-      for (let s = SLOT_END + SLOT_LEN / 2; s <= lane.len - SLOT_END - SLOT_LEN / 2; s += SLOT_LEN) lane.slots.push({ id: `${lane.id}#${lane.slots.length}`, lane, s, lat, state: 0, leaveAt: 0, by: -1 });
+      const side = P.off >= 0 ? 1 : -1, cuts = [];
+      for (const d of it.e.dw || []) if (d.side === side) { const c = dir > 0 ? d.s - ta : it.len - tb - d.s; cuts.push([c - d.hw - CUT_PAD, c + d.hw + CUT_PAD]); } // kerb in front of a driveway stays clear
+      const add = (s) => lane.slots.push({ id: `${lane.id}#${lane.slots.length}`, lane, s, lat, state: 0, leaveAt: 0, by: -1 });
+      if (!cuts.length) { for (let s = SLOT_END + SLOT_LEN / 2; s <= lane.len - SLOT_END - SLOT_LEN / 2; s += SLOT_LEN) add(s); continue; }
+      // islands of parking between the driveways: each free run is filled evenly, runs too short for a car stay empty
+      cuts.sort((a, b) => a[0] - b[0]);
+      let from = SLOT_END;
+      const runs = [];
+      for (const [c0, c1] of cuts) { if (c0 > from) runs.push([from, c0]); from = Math.max(from, c1); }
+      runs.push([from, lane.len - SLOT_END]);
+      for (const [r0, r1] of runs) { const n = Math.floor((r1 - r0) / SLOT_LEN); for (let k = 0, o = (r1 - r0 - n * SLOT_LEN) / 2; k < n; k++) add(r0 + o + (k + 0.5) * SLOT_LEN); }
     }
   }
   // pass 3: intersections
@@ -175,11 +185,11 @@ function connectorPath(L, M, type) {
 }
 
 // Edge list for the sim from the game state's edge map (kept here so every caller agrees on what drives).
-function drivableEdges(edgeMap) {
+function drivableEdges(edgeMap, driveways) {
   const out = [];
   for (const e of edgeMap.values()) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
-    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
+    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0, dw: driveways?.get(e.id) });
   }
   inferDivided(out);
   return out;
