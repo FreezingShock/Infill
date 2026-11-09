@@ -14,7 +14,7 @@ pack2.py calls infer() itself when it builds a pack.
 """
 import json, sys
 from shapely.geometry import LineString, Polygon
-from shapely.ops import unary_union
+from shapely.ops import nearest_points, unary_union
 from shapely import STRtree
 
 MIN_OPEN = 140        # m2 of open ground worth looking at
@@ -24,6 +24,18 @@ AISLE_REACH = 9.0     # a parking bay is about 5.5 m deep beside an aisle: only 
 MAX_BLOCK = 2500      # m2: no single recognised lot is bigger than this (real lots with this much are mapped)
 MAX_UNBACKED = 1400   # m2 for a lot recognised with no aisle at all
 BUILD_BUFFER = 1.2    # walkway room around a building
+
+
+def _solid(poly):
+    """The game paves rings without holes: cut a hairline slit from each hole (a building, a planter) to the outside."""
+    out, todo = [], [poly]
+    while todo:
+        q = todo.pop()
+        if not q.interiors: out.append(q); continue
+        hole = Polygon(q.interiors[0]); a, b = nearest_points(hole.centroid if hole.centroid.within(hole) else hole.representative_point(), q.exterior)
+        cut = q.difference(LineString([a.coords[0], b.coords[0]]).buffer(0.15))
+        todo.extend(_polys(cut)) if not cut.is_empty and cut.area < q.area else out.append(Polygon(q.exterior))
+    return out
 
 
 def _polys(g):
@@ -76,9 +88,10 @@ def infer(pack):
             else:
                 continue
             for part in _polys(q):
-                for r in _polys(part.buffer(-EDGE_MARGIN).difference(roads)):
+                for r in [w for pc in _polys(part.buffer(-EDGE_MARGIN).difference(roads)) for w in _solid(pc)]:
+                    r = r.simplify(0.3)
                     if r.area < 40 or r.area > MAX_BLOCK: continue
-                    r = r.simplify(0.3); out.append([[round(x, 1), round(z, 1)] for x, z in list(r.exterior.coords)[:-1]])
+                    out.append([[round(x, 1), round(z, 1)] for x, z in list(r.exterior.coords)[:-1]])
                     for i in idx:
                         ar = lots[i][1].intersection(r).area
                         if ar > 5: per[lots[i][0]['id']] = per.get(lots[i][0]['id'], 0) + round(ar)
