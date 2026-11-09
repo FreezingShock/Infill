@@ -12,6 +12,7 @@ from PIL import Image
 
 URL = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage'
 CELL = 3.0
+TILE = 900  # pixels a side of one imagery request
 
 
 class Mask:
@@ -41,21 +42,26 @@ def fetch_mask(pack, work, log=print):
     wm, hm = (E - W) * KX, (N - S) * KY
     px = 1.0
     w, h = int(wm / px), int(hm / px)
-    if w > 4000 or h > 4000: return None
+    if w > 6000 or h > 6000: return None
     cache = os.path.join(work, 'naip_asphalt.npy')
     if os.path.exists(cache):
         frac = np.load(cache)
     else:
-        url = f'{URL}?bbox={W},{S},{E},{N}&bboxSR=4326&imageSR=4326&size={w},{h}&format=tiff&f=image'
         try:
-            for attempt in range(4):  # the image server answers 5xx now and then
-                try: b = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'renovated-area-builder'}), timeout=180).read(); break
-                except Exception:  # noqa: BLE001
-                    if attempt == 3: raise
-                    time.sleep(2 * (attempt + 1))
-            im = Image.open(io.BytesIO(b))
-            if im.mode != 'RGBA': return None
-            m = asphalt_like(np.asarray(im)).astype(float)
+            m = np.zeros((h, w), dtype=float)
+            for y0 in range(0, h, TILE):  # the image server times out on one big request: ask for tiles of at most TILE pixels
+                for x0 in range(0, w, TILE):
+                    tw, th = min(TILE, w - x0), min(TILE, h - y0)
+                    tb = (W + (E - W) * x0 / w, N - (N - S) * (y0 + th) / h, W + (E - W) * (x0 + tw) / w, N - (N - S) * y0 / h)
+                    url = f'{URL}?bbox={tb[0]},{tb[1]},{tb[2]},{tb[3]}&bboxSR=4326&imageSR=4326&size={tw},{th}&format=tiff&f=image'
+                    for attempt in range(5):  # the image server answers 5xx now and then
+                        try: b = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'renovated-area-builder'}), timeout=180).read(); break
+                        except Exception:  # noqa: BLE001
+                            if attempt == 4: raise
+                            time.sleep(2 * (attempt + 1))
+                    im = Image.open(io.BytesIO(b))
+                    if im.mode != 'RGBA': return None
+                    m[y0:y0 + th, x0:x0 + tw] = asphalt_like(np.asarray(im)).astype(float)
         except Exception as e:  # noqa: BLE001
             log(f'NAIP imagery unavailable ({type(e).__name__}: {e}); using map data only'); return None
         n = int(CELL / px); H, Wd = (m.shape[0] // n) * n, (m.shape[1] // n) * n

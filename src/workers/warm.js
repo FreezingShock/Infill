@@ -1,7 +1,7 @@
 // Builds lot geometry on the worker pool and drops it in the shared lot cache (app/scene.js GEN), so the
 // main thread only has to merge ready meshes. Every caller still works without workers: it just builds in slices.
 import { AREA, PACK } from '../engine/pack.js';
-import { GEN, genCached, lotHash } from '../app/scene.js';
+import { GEN, genCached, lotHash, wantsGeo } from '../app/scene.js';
 import { work } from '../app/store.js';
 import { bootProgress } from '../app/loader.js';
 import { decodeBatch } from './codec.js';
@@ -21,19 +21,19 @@ function getPool() {
 function missing(S) {
   const out = [];
   for (const lot of S.lots.values()) {
-    const h = lotHash(lot, S);
-    if (!GEN.has(h)) out.push({ h, lot, demo: lot.b.filter((i) => S.demo.has(i)) });
+    const h = lotHash(lot, S), have = GEN.get(h), geo = wantsGeo(lot, S, h);
+    if (!have || (have.slim && geo)) out.push({ h, lot, geo, demo: lot.b.filter((i) => S.demo.has(i)) }); // geo false = numbers only (far lots of a big area)
   }
   return out;
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 // Generate every lot of S that is not cached yet. Resolves with how many were built.
-async function prewarm(S) {
+async function prewarm(S, quiet = false) {
   const jobs = missing(S);
   if (!jobs.length) return 0;
   const p = getPool(), t0 = performance.now();
-  work.start(jobs.length, p ? p.size : 0);
+  if (!quiet) work.start(jobs.length, p ? p.size : 0);
   if (p) {
     const per = Math.max(6, Math.min(40, Math.ceil(jobs.length / (p.size * 4)))), batches = [];
     for (let i = 0; i < jobs.length; i += per) batches.push(jobs.slice(i, i + per));
@@ -41,19 +41,19 @@ async function prewarm(S) {
       await Promise.all(batches.map(async (b) => {
         const r = await p.run({ type: 'gen', jobs: b });
         decodeBatch(r.buf, r.metas).forEach((g) => GEN.set(g.h, g));
-        work.progress(b.length);
+        if (!quiet) work.progress(b.length);
       }));
     } catch (err) { console.warn('worker build failed, finishing on the page thread', err); }
   }
   // no workers, or a worker failed: build what is left in short slices so the page keeps moving
   let slice = performance.now();
   for (const j of jobs) {
-    if (GEN.has(j.h)) continue;
-    genCached(j.lot, S); work.progress(1);
+    const have = GEN.get(j.h); if (have && !(have.slim && j.geo)) continue;
+    genCached(j.lot, S, j.geo, j.h); if (!quiet) work.progress(1);
     if (performance.now() - slice > 12) { await tick(); slice = performance.now(); }
   }
   const ms = performance.now() - t0;
-  work.finish(ms);
+  if (!quiet) work.finish(ms);
   console.info(`[infill] built ${jobs.length} lots in ${Math.round(ms)} ms on ${p ? p.size + ' workers' : 'the page thread'}`);
   return jobs.length;
 }

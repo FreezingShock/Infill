@@ -18,26 +18,30 @@ function faceNormals(p) {
   return n;
 }
 
-// items: [{ h, g }] with g as genLot returns it. Returns { buf, metas } (buf is transferable).
+const NONE = new Float32Array(0);
+// items: [{ h, g, geo }] with g as genLot returns it. geo === false makes a slim lot: the numbers every score reads
+// (units, parking, trees, cars...) without its meshes, which is what lots far from the camera keep.
+// Returns { buf, metas } (buf is transferable).
 function encodeBatch(items) {
   let total = 0;
-  const arrays = items.map(({ g }) => KEYS.map((k) => {
+  const arrays = items.map(({ g, geo }) => KEYS.map((k) => {
+    if (geo === false) return { p: NONE, c: NONE, l: NONE, n: NONE };
     const a = g[k], p = Float32Array.from(a.p);
     return { p, c: Float32Array.from(a.c), l: Float32Array.from(a.l), n: faceNormals(p) };
   }));
   for (const a of arrays) for (const m of a) for (const f of FIELDS) total += m[f].length;
   const buf = new Float32Array(total), metas = [];
   let o = 0;
-  items.forEach(({ h, g }, i) => {
+  items.forEach(({ h, g, geo }, i) => {
     const spans = [];
     for (const m of arrays[i]) for (const f of FIELDS) { buf.set(m[f], o); spans.push(o, m[f].length); o += m[f].length; }
-    metas.push({ h, spans, trees: g.trees, cars: g.cars, units: g.units, floor: g.floor, cost: g.cost, park: g.park, stalls: g.stalls, warn: g.warn, ok: g.ok });
+    metas.push({ h, spans, trees: g.trees, cars: g.cars, units: g.units, floor: g.floor, cost: g.cost, park: g.park, stalls: g.stalls, warn: g.warn, ok: g.ok, slim: geo === false });
   });
   return { buf, metas };
 }
 
 function decodeLot(buf, meta) {
-  const g = { h: meta.h, trees: meta.trees, cars: meta.cars, units: meta.units, floor: meta.floor, cost: meta.cost, park: meta.park, stalls: meta.stalls, warn: meta.warn, ok: meta.ok };
+  const g = { h: meta.h, trees: meta.trees, cars: meta.cars, units: meta.units, floor: meta.floor, cost: meta.cost, park: meta.park, stalls: meta.stalls, warn: meta.warn, ok: meta.ok, slim: !!meta.slim };
   let s = 0;
   for (const k of KEYS) {
     g[k] = {};
@@ -47,4 +51,11 @@ function decodeLot(buf, meta) {
 }
 const decodeBatch = (buf, metas) => metas.map((m) => decodeLot(buf, m));
 
-export { decodeBatch, decodeLot, encodeBatch, faceNormals };
+// A slim copy of a full lot: same numbers, no meshes (frees the memory when the camera leaves its chunk).
+function slimOf(g) {
+  const o = { ...g, slim: true };
+  for (const k of KEYS) o[k] = { p: NONE, c: NONE, l: NONE, n: NONE };
+  return o;
+}
+
+export { decodeBatch, decodeLot, encodeBatch, faceNormals, slimOf };

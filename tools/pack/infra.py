@@ -138,7 +138,9 @@ def convert(pack, raw, power_feats):
 def build(pack_path, out_path, get=_get, power_geojson=None, raw_dir=None, area_id=None, log=print):
     pack = json.load(open(pack_path))
     W, S, E, N = pack['bbox']; box = (W - PAD, S - PAD, E + PAD, N + PAD)
-    raw = {}
+    raw, failed = {}, []
+    final = out_path[:-4] if out_path.endswith('.tmp') else out_path  # build_area writes to <name>.tmp and renames
+    prev = json.load(open(final)) if os.path.exists(final) else None
     for k, url in LAYERS.items():
         try:
             if raw_dir:
@@ -148,10 +150,15 @@ def build(pack_path, out_path, get=_get, power_geojson=None, raw_dir=None, area_
                 raw[k] = arcgis(url, (box if k != 'transmission' else (W - 0.02, S - 0.02, E + 0.02, N + 0.02)), get)
             log(f'{k}: {len(raw[k])} features')
         except Exception as e:  # noqa: BLE001
-            log(f'{k} unavailable ({type(e).__name__}: {e})'); raw[k] = []
+            log(f'{k} unavailable ({type(e).__name__}: {e})'); raw[k] = []; failed.append(k)
     power = []
     if power_geojson and os.path.exists(power_geojson): power = json.load(open(power_geojson))['features']
     o = convert(pack, raw, power)
+    o['origin'] = pack['origin']
+    keep = {'lights': 'lights', 'hydrants': 'hydrants', 'busstops': 'stops', 'transmission': 'transmission'}
+    if prev and prev.get('origin', pack['origin']) == pack['origin']:  # a layer the host would not serve (cloud builds): keep what the last build had, never drop real data
+        for k in failed:
+            if prev.get(keep[k]): o[keep[k]] = prev[keep[k]]; log(f'{k}: kept {len(prev[keep[k]])} from the previous build')
     json.dump(o, open(out_path, 'w'), separators=(',', ':'))
     return {k: len(o[k]) for k in ('lights', 'hydrants', 'stops', 'transmission')} | {'power': len(o['power']['lines']) + len(o['power']['pts'])}
 

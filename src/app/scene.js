@@ -8,13 +8,14 @@ import { medianPaths, plan as roadPlan, trimPath } from '../tools/roads/markings
 import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
+import { DETAIL, chunkKey, lod } from '../engine/lod.js';
+import { slimOf } from '../workers/codec.js';
 import { BASE } from '../engine/commands.js';
 import { INK, MAT, toon } from './render.js';
 
 // =====================================================================
 // Generated scene: never saved, rebuilt from programs. Lots merge into chunks.
 // =====================================================================
-const CH = 110;
 // grid index over lot bounds for instant picking, lasso and brush
 class LotIndex {
   constructor(lots, cell = 40) { this.cell = cell; this.m = new Map(); this.lots = lots; for (const l of lots) { const b = l.bb; for (let i = Math.floor(b[0] / cell); i <= Math.floor(b[2] / cell); i++) for (let j = Math.floor(b[1] / cell); j <= Math.floor(b[3] / cell); j++) { const k = i + ',' + j; if (!this.m.has(k)) this.m.set(k, []); this.m.get(k).push(l); } } }
@@ -24,12 +25,22 @@ class LotIndex {
 const BASE_LOT_GRID = new LotIndex([...BASE.lots.values()]);
 const GEN = new Map(); // lot hash -> generated lot, shared by the before and after worlds
 function lotHash(lot, S) { return JSON.stringify([lot.id, lot.r, lot.prog, liveBuildings(lot, S), lot.z, lot.fd, lot.flags.noaccess ? 1 : 0, lot.pk.length, lot.lt, lot.dw]); }
-function genCached(lot, S) {
-  const h = lotHash(lot, S); let g = GEN.get(h);
-  if (!g) { g = genLot(lot, S); g.h = h; if (GEN.size > 30000) GEN.clear(); GEN.set(h, g); }
+// geo: the caller needs the meshes. Without it the numbers are enough, and on a big area (src/engine/lod.js) a lot far from
+// the camera keeps only those numbers (a slim lot), so memory follows what is near the camera and not the area size.
+function genCached(lot, S, geo = false, h = lotHash(lot, S)) {
+  let g = GEN.get(h);
+  if (g && (geo || !g.slim)) return g;
+  if (!g || geo) { g = genLot(lot, S); g.h = h; if (lod.on && !geo) g = Object.assign(slimOf(g), { h }); if (GEN.size > 30000) GEN.clear(); GEN.set(h, g); }
   return g;
 }
-const chunkKey = (c) => Math.floor((c[0] - X0) / CH) + ',' + Math.floor((c[1] - Z0) / CH);
+// which lots need meshes: everything on a small area; on a big one the chunks near the camera and any lot that differs from the base city
+let BASE_H = null;
+function baseHash(id) {
+  if (!BASE_H) { BASE_H = new Map(); for (const l of BASE.lots.values()) BASE_H.set(l.id, lotHash(l, BASE)); }
+  return BASE_H.get(id);
+}
+const edited = (lot, S, h) => S !== BASE && baseHash(lot.id) !== h;
+function wantsGeo(lot, S, h = lotHash(lot, S)) { return !lod.on || DETAIL.has(chunkKey(lot.c)) || edited(lot, S, h); }
 function concatAcc(gens, key) {
   let n = 0, nl = 0; for (const g of gens) { n += g[key].p.length; nl += g[key].l.length; }
   const p = new Float32Array(n), c = new Float32Array(n), l = new Float32Array(nl); let o = 0, ol = 0;
@@ -170,19 +181,24 @@ function buildWalks() { // mapped sidewalks, paths and crossings from the data
 
 // ---------- a world = one city state rendered ----------
 class World {
-  constructor() { this.group = new THREE.Group(); this.lotRoot = new THREE.Group(); this.group.add(this.lotRoot); this.rendered = new Map(); this.chunks = new Map(); this.roads = null; this.roadKey = ''; this.inst = null; this.gens = new Map(); this.held = new Set(); }
+  constructor(opts = {}) { this.pin = !!opts.pin; this.synced = false; this.group = new THREE.Group(); this.lotRoot = new THREE.Group(); this.group.add(this.lotRoot); this.rendered = new Map(); this.chunks = new Map(); this.roads = null; this.roadKey = ''; this.inst = null; this.gens = new Map(); this.held = new Set(); }
   sync(S, hold = new Set()) {
-    const dirty = new Set(), seen = new Set();
+    const dirty = new Set(), seen = new Set(); this.synced = true;
+    if (lod.on && this.pin) { // chunks holding edits keep full detail wherever the camera is
+      DETAIL.pinned.clear();
+      for (const lot of S.lots.values()) { const h = lotHash(lot, S); if (edited(lot, S, h)) DETAIL.pinned.add(chunkKey(lot.c)); }
+    }
     for (const lot of S.lots.values()) {
       seen.add(lot.id);
-      const g = genCached(lot, S), ck = chunkKey(lot.c), prev = this.rendered.get(lot.id);
-      if (!prev || prev.h !== g.h || prev.ck !== ck || hold.has(lot.id) !== this.held.has(lot.id)) { if (prev) dirty.add(prev.ck); dirty.add(ck); this.rendered.set(lot.id, { h: g.h, ck }); }
-      this.gens.set(lot.id, g);
+      const ck = chunkKey(lot.c), det = !lod.on || DETAIL.has(ck), g = genCached(lot, S, det), prev = this.rendered.get(lot.id);
+      if (!det && !g.slim) { const sg = Object.assign(slimOf(g), { h: g.h }); GEN.set(g.h, sg); this.gens.set(lot.id, sg); } else this.gens.set(lot.id, g); // leaving detail frees the meshes
+      const gg = this.gens.get(lot.id);
+      if (!prev || prev.h !== gg.h || prev.ck !== ck || prev.det !== det || hold.has(lot.id) !== this.held.has(lot.id)) { if (prev) dirty.add(prev.ck); dirty.add(ck); this.rendered.set(lot.id, { h: gg.h, ck, det }); }
     }
     for (const [id, r] of this.rendered) if (!seen.has(id)) { dirty.add(r.ck); this.rendered.delete(id); this.gens.delete(id); }
     this.held = new Set(hold);
     if (dirty.size) {
-      const byChunk = new Map(); for (const [id, r] of this.rendered) { if (!dirty.has(r.ck)) continue; if (!byChunk.has(r.ck)) byChunk.set(r.ck, []); if (!hold.has(id)) byChunk.get(r.ck).push(this.gens.get(id)); }
+      const byChunk = new Map(); for (const [id, r] of this.rendered) { if (!dirty.has(r.ck)) continue; if (!byChunk.has(r.ck)) byChunk.set(r.ck, []); if (!hold.has(id) && r.det) byChunk.get(r.ck).push(this.gens.get(id)); }
       for (const ck of dirty) {
         const old = this.chunks.get(ck); if (old) { this.lotRoot.remove(old); disposeTree(old); this.chunks.delete(ck); }
         const list = byChunk.get(ck); if (!list || !list.length) continue;
@@ -194,7 +210,7 @@ class World {
     if (dirty.size) {
       if (this.inst) { this.group.remove(this.inst); disposeTree(this.inst); }
       const trees = [...this.roads.userData.trees, ...STATIC_TREES], cars = [];
-      for (const [id, g] of this.gens) { for (const t of g.trees) trees.push(t); for (const c of g.cars) cars.push(c); void id; }
+      for (const [id, g] of this.gens) { if (!this.rendered.get(id).det) continue; for (const t of g.trees) trees.push(t); for (const c of g.cars) cars.push(c); } // yard trees and parked cars only where the lot is detailed
       this.inst = new THREE.Group(); this.inst.add(instTrees(trees), instCars(cars)); this.group.add(this.inst);
       this.treeCount = trees.length; this.carCount = cars.length;
     }
@@ -283,5 +299,6 @@ export {
   buildWalks,
   genCached,
   lotHash,
+  wantsGeo,
   lotObject,
 };
