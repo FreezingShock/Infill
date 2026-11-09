@@ -15,6 +15,7 @@ async function boot() {
   globalThis.__RENOVATED_AREAS__ = manifest;
   globalThis.__RENOVATED_AREA__ = area;
   globalThis.__RENOVATED_PACK__ = await res.json();
+  await (await import('./assets/boot.js')).bootAssets(area, globalThis.__RENOVATED_PACK__); // optional open-data building looks
   await import('./app/input.js');
   await import('./ui/index.js'); // info views, clock and advisor
 }

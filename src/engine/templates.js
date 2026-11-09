@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Acc, C, FT, UP, area, clamp, decal, elev, fmt, inPoly, obb, obox, ofacade, oroof, pick, rcorners, ribbon, rng, segDist2, subR } from './core.js';
 import { FLOOR_H, addedFloors, dressUse, useOf, useTotals } from './renovate.js';
 import { BLD, DREAM, PAL, fitRect, frameOf, liveBuildings, zfam, zrule } from './model.js';
+import { drawBuilding } from './looks.js';
 
 // =====================================================================
 // Programs -> geometry. A program is {t, st, rf, pl, sb, adu, trees, solar, fence, sd, dr}.
@@ -136,6 +137,7 @@ function genAsBuilt(ctx) {
     const b = BLD[i]; let r = b.r; const n = r.length, y0 = b.b - 1;
     const h0 = b.h * k, floors0 = Math.max(1, Math.round(h0 / 3.2)), added = b.a > 40 && b.t !== 'outbuilding' ? addedFloors(prog, floors0) : 0;
     const h = h0 + added * FLOOR_H, y1 = b.b + h;
+    if (!U && drawBuilding(ctx, b, i, { h, P, solar: (R, y, rf) => { if (prog.solar && R) solar(ctx, R, y, rf); }, overridden: !!lot.base && (prog.pl !== lot.base.pl || prog.rf !== lot.base.rf) })) { ctx.avoid.push(r); ctx.floor += b.a * Math.max(1, Math.round(h / 3.2)); continue; } // open-data look (src/engine/looks.js); falls through to the plain box
     const res = b.t === 'residential' || b.t === 'unknown' || b.t === 'outbuilding';
     const wall = C(U ? U.wall : res ? P.w : ({ commercial: 0xe1e4e6, education: 0xdcd5e6, civic: 0xdcd5e6 }[b.t] || P.w));
     const cx = b.r.reduce((s, p) => s + p[0], 0) / n, cz = b.r.reduce((s, p) => s + p[1], 0) / n;

@@ -1,0 +1,38 @@
+// Building looks: classification is pure, the sidecar must match the pack, and every as-built lot still generates with looks on.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const manifest = JSON.parse(fs.readFileSync(new URL('../public/areas/index.json', import.meta.url)));
+const area = manifest.areas.find((a) => a.id === manifest.default);
+globalThis.__RENOVATED_AREA__ = area;
+globalThis.__RENOVATED_PACK__ = JSON.parse(fs.readFileSync(new URL(`../public/areas/${area.pack}`, import.meta.url)));
+const sidecar = JSON.parse(fs.readFileSync(new URL(`../public/areas/${area.pack.replace('.json', '.looks.json')}`, import.meta.url)));
+
+const looks = await import('../src/engine/looks.js');
+const { PACK } = await import('../src/engine/pack.js');
+const { BASE } = await import('../src/engine/commands.js');
+const { genLot } = await import('../src/engine/templates.js');
+
+test('classify picks sensible kinds', () => {
+  const geo = { aspect: 1.5 };
+  assert.equal(looks.classify({ a: 150, t: 'residential' }, { c: 'house' }, geo, 1), 'house');
+  assert.equal(looks.classify({ a: 300, t: 'commercial' }, { c: 'retail' }, geo, 1), 'store');
+  assert.equal(looks.classify({ a: 900, t: 'commercial' }, { c: 'retail' }, { aspect: 4 }, 1), 'strip');
+  assert.equal(looks.classify({ a: 4000, t: 'commercial' }, { c: 'retail' }, geo, 1), 'bigbox');
+  assert.equal(looks.classify({ a: 20, t: 'residential' }, { c: 'garage' }, geo, 1), 'outbuilding');
+  assert.equal(looks.classify({ a: 500, t: 'residential' }, { c: 'apartments' }, geo, 3), 'apt');
+});
+
+test('the shipped sidecar matches the pack', () => {
+  assert.equal(looks.setLooksData(sidecar, PACK.buildings.length, looks.packChecksum(PACK.buildings)), true);
+  assert.equal(looks.setLooksData(sidecar, PACK.buildings.length + 1, null), false);
+  looks.setLooksData(sidecar, PACK.buildings.length, null);
+});
+
+test('every lot generates finite geometry with looks on', () => {
+  for (const lot of BASE.lots.values()) {
+    const g = genLot(lot, BASE);
+    for (const arr of [g.s.p, g.g.p]) for (const v of arr) assert.ok(Number.isFinite(v), `lot ${lot.id}`);
+  }
+});

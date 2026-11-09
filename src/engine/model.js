@@ -73,6 +73,7 @@ function mkLot(l) {
     lt: l.lt, z: l.z, yr: l.yr, st0: l.st, u0: l.u, b: l.b.slice(), sh: l.sh || [], sd: l.sd, flags: {}, pk: [], ain: l.ain || null, zr: l.zr || null, gp: l.gp || null, ys: l.ys || null };
   lot.bb = bbox(lot.r);
   lot.prog = inferProgram(lot);
+  lot.base = { pl: lot.prog.pl, rf: lot.prog.rf }; // what the data chose, so looks can tell a player's palette pick from the default
   return lot;
 }
 function inferProgram(lot) {
