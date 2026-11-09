@@ -1,0 +1,14 @@
+.loadarea { margin-top: 14px; padding: 12px 14px; border: 2px solid var(--ink); border-radius: 12px; background: rgba(246, 237, 217, 0.7); }
+.loadarea h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.loadarea p { margin: 4px 0 8px; font-size: 0.86rem; opacity: 0.85; }
+.loadarea .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.loadarea .inp { flex: 1; min-width: 140px; }
+.loadarea select { border: 2px solid var(--ink); border-radius: 8px; background: #fffaf0; padding: 5px 8px; font: inherit; }
+.la-hits { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; }
+.la-hits button { text-align: left; font-size: 0.8rem; max-width: 100%; }
+.la-prog { margin-top: 10px; }
+.la-bar { height: 10px; border: 2px solid var(--ink); border-radius: 6px; background: #fffaf0; overflow: hidden; }
+.la-bar i { display: block; height: 100%; width: 0; background: var(--terracotta, #c4613b); transition: width 0.5s ease; }
+.la-prog small { display: block; margin-top: 4px; }
+.la-off { opacity: 0.8; }
+.la-err { color: #a3321e; }

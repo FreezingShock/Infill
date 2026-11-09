@@ -14,6 +14,8 @@ import { tickTraffic } from '../views/traffic.js';
 import { ROAD, roadClick, roadHover, roadPath } from '../tools/roads/ui.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
 import { startGrowth } from '../game/zoning/driver.js';
+import { drawDraft, initPicker } from '../areas/picker.js';
+import { rebaseNote } from '../areas/rebase.js';
 
 // =====================================================================
 // Tools and input
@@ -437,6 +439,7 @@ function drawAreaMap() { // the Valley as a lon/lat frame with every area's rect
     g.fillRect(p[0], p[1], q[0] - p[0], q[1] - p[1]); g.strokeRect(p[0], p[1], q[0] - p[0], q[1] - p[1]);
     g.setLineDash([]); g.fillStyle = '#2b2420'; g.font = `${on ? 700 : 500} ${on ? 13 : 11}px Fraunces, Georgia, serif`; g.fillText(a.name, p[0], p[1] - 4);
   }
+  drawDraft(g, LL);
   g.font = '12px Capriola, sans-serif'; g.fillStyle = '#5d5148'; g.fillText(AREAS.region?.name || '', pad, H - 10); g.fillText('N ↑', W - 40, 22);
 }
 function openLog() {
@@ -525,9 +528,10 @@ const start = (AREA.main && [...STATE.lots.values()].find((l) => (l.a || '').inc
 controls.target.set(start.c[0], start.e, start.c[1]); cam.position.copy(controls.target).add(CAM_OFF);
 resize(); cam.lookAt(controls.target); cam.updateMatrixWorld();
 $('loading').remove();
+initPicker({ AREA, AREAS, redraw: drawAreaMap });
 if (!saved) openAreas();
 addEventListener('resize', resize);
-if (saved && saved.log && saved.log.length) toast(`Welcome back: ${saved.log.length} edits restored from this browser.`);
+if (saved && saved.log && saved.log.length) toast(rebaseNote(saved, AREA, ui.lastInfo) || `Welcome back: ${saved.log.length} edits restored from this browser.`);
 
 let lastShadowZoom = 0, lastNow = performance.now();
 function frame(now) {

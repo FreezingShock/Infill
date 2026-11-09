@@ -4,7 +4,7 @@ from shapely.ops import polygonize, unary_union
 import shapely
 from PIL import Image
 D = sys.argv[1]
-W,S,E,N = -118.6115,34.1590,-118.5990,34.1700
+W,S,E,N = map(float, (sys.argv[3] if len(sys.argv) > 3 else '-118.6115,34.1590,-118.5990,34.1700').split(','))  # lon/lat box; default is the Woodland Hills pack
 lat0=(S+N)/2; lon0=(W+E)/2
 KX = math.cos(math.radians(lat0))*111320; KY = 110540
 def P(lon,lat): return ((lon-lon0)*KX, -(lat-lat0)*KY)   # x east, z south
@@ -12,16 +12,18 @@ def tr(g): return shapely.transform(g, lambda a: __import__('numpy').column_stac
 clip = tr(box(W,S,E,N))
 # ---- terrain
 import numpy as np
-z=15; tiles={}
-for x in (5587,5588):
-  for y in (13071,13072):
+z=15; n=2**z; tiles={}
+def tile_of(lon,lat): return int((lon+180)/360*n), int((1-math.asinh(math.tan(math.radians(lat)))/math.pi)/2*n)
+TX0,TY0=tile_of(W,N); TX1,TY1=tile_of(E,S)   # tiles covering the box, padded by one tile east/south for bilinear lookups
+TX1+=1; TY1+=1
+for x in range(TX0,TX1+1):
+  for y in range(TY0,TY1+1):
     im=np.asarray(Image.open(f'{D}/t_{x}_{y}.png').convert('RGB')).astype(float)
     tiles[(x,y)] = im[:,:,0]*256+im[:,:,1]+im[:,:,2]/256-32768
-big = np.vstack([np.hstack([tiles[(5587,13071)],tiles[(5588,13071)]]), np.hstack([tiles[(5587,13072)],tiles[(5588,13072)]])])
-n=2**z
+big = np.vstack([np.hstack([tiles[(x,y)] for x in range(TX0,TX1+1)]) for y in range(TY0,TY1+1)])
 def elev_ll(lon,lat):
-  fx=(lon+180)/360*n*256 - 5587*256
-  fy=(1-math.asinh(math.tan(math.radians(lat)))/math.pi)/2*n*256 - 13071*256
+  fx=(lon+180)/360*n*256 - TX0*256
+  fy=(1-math.asinh(math.tan(math.radians(lat)))/math.pi)/2*n*256 - TY0*256
   x0=int(fx); y0=int(fy); dx=fx-x0; dy=fy-y0
   a=big[y0,x0]; b=big[y0,x0+1]; c=big[y0+1,x0]; d=big[y0+1,x0+1]
   return a*(1-dx)*(1-dy)+b*dx*(1-dy)+c*(1-dx)*dy+d*dx*dy

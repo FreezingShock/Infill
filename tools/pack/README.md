@@ -2,7 +2,16 @@
 
 An area pack is one JSON file in `public/areas/` holding everything the game needs for a rectangle of map: terrain, the road graph with blocks, lots, buildings, parking polygons, street props and land use. The game never calls a map server while you play.
 
-These are the scripts that built the Woodland Hills pack. They still hard-code its box (-118.6115, 34.1590, -118.5990, 34.1700); generalizing them into one `build_area.py --id --bbox` is milestone M5 in `docs/PLAN.md`.
+**`build_area.py` does all of the steps below for any box** (the game's *Load any spot* screen runs it through `tools/vite-areas.js`):
+
+```sh
+python tools/pack/build_area.py --id canoga-park --bbox=-118.6082,34.1955,-118.5958,34.2065   # new area (use --bbox=, the value starts with a minus)
+python tools/pack/build_area.py --id wh-topanga --refresh                                      # re-pull the data, keep ids
+```
+
+It installs its Python packages into `tools/pack/.venv` on first run, prints progress as `@@{json}` lines, writes `public/areas/<id>.json` and updates `index.json`. With `--refresh` the old pack is read so every lot (county AIN match, else best overlap) and street (same name, same end points) keeps its id; saved edits point at those ids. New lots and streets get fresh ids above the old maximum. Boxes are limited to 2.6 km a side.
+
+The numbered steps below are what it runs, for reference or manual work.
 
 ## Setup
 

@@ -4,3 +4,5 @@ dist/
 *.log
 .DS_Store
 tools/pack/work/
+__pycache__/
+.venv/

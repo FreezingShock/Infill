@@ -17,7 +17,13 @@ npm run dev
 
 To pick up new work later: `git pull` on `integration`, then `npm install` if `package.json` changed. Vite reloads the page by itself while `npm run dev` is running.
 
-Vite opens http://localhost:5173 with Woodland Hills (Topanga Canyon Blvd) loaded. Pick another area with **Change area**; areas marked "needs a pack" are planned and can be built with `tools/pack`.
+Vite opens http://localhost:5173 with Woodland Hills (Topanga Canyon Blvd) loaded. Pick another area with **Change area**.
+
+### Load any spot, or refresh an area
+
+With `npm run dev` running (and Python 3 installed), **Change area** has a *Load any spot in the Valley* box: search an address or place, or click or drag a box on the map, name it and press **Build this area**. It pulls real streets, buildings, parking and terrain (Overture Maps, AWS terrain) and, inside the City of LA, the real parcel boundaries, zoning and permit years from data.lacity.org, then opens the result. The first build installs a few Python packages into `tools/pack/.venv`; after that it takes about a minute. Outside the city the lots are estimated from address points.
+
+**Refresh this area's data** re-pulls the data for the highlighted area. Lots and streets keep their ids, so your saved edits carry over; any that no longer fit are skipped and counted when the area reopens. The same builder runs from the command line: `python tools/pack/build_area.py --id canoga-park --bbox=-118.6082,34.1955,-118.5958,34.2065` (add `--refresh` to rebuild an existing area).
 
 Other scripts:
 
