@@ -17,13 +17,14 @@ export function createOrbit({ cam, controls, canvas, bounds, elev, enabled = tru
     for (const t of INPUTS) removeEventListener(t, stop, true);
     controls.update(); // re-reads the camera as it is now: control resumes from here
   }
-  const onMove = (e) => { if (e.movementX || e.movementY || e.pointerType === 'touch') stop(); };
+  let moved = 0; // a few px of cursor drift (or the cursor sitting under a lifting boot screen) is not an input
+  const onMove = (e) => { if (e.pointerType === 'touch') return stop(); moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0); if (moved > 12) stop(); };
 
   function start(now) {
     if (!enabled || on) return;
     const spherical = new THREE.Spherical().setFromVector3(v.copy(cam.position).sub(controls.target));
     from = { target: controls.target.clone(), dist: spherical.radius, polar: spherical.phi };
-    az = spherical.theta; t0 = last = now; on = true;
+    az = spherical.theta; t0 = last = now; on = true; moved = 0;
     addEventListener('pointermove', onMove, true);
     for (const t of INPUTS) addEventListener(t, stop, { capture: true, passive: true });
   }
