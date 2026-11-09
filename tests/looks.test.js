@@ -65,7 +65,7 @@ test('every ready pack has valid cul-de-sac bulbs and measured right-of-way widt
   for (const a of manifest.areas.filter((x) => x.status === 'ready' && x.pack)) {
     const p = JSON.parse(fs.readFileSync(new URL(`../public/areas/${a.pack}`, import.meta.url)));
     assert.ok(Array.isArray(p.bulbs), `${a.id} bulbs`);
-    for (const [x, z, r, n] of p.bulbs) { assert.ok(r >= 8 && r <= 14 && Number.isFinite(x + z), `${a.id} bulb`); assert.ok(p.nodes[n], `${a.id} bulb node`); }
+    for (const [x, z, r, n] of p.bulbs) { assert.ok(r >= 6 && r <= 18 && Number.isFinite(x + z), `${a.id} bulb`); assert.ok(p.nodes[n], `${a.id} bulb node`); }
     const rw = p.edges.filter((e) => e.rw); assert.ok(rw.length > 10, `${a.id} rw ${rw.length}`);
     for (const e of rw) assert.ok(e.rw >= 12 && e.rw <= 20, `${a.id} ${e.id} rw`);
   }

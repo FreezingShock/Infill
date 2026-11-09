@@ -165,7 +165,7 @@ def main():
         say('imagery', f'Imagery check skipped ({type(e).__name__}: {e})', 85)
     try:  # cul-de-sac bulbs from the parcels around dead-end streets (no network needed)
         import bulbs, rowwidth
-        say('bulbs', f'Found {bulbs.apply(pack)} cul-de-sac turnarounds, right-of-way width on {rowwidth.apply(pack)} streets', 87)
+        say('bulbs', f'Right-of-way width on {rowwidth.apply(pack)} streets, {bulbs.apply(pack)} cul-de-sac turnarounds', 87)
     except Exception as e:  # noqa: BLE001
         say('bulbs', f'Cul-de-sac check skipped ({type(e).__name__}: {e})', 87)
     json.dump(pack, open(tmp, 'w'), separators=(',', ':'))
