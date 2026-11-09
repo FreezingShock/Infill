@@ -10,6 +10,12 @@ const kindOf = (look) => Math.floor(look / 8);
 const IDM = { a: 2.6, b: 3.4, T: 1.1, s0: 2.0 };
 const GREEN = 9, CYCLE = 12;
 const PARK_TIME = 1.4;
+// Junction behaviour (general rules, same at every junction in every area):
+const COMFORT = 2.2;      // m/s^2 used to plan slowing for a stop line or a turn
+const STOP_OFF = 1.2;     // cars stop about 0.8 m short of the stop line (the virtual wall sits this far past it)
+const JERK = 7;           // m/s^3 limit on accel changes, so stop-and-go and braking onsets are smooth
+// seconds a conflicting higher-priority car must still be away from the junction before we pull out
+const GAP = { S: 3.4, L: 4.2, R: 2.8, U: 4.8 };
 
 class Sim {
   constructor(seed = 1) {
@@ -34,6 +40,7 @@ class Sim {
       const seg = c.isConn ? net.connById.get(c.seg.id) : net.laneById.get(c.seg.id);
       if (!seg || c.park || (c.s > seg.len + 1)) continue;
       c.seg = seg; seg.cars.push(c);
+      c.prev = null; c.hold = false;
       if (c.isConn) { c.plan = seg; seg.reserved++; seg.to.reserved++; c.granted = seg; }
       else { c.plan = null; c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(seg); }
       keep.push(c);
@@ -70,7 +77,7 @@ class Sim {
   look(bus) { const r = this.r(), k = r < 0.46 ? 0 : r < 0.7 ? 1 : r < 0.82 ? 2 : r < 0.94 ? 3 : bus ? 4 : 0; return Math.floor(this.r() * 6) + 8 * k; }
   add(lane, s, v, color, lat, trip) {
     if (kindOf(color) === 4) trip = 1e9;
-    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: LENS[kindOf(color)], fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0 };
+    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: LENS[kindOf(color)], fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0, prev: null, hold: false };
     c.plan = this.choose(lane); lane.cars.push(c); this.cars.push(c); return c;
   }
   choose(lane) {
@@ -90,24 +97,34 @@ class Sim {
     if (fa !== ca) return fa < ca;
     return fd < d || (fd === d && f.id < car.id);
   }
+  // The box stays clear: a car only enters when the exit lane has room for its whole length (plus the cars
+  // already committed to that lane), so nobody ends up parked inside the junction.
   roomFor(conn, car) {
     const tl = conn.to, rear = tl.cars[tl.cars.length - 1];
     const free = rear ? rear.s - rear.len : tl.len;
     const unit = Math.min(car.len + 1.5, tl.len);
     return free - tl.reserved * unit >= Math.min(unit + car.v * 0.4, tl.len);
   }
+  // true when no car on `k`'s approach reaches the junction within `need` seconds (a stopped car at the line counts as leaving now)
+  gapClear(k, need) {
+    const L = k.from.len;
+    for (const c of k.from.cars) { if (c.v < 0.5 && (c.i > 0 || c.wait > 4)) continue; const d = L - c.s; if (d < 120 && d / Math.max(c.v, 2.5) < need) return false; } // a queue that has stood still is not about to arrive
+    return true;
+  }
+  // a stop sign or an all-way stop: the car must come to rest at the line first
+  stopSign(conn) { const n = conn.node; return n.control === 'allway' || (n.control === 'priority' && conn.rank < n.rank && !n.noStop); }
   canGo(conn, car) {
     if (!this.roomFor(conn, car)) return false;
     for (const k of conn.conflicts) if (k.reserved > 0) return false;
-    const n = conn.node;
-    if (n.control === 'signal') { if (!this.green(n, conn.group)) return false; }
-    else if (n.control !== 'none') {
-      // gap acceptance: a car that must give way waits until nothing on the conflicting road is about to arrive (about 4 s away),
-      // so the main road never has to brake for a side street
-      for (const k of conn.conflicts) {
-        if (k.pv <= conn.pv || k.from === conn.from) continue;
-        for (const c of k.from.cars) if (k.from.len - c.s < 10 + Math.max(c.v, 6) * 6) return false;
-      }
+    const n = conn.node, need = GAP[conn.type] || GAP.S;
+    if (n.control === 'signal') {
+      if (!this.green(n, conn.group)) return false;
+      // permissive turns on green give way to the oncoming flow that is also green
+      for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && this.green(n, k.group) && !this.gapClear(k, need)) return false;
+    } else if (n.control !== 'none') {
+      // gap acceptance: give way to higher-priority traffic until it is far enough away in time, so the minor road
+      // moves as soon as a real gap opens and the major road does not have to brake for it
+      for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && !this.gapClear(k, need)) return false;
       for (const k of conn.conflicts) {
         const f = k.from.cars[0]; if (!f || f === car || f.granted || f.plan !== k || !this.roomFor(k, f)) continue;
         const fd = k.from.len - f.s;
@@ -117,12 +134,11 @@ class Sim {
     return true;
   }
   mayEnter(conn, car, d) {
-    const n = conn.node, stop = n.control === 'allway' || (n.control === 'priority' && conn.rank < n.rank && !n.noStop);
-    if (stop) {
-      if (!car.stopped) { if (d < 3.6 && car.v < 0.35) { car.stopped = true; car.arrive = this.t; } else return false; }
-    } else if (d > Math.max(10, car.v * car.v / 6 + 5)) return false;
-    if (!this.canGo(conn, car)) return false;
-    conn.reserved++; conn.to.reserved++; car.granted = conn;
+    if (this.stopSign(conn)) {
+      if (!car.stopped) { if (d < 2.4 && car.v < 0.5) { car.stopped = true; car.arrive = this.t; } else return false; }
+    } else if (!car.hold && d > Math.max(10, car.v * car.v / (2 * COMFORT) + 8)) return false; // too early to decide: keep rolling
+    if (!this.canGo(conn, car)) { if (!this.stopSign(conn)) car.hold = true; return false; } // once we must brake we keep braking (no flicker)
+    conn.reserved++; conn.to.reserved++; car.granted = conn; car.hold = false;
     return true;
   }
 
@@ -132,7 +148,11 @@ class Sim {
     this.t += dt;
     for (const seg of this.segs) if (seg.cars.length) { if (seg.cars.length > 1) seg.cars.sort((a, b) => b.s - a.s); for (let i = 0; i < seg.cars.length; i++) seg.cars[i].i = i; }
     // accelerations from the state at the start of the tick
-    for (const c of this.cars) c.acc = this.accel(c);
+    for (const c of this.cars) {
+      const a = this.accel(c);
+      // jerk limit smooths stop-and-go; real emergencies (below -6) pass straight through
+      c.acc = a < -6 ? a : c.acc + Math.max(-JERK * dt, Math.min(JERK * dt, a - c.acc));
+    }
     const dead = [];
     for (const c of this.cars) {
       if (c.park && c.park.phase === 1) { c.v = 0; c.park.timer += dt; c.lat = c.park.slot.lat * Math.min(1, c.park.timer / PARK_TIME); if (c.park.timer >= PARK_TIME) dead.push(c); continue; }
@@ -168,7 +188,7 @@ class Sim {
             const rear = plan.cars[plan.cars.length - 1];
             if (rear) { gap = d + rear.s - rear.len; vl = rear.v; }
             else { const rr = plan.to.cars[plan.to.cars.length - 1]; if (rr) { gap = d + plan.len + rr.s - rr.len; vl = rr.v; } }
-          } else { gap = d - 0.6; vl = 0; }
+          } else if (c.hold || this.stopSign(plan)) { gap = d + STOP_OFF; vl = 0; } // wall at the stop line
         }
       } else {
         const rr = seg.to.cars[seg.to.cars.length - 1]; if (rr) { gap = d + rr.s - rr.len; vl = rr.v; }
@@ -176,16 +196,17 @@ class Sim {
     }
     let v0 = c.fac * seg.speed;
     if (c.isConn) v0 = Math.min(v0, seg.speed);
-    else if (c.plan) { const d = seg.len - c.s; v0 = Math.min(v0, Math.sqrt(c.plan.speed * c.plan.speed + 5 * Math.max(0, d - 1))); }
+    else if (c.plan) { const d = seg.len - c.s; v0 = Math.min(v0, Math.sqrt(c.plan.speed * c.plan.speed + 2 * COMFORT * Math.max(0, d - 1))); } // slow down early to the turn's speed
     if (c.park) {
       if (c.park.phase === 0) { const g2 = c.park.ft - c.s + IDM.s0; if (g2 < gap) { gap = g2; vl = 0; } if (c.s > c.park.ft + 4) { c.park.slot.state = 0; c.park = null; } }
     }
-    if (gap < 1e8 || c.v > v0) {
+    // speed-target braking is capped at a comfortable rate; only a car ahead can ask for hard braking
+    const free = Math.max(-3.2, IDM.a * (1 - Math.pow(c.v / Math.max(v0, 0.5), 4)));
+    if (gap < 1e8) {
       const v = c.v, sStar = IDM.s0 + Math.max(0, v * IDM.T + v * (v - vl) / (2 * Math.sqrt(IDM.a * IDM.b)));
-      const a = IDM.a * (1 - Math.pow(v / Math.max(v0, 0.5), 4) - (sStar / Math.max(gap, 0.1)) ** 2);
-      return Math.max(-9, Math.min(IDM.a, a));
+      return Math.max(-9, Math.min(IDM.a, free - IDM.a * (sStar / Math.max(gap, 0.1)) ** 2));
     }
-    return IDM.a * (1 - Math.pow(c.v / Math.max(v0, 0.5), 4));
+    return free;
   }
 
   advance(c, dead) {
@@ -195,10 +216,10 @@ class Sim {
         if (!c.plan) { dead.push(c); return; }
         if (!c.granted) { c.s = seg.len - 0.05; c.v = 0; return; }
         const conn = c.plan; c.s -= seg.len; seg.cars.splice(seg.cars.indexOf(c), 1);
-        c.seg = conn; c.isConn = true; conn.cars.push(c); c.i = conn.cars.length - 1;
+        c.seg = conn; c.isConn = true; c.prev = seg; c.hold = false; conn.cars.push(c); c.i = conn.cars.length - 1;
       } else {
         const tl = seg.to; seg.reserved--; tl.reserved--; c.s -= seg.len; seg.cars.splice(seg.cars.indexOf(c), 1);
-        c.seg = tl; c.isConn = false; tl.cars.push(c); c.i = tl.cars.length - 1;
+        c.seg = tl; c.isConn = false; c.prev = seg; c.hold = false; tl.cars.push(c); c.i = tl.cars.length - 1;
         c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(tl);
         if (c.trip < -200) { dead.push(c); return; }
         if (c.trip <= 0 && !c.park && tl.idx === 0 && tl.slots.length) this.seekSlot(c, 6);
@@ -259,7 +280,17 @@ class Sim {
       const p = sampleAt(seg.pts, seg.cum, Math.max(0, s - LENS[kindOf(color)] / 2));
       out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color;
     };
-    for (const c of this.cars) { put(c.id, c.seg, c.s, c.lat, c.v, c.color); sum += c.v; if (c.v < 0.3) wait++; }
+    // A moving car is posed by its two axles, which can lie on different segments (the lane it just left and the
+    // connector it is on). That keeps the car continuous across handovers and turns its heading smoothly through a corner.
+    const pose = (c) => {
+      const len = LENS[kindOf(c.color)], at = (d) => (d >= 0 || !c.prev ? sampleAt(c.seg.pts, c.seg.cum, Math.max(0, d)) : sampleAt(c.prev.pts, c.prev.cum, c.prev.len + d));
+      const f = at(c.s - 0.8), r = at(c.s - len + 0.8);
+      let dx = f[0] - r[0], dz = f[1] - r[1]; const L = Math.hypot(dx, dz);
+      if (L < 0.3) { dx = f[2]; dz = f[3]; } else { dx /= L; dz /= L; }
+      const x = (f[0] + r[0]) / 2 - dz * c.lat, z = (f[1] + r[1]) / 2 + dx * c.lat;
+      out[o++] = c.id; out[o++] = x; out[o++] = z; out[o++] = Math.atan2(dx, dz); out[o++] = dx * c.v; out[o++] = dz * c.v; out[o++] = c.color;
+    };
+    for (const c of this.cars) { pose(c); sum += c.v; if (c.v < 0.3) wait++; }
     for (const s of parked) put(1e6 + s.ix, s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
     this.stats = { moving: this.cars.length, parked: parked.length, waiting: wait, avg: this.cars.length ? sum / this.cars.length : 0, broken: this.broken };
     return out;
