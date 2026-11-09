@@ -6,5 +6,6 @@ export default defineConfig({
   base: './',
   plugins: [areasPlugin()],
   server: { port: 5173, open: true },
+  worker: { format: 'es' }, // module workers that import the engine need code splitting
   build: { target: 'es2022', chunkSizeWarningLimit: 1500 },
 });

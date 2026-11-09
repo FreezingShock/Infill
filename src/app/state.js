@@ -9,6 +9,7 @@ import { LotIndex, World, genCached, lotObject } from './scene.js';
 import { renderCard } from './inspector.js';
 import { syncTraffic } from '../views/traffic.js';
 import { buildLabels, renderViews } from './input.js';
+import { warmFor } from '../workers/warm.js';
 
 // =====================================================================
 // Builder: state, undo, overlays, scores
@@ -48,15 +49,18 @@ function commit(cmd, opts = {}) {
   if (cmd.op === 'street.move') { dropSnapsAfterAdd(cmd); CUR++; STATE = stateAt(CUR); }
   else { try { exec(STATE, cmd, info); } catch (e) { console.warn(e); info.notes.push('That edit could not be applied to these shapes.'); } CUR++; SNAPS[CUR] = structuredClone(STATE); }
   trimSnaps();
-  refresh(opts.anim);
-  const after = scores();
-  showDelta(before, after, opts.label);
-  ui.skipped = [...(opts.skipped || []), ...info.skipped];
-  if (info.notes.length) toast(info.notes.join(' '));
-  save(); renderCard(); renderViews();
+  save(); // the edit log is safe at once; the scene catches up when the lots are built (workers, for big edits)
+  warmFor(STATE, () => {
+    refresh(opts.anim);
+    const after = scores();
+    showDelta(before, after, opts.label);
+    ui.skipped = [...(opts.skipped || []), ...info.skipped];
+    if (info.notes.length) toast(info.notes.join(' '));
+    save(); renderCard(); renderViews();
+  }, busyToast);
 }
-function undo() { if (!CUR) return toast('Nothing to undo.'); const c = LOG[CUR - 1]; const before = scores(); CUR--; if (c.op === 'street.move') dropSnapsAfterAdd(c); STATE = stateAt(CUR); refresh(); showDelta(before, scores(), 'Undid ' + describe(c).toLowerCase()); save(); renderCard(); renderViews(); }
-function redo() { if (CUR >= LOG.length) return toast('Nothing to redo.'); const c = LOG[CUR]; const before = scores(); CUR++; if (c.op === 'street.move') dropSnapsAfterAdd(c); STATE = stateAt(CUR); refresh(); showDelta(before, scores(), 'Redid ' + describe(c).toLowerCase()); save(); renderCard(); renderViews(); }
+function undo() { if (!CUR) return toast('Nothing to undo.'); const c = LOG[CUR - 1]; const before = scores(); CUR--; if (c.op === 'street.move') dropSnapsAfterAdd(c); STATE = stateAt(CUR); warmFor(STATE, () => { refresh(); showDelta(before, scores(), 'Undid ' + describe(c).toLowerCase()); save(); renderCard(); renderViews(); }, busyToast); }
+function redo() { if (CUR >= LOG.length) return toast('Nothing to redo.'); const c = LOG[CUR]; const before = scores(); CUR++; if (c.op === 'street.move') dropSnapsAfterAdd(c); STATE = stateAt(CUR); warmFor(STATE, () => { refresh(); showDelta(before, scores(), 'Redid ' + describe(c).toLowerCase()); save(); renderCard(); renderViews(); }, busyToast); }
 function describe(c) {
   const n = (c.lots || []).length, L = (k) => `${fmt(k)} lot${k === 1 ? '' : 's'}`;
   if (c.rl) return c.rl;
@@ -193,6 +197,7 @@ function showDelta(a, b, label) {
   clearTimeout(deltaT); deltaT = setTimeout(() => (el.hidden = true), 4200);
 }
 let toastT;
+const busyToast = (n) => toast(`Building ${fmt(n)}+ lots…`);
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 4200); }
 
 // ---------- save / load ----------
