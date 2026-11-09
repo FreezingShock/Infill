@@ -36,7 +36,7 @@ export async function initBackdrop({ scene, cam, canvas, onPick }) {
   // --- terrain
   {
     const pos = new Float32Array(T.nx * T.nz * 3), col = new Float32Array(T.nx * T.nz * 3), tmp = new THREE.Color();
-    const grass = new THREE.Color(0x6f8f48), dry = new THREE.Color(0xb8a05c), town = new THREE.Color(0x9a9078);
+    const grass = new THREE.Color(0x5f8a3c), dry = new THREE.Color(0xb8a05c), town = new THREE.Color(0x9a9078);
     for (let j = 0; j < T.nz; j++) for (let i = 0; i < T.nx; i++) {
       const k = j * T.nx + i, x = T.minx + i * T.cell, z = T.minz + j * T.cell;
       pos[k * 3] = x; pos[k * 3 + 1] = ground(x, z) - 0.4; pos[k * 3 + 2] = z;

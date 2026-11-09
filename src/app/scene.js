@@ -51,7 +51,7 @@ function lotObject(gens) {
 }
 
 // ---------- trees, cars ----------
-const TREE_COLS = [0x4f7a35, 0x5c8a38, 0x41703a, 0x6a9141, 0x557a42].map((h) => new THREE.Color(h));
+const TREE_COLS = [0x34602e, 0x3f6d31, 0x2d5530, 0x4a7a36, 0x3a6535, 0x2f5a3a, 0xb0602e, 0xc08a45].map((h) => new THREE.Color(h));
 const TREE_KINDS = (() => {
   const mk = (geo, y) => { geo.translate(0, y, 0); return geo; };
   return [
@@ -194,7 +194,7 @@ class World {
 // ---------- static scenery: terrain, mapped walks, street props, trees on wild land ----------
 function buildTerrain() {
   const pos = new Float32Array(T.nx * T.nz * 3), col = new Float32Array(T.nx * T.nz * 3);
-  const grass = C(0x6f8f48), meadow = C(0x7f9450), dry = C(0xb8a05c), dirt = C(0x9a7f58), tmp = new THREE.Color();
+  const grass = C(0x5f8a3c), meadow = C(0x71903f), dry = C(0xb8a05c), dirt = C(0x9a7f58), tmp = new THREE.Color();
   for (let j = 0; j < T.nz; j++) for (let i = 0; i < T.nx; i++) {
     const k = j * T.nx + i, h = HG[k];
     pos[k * 3] = T.minx + i * T.cell; pos[k * 3 + 1] = h; pos[k * 3 + 2] = T.minz + j * T.cell;
