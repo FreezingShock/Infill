@@ -63,7 +63,7 @@ function commands() {
   ];
 }
 
-let bar, input, list, hi, items = [], active = 0, returnFocus = null;
+let bar, input, list, items = [], active = 0, returnFocus = null;
 let closing = false, closeTimer = null, staggerTimer = null;
 const reducedMotion = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -76,23 +76,11 @@ function render() {
   let html = '', last = null, n = 0; // n sets --i, the row's place in the stagger
   items.forEach((c, i) => {
     if (c.g !== last) { html += `<li class="cmdhead" role="presentation" style="--i:${n++}">${esc(c.g)}</li>`; last = c.g; }
-    html += `<li role="presentation" style="--i:${n++}"><button type="button" role="option" id="cmdo${i}" class="cmdrow${i === active ? ' on' : ''}" aria-selected="${i === active}" data-i="${i}">`
+    html += `<li role="presentation" style="--i:${n++}"><button type="button" role="option" id="cmdo${i}" class="cmdrow${i === active ? ' on' : ''}" aria-selected="${i === active}" data-i="${i}"><span class="cmdfill" aria-hidden="true"></span>`
       + `<span class="cmdlabel">${esc(c.t)}</span>${c.on?.() ? '<em class="cmdon">On</em>' : ''}${c.sub ? `<small class="cmdsub">${esc(c.sub)}</small>` : ''}${c.k ? `<kbd>${esc(c.k)}</kbd>` : ''}</button></li>`;
   });
   list.innerHTML = html || '<li class="cmdempty" role="presentation">Nothing matches. Try a view, a tool, an area or an address.</li>';
   input.setAttribute('aria-activedescendant', items.length ? `cmdo${active}` : '');
-  placeHi();
-}
-
-// Slides the white highlight onto the active row. snap = jump with no motion (used when the bar opens).
-function placeHi(snap = false) {
-  const b = list.querySelector(`.cmdrow[data-i="${active}"]`);
-  if (!b) { hi.classList.remove('show'); return; }
-  if (snap) hi.style.transition = 'none';
-  hi.style.height = `${b.offsetHeight}px`;
-  hi.style.transform = `translateY(${b.offsetTop}px)`;
-  hi.classList.add('show');
-  if (snap) { void hi.offsetWidth; hi.style.transition = ''; }
 }
 
 function paintActive() {
@@ -102,7 +90,6 @@ function paintActive() {
     if (on) b.scrollIntoView({ block: 'nearest' });
   });
   input.setAttribute('aria-activedescendant', items.length ? `cmdo${active}` : '');
-  placeHi();
 }
 
 function move(d) { if (!items.length) return; active = (active + d + items.length) % items.length; paintActive(); }
@@ -110,7 +97,7 @@ function move(d) { if (!items.length) return; active = (active + d + items.lengt
 function open() {
   returnFocus = document.activeElement;
   clearTimeout(closeTimer); closing = false; bar.classList.remove('closing');
-  bar.hidden = false; input.value = ''; active = 0; render(); placeHi(true); input.focus();
+  bar.hidden = false; input.value = ''; active = 0; render(); input.focus();
   // the result rows reveal in a stagger for a moment after opening; typing afterwards re-renders without replaying it
   if (!reducedMotion()) {
     list.classList.add('stagger');
@@ -140,11 +127,11 @@ export function mountCommandBar() {
   bar.className = 'cmdbar'; bar.id = 'cmdBar'; bar.hidden = true;
   bar.innerHTML = `<div class="cmdpanel" role="dialog" aria-modal="true" aria-label="Command bar">
     <label class="cmdsearch"><kbd class="cmdkey">/</kbd><input id="cmdInput" type="text" autocomplete="off" spellcheck="false" placeholder="Run a view, tool, area or address" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-controls="cmdList" aria-label="Command bar"></label>
-    <div class="cmdbody"><i class="cmdhi" aria-hidden="true"></i><ul class="cmdlist" id="cmdList" role="listbox" aria-label="Commands"></ul></div>
+    <div class="cmdbody"><ul class="cmdlist" id="cmdList" role="listbox" aria-label="Commands"></ul></div>
     <div class="cmdfoot"><span>Up / Down move</span><span>Enter run</span><span>Esc close</span></div>
   </div>`;
   $('app').appendChild(bar);
-  input = $('cmdInput'); list = $('cmdList'); hi = bar.querySelector('.cmdhi');
+  input = $('cmdInput'); list = $('cmdList');
 
   input.addEventListener('input', () => { active = 0; render(); });
   input.addEventListener('keydown', (e) => {

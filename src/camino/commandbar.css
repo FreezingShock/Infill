@@ -1,5 +1,5 @@
-/* sfvOS command bar: a dark glass panel with a white transit-style rule, mono key hints, a white highlight that slides
-   between rows. Motion follows the HUD: corner brackets and a cyan scanline draw the panel in, rows reveal in a short stagger,
+/* sfvOS command bar: a dark glass panel with a white transit-style rule, mono key hints, a white highlight that wipes onto
+   the active row. Motion follows the HUD: corner brackets and a cyan scanline draw the panel in, rows reveal in a short stagger,
    and close folds the panel up fast. Everything is scoped to html[data-theme=camino] and to .cmdbar, so nothing else is touched.
    Motion tokens (--ease, --ease-io) come from hud2.css on #app. Reduced motion turns every animation off (see the end). */
 [data-theme=camino] .cmdbar { position: absolute; inset: 0; z-index: 15; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(2, 3, 4, .38); animation: cmdFade .2s ease-out both; }
@@ -31,15 +31,16 @@
 [data-theme=camino] .cmdsearch input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--ink); font: 500 15px var(--display); padding: 14px 0; }
 [data-theme=camino] .cmdsearch input::placeholder { color: var(--ink-soft); }
 
-/* the scroll box holds the highlight, so the highlight scrolls with the rows */
-[data-theme=camino] .cmdbody { position: relative; overflow: auto; flex: 1 1 auto; min-height: 0; }
+[data-theme=camino] .cmdbody { overflow: auto; flex: 1 1 auto; min-height: 0; }
 [data-theme=camino] .cmdlist { list-style: none; margin: 0; padding: 4px 0 6px; }
-/* one white bar that slides to the active row (JS sets its transform and height) */
-[data-theme=camino] .cmdhi { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 0; background: var(--white); opacity: 0; pointer-events: none; transition: transform .18s var(--ease, ease-out), height .18s var(--ease, ease-out), opacity .15s; }
-[data-theme=camino] .cmdhi.show { opacity: 1; }
+/* the white highlight lives inside each row, so it always sits on the row it marks (after filtering, on open, on arrow keys).
+   It wipes in from the left on the active row; the row's text is painted above it. */
+[data-theme=camino] .cmdfill { position: absolute; inset: 0; z-index: -1; background: var(--white); opacity: 0; transform: scaleX(0); transform-origin: left center; pointer-events: none; }
+[data-theme=camino] .cmdrow.on .cmdfill { opacity: 1; transform: none; animation: cmdWipe .16s var(--ease-io, ease-in-out) both; }
+@keyframes cmdWipe { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 [data-theme=camino] .cmdhead { font: 500 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); padding: 12px 14px 6px; }
-[data-theme=camino] .cmdrow { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; background: transparent; border: 0; border-radius: 0; color: var(--ink); font: 500 13px/1.2 var(--display); padding: 7px 14px; cursor: pointer; text-align: left; }
+[data-theme=camino] .cmdrow { position: relative; z-index: 1; isolation: isolate; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; background: transparent; border: 0; border-radius: 0; color: var(--ink); font: 500 13px/1.2 var(--display); padding: 7px 14px; cursor: pointer; text-align: left; }
 [data-theme=camino] .cmdrow.on { background: transparent; color: #050607; }
 [data-theme=camino] .cmdrow:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
 [data-theme=camino] .cmdlabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -64,6 +65,5 @@
 @media (prefers-reduced-motion: reduce) {
   [data-theme=camino] .cmdbar, [data-theme=camino] .cmdbar.closing, [data-theme=camino] .cmdbar.closing .cmdpanel, [data-theme=camino] .cmdpanel,
   [data-theme=camino] .cmdpanel::before, [data-theme=camino] .cmdpanel::after, [data-theme=camino] .cmdlist.stagger > li,
-  [data-theme=camino] .cmdsearch, [data-theme=camino] .cmdfoot { animation: none; }
-  [data-theme=camino] .cmdhi { transition: none; }
+  [data-theme=camino] .cmdsearch, [data-theme=camino] .cmdfoot, [data-theme=camino] .cmdrow.on .cmdfill { animation: none; }
 }
