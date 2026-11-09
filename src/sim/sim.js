@@ -220,6 +220,21 @@ class Sim {
     this.cars = this.cars.filter((c) => !gone.has(c));
   }
 
+  // ---------- per-street numbers for the info views ----------
+  // flow: edgeId -> congestion 0..1.4 (queue length and slowness); curb: edgeId -> share of curb slots taken 0..1
+  edgeStats() {
+    const flow = {}, curb = {}, slots = {};
+    for (const l of this.net.lanes) {
+      let used = 0, v = 0; for (const c of l.cars) { used += c.len; v += c.v; }
+      const occ = Math.min(1, used / Math.max(l.len, 1)), slow = l.cars.length ? 1 - Math.min(1, v / l.cars.length / Math.max(l.speed * 0.7, 1)) : 0;
+      const cong = Math.min(1.4, occ * 2.4 + slow * 0.7 * Math.min(1, occ * 5));
+      if (flow[l.eid] === undefined || cong > flow[l.eid]) flow[l.eid] = cong;
+      if (l.slots.length) { const e = slots[l.eid] || (slots[l.eid] = [0, 0]); for (const sl of l.slots) { e[1]++; if (sl.state) e[0]++; } }
+    }
+    for (const id in slots) curb[id] = slots[id][0] / slots[id][1];
+    return { flow, curb };
+  }
+
   // ---------- output: [id, x, z, heading, vx, vz, colour] per vehicle ----------
   snapshot() {
     const net = this.net; if (!net) return new Float32Array(0);
