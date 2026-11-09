@@ -5,6 +5,7 @@ import { scene, toon } from '../app/render.js';
 import { X0, X1, Z0, Z1, elev } from '../engine/core.js';
 import { clock } from '../game/clock.js';
 import { nodeControl } from '../tools/roads/graph.js';
+import { provide } from './providers.js';
 import { buildNet, drivableEdges, keyOf } from '../sim/net.js';
 import { Sim, STRIDE } from '../sim/sim.js';
 
@@ -30,23 +31,28 @@ let backend = null;
 function startBackend() {
   try {
     const w = new Worker(new URL('../sim/worker.js', import.meta.url), { type: 'module' });
-    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats); };
+    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); };
     w.onerror = () => { backend = localBackend(); };
     return { post: (m) => w.postMessage(m) };
   } catch (err) { return localBackend(); }
 }
 function localBackend() {
-  const sim = new Sim(7); let last = performance.now(), acc = 0;
+  const sim = new Sim(7); let last = performance.now(), acc = 0, tick = 0;
   setInterval(() => {
     const now = performance.now(), el = Math.min(0.25, (now - last) / 1000); last = now;
     if (!sim.net) return;
     const t0 = performance.now(); if (sim.running) { acc += el; let n = 0; while (acc >= 0.05 && n < 2) { sim.step(0.05); acc -= 0.05; n++; } if (n === 2) acc = 0; }
-    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0 });
+    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0 }, ++tick % 20 === 1 ? sim.edgeStats() : null);
   }, 50);
   return { post: (m) => { if (m.type === 'net') sim.setNet(buildNet(m.edges, { bounds: m.bounds, control: m.control })); else if (m.type === 'cfg') { if (m.density != null) sim.density = m.density; if (m.running != null) sim.running = m.running; } } };
 }
 
-function onSnap(buf, stats) {
+const live = { flow: null, curb: null };
+// the info views switch from estimates to these as soon as the sim has numbers (see views/providers.js)
+provide('edgeFlow', () => (live.flow && st.on ? live.flow : null));
+provide('curbOcc', () => (live.curb && st.on ? live.curb : null));
+function onSnap(buf, stats, edges) {
+  if (edges) { live.flow = new Map(Object.entries(edges.flow)); live.curb = new Map(Object.entries(edges.curb)); }
   st.snap = buf; st.snapT = performance.now(); st.stats = stats; st.fresh = true;
   // colours only change when the list does, so set them here and leave the per-frame work to positions
   let nm = 0, np = 0;

@@ -64,6 +64,7 @@ export function parking(S, facts, min = minuteOfDay()) {
   }
   const edgeOcc = new Map();
   for (const [id, n] of curb) { curbHave += n; if (n) edgeOcc.set(id, clamp(0.15 + (spill.get(id) || 0) / n, 0, 1.5)); }
+  const lc = provided('curbOcc'); if (lc) { const m = lc(min); if (m) for (const [id, o] of m) edgeOcc.set(id, o); } // real curb fill from the sim
   return { edgeOcc, lotOcc, live: false, want, have, curbHave, short: Math.max(0, want - have - curbHave * 0.85) };
 }
 

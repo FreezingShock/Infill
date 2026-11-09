@@ -41,6 +41,7 @@ test('cars flow through the crossing without overlapping or stalling', () => {
   assert.ok(worst > -0.5, `cars overlapped by ${worst}`);
   const snap = sim.snapshot();
   assert.ok(snap.length >= STRIDE && snap.every(Number.isFinite));
+  const es = sim.edgeStats(); assert.ok(Object.values(es.flow).every(Number.isFinite) && Object.values(es.curb).every((v) => v >= 0 && v <= 1) && Object.keys(es.flow).length === 4);
   assert.ok(sim.stats.moving > 3, `only ${sim.stats.moving} cars`);
   assert.ok(sim.stats.waiting < sim.stats.moving, 'everyone is stopped');
 });
