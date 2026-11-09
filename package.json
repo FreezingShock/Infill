@@ -1,8 +1,8 @@
 {
-  "name": "renovated",
+  "name": "sfvos",
   "private": true,
   "version": "0.1.0",
-  "description": "Renovated: a cozy city renovation game on real San Fernando Valley map data",
+  "description": "sfvOS: a live city builder on real San Fernando Valley map data",
   "type": "module",
   "scripts": {
     "dev": "vite",

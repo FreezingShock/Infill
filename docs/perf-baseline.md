@@ -1,4 +1,4 @@
-# Perf baseline (Infill)
+# Perf baseline (sfvOS)
 
 Numbers are measured in plain node on the cloud box (no browser, per nate's rule), so treat them as ratios, not frame times. Threads that add per-frame or per-edit cost: add a row with the date.
 

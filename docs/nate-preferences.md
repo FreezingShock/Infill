@@ -1,6 +1,6 @@
 # What nate asks for and likes (sfvOS)
 
-Seeded 9 Nov 2026 from the Infill project chat and from nate's Deepstack notes. Threads: append one dated line when something new about taste comes up (a correction, a "don't", a "love this"), under the matching heading, and add 2-3 backlog ideas in his wording.
+Seeded 9 Nov 2026 from the sfvOS project chat and from nate's Deepstack notes. Threads: append one dated line when something new about taste comes up (a correction, a "don't", a "love this"), under the matching heading, and add 2-3 backlog ideas in his wording.
 
 ## Product
 - **No grid map.** Real lots and streets, deep customization, but customizing must be much easier (Nexus-like ease). 2026-10-25.
@@ -20,7 +20,7 @@ Seeded 9 Nov 2026 from the Infill project chat and from nate's Deepstack notes. 
 - **Auto-merge PRs into `integration`** when lint, tests and build pass; localhost runs from `integration`. 2026-10-26.
 - **Many threads at once**, split to avoid file conflicts; ask him questions on style, taste and decisions (numbered, with a recommended default), then proceed on the default. Pattern from Deepstack.
 - **Models**: big features claude-sonnet-5-5 at medium effort; quick fixes claude-haiku-5-5 at high effort. 2026-11-09.
-- **Work in `C:\Users\natea\Infill`**, not Backbone. 2026-11-09.
+- **Work in `C:\Users\natea\sfvOS`**, not Backbone. 2026-11-09.
 - Windows user: `git checkout integration`, `git pull`, `npm install`, `npm run dev`.
 
 ## From Deepstack (likely to carry over)

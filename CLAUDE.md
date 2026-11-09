@@ -1,6 +1,6 @@
 # Working on sfvOS (read this first)
 
-sfvOS (repo and package still named Infill / "renovated") is a Vite + Three.js city game on real San Fernando Valley map data: a live city on real lots and streets, played through the **Camino** surveillance-OS interface. Many Claude threads work here in parallel. Everything merges into `integration`; nate plays `integration` on localhost.
+sfvOS is a Vite + Three.js city game on real San Fernando Valley map data: a live city on real lots and streets, played through the **Camino** surveillance-OS interface. Many Claude threads work here in parallel. Everything merges into `integration`; nate plays `integration` on localhost.
 
 Reading order: this file, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (map, theme, recipes), [docs/ROADMAP.md](docs/ROADMAP.md) (who owns what), [docs/IMPORT.md](docs/IMPORT.md) (importer), [docs/nate-preferences.md](docs/nate-preferences.md) (taste). [docs/PLAN.md](docs/PLAN.md) is the original v3 plan, kept for history.
 
@@ -13,7 +13,7 @@ Reading order: this file, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (map
 6. **No emoji in the UI** (cards, toasts, advisor). Use drawn SVG/CSS glyphs in the Camino style (see `SEV` in `src/ui/index.js`).
 7. **Realism of rules does not matter** (no assessor data, real heights or zoning accuracy). Realism of look and layout does.
 8. **The world is live.** A loaded area has cars, parked cars, turns and a clock. Sim state is derived and never saved; a save is the edit log.
-9. **Work in `C:\Users\natea\Infill`**, not Backbone, when touching nate's PC.
+9. **Work in `C:\Users\natea\sfvOS`**, not Backbone, when touching nate's PC.
 10. **Models.** Big features use `claude-sonnet-5-5` at medium effort. Quick fixes (including small Camino theme fixes) use `claude-haiku-5-5` at high effort.
 11. **Camino is the only look.** The classic paper look is gone; build nothing for it.
 
