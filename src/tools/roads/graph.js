@@ -2,6 +2,7 @@ import { bbox, bufferLine } from '../../engine/core.js';
 import { PACK } from '../../engine/pack.js';
 import { rowWidth } from '../../engine/model.js';
 import { ring } from './shapes.js';
+import { rankOf } from './classes.js';
 
 // =====================================================================
 // Intersections and the road-graph API other systems (traffic sim, parking, routing) read.
@@ -26,7 +27,7 @@ const CONTROLS = {
 const BIG = new Set(['motorway', 'trunk', 'primary', 'secondary']);
 
 function nodeEdges(S, n) {
-  const out = []; for (const e of S.edges.values()) if (e.g && (e.a === n || e.b === n)) out.push(e); return out;
+  const out = []; for (const e of S.edges.values()) if (e.g && !e.xmed && (e.a === n || e.b === n)) out.push(e); return out; // the box between a divided road's carriageways is not a leg
 }
 function nearestNode(S, x, z, tol) {
   let b = -1, bd = tol; S.nodes.forEach((p, i) => { const d = Math.hypot(p[0] - x, p[1] - z); if (d < bd) { bd = d; b = i; } }); return b;
@@ -40,9 +41,11 @@ function nodeControl(S, n) {
   const set = S.ctrl && S.ctrl[n]; if (set) return set;
   const es = nodeEdges(S, n); if (es.length < 3) return 'none';
   const p = S.nodes[n], big = es.filter((e) => BIG.has(e.c));
-  if (big.length >= 2) return 'signal';
+  // a divided road is one road, not two: two carriageways of the same street never make a signal by themselves
+  if (new Set(big.map((e) => e.n || e.id)).size >= 2) return 'signal';
   if (PACK.props.some(([k, x, z]) => k === 'signal' && Math.hypot(x - p[0], z - p[1]) < 25)) return 'signal';
-  return big.length === 1 ? 'stop' : 'allway';
+  const rk = es.map(rankOf);
+  return Math.max(...rk) > Math.min(...rk) ? 'stop' : 'allway'; // the bigger road flows through, smaller streets stop; equals take turns
 }
 // Streets that must give way under the node's control: side streets for stop/yield, everything for allway.
 function givesWay(S, n, e) {

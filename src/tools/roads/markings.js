@@ -1,5 +1,6 @@
 import { polyLen } from '../../engine/core.js';
 import { EL, rowWidth } from '../../engine/model.js';
+import { rankOf } from './classes.js';
 
 // =====================================================================
 // Intersection-aware road details, as plain geometry for buildRoads to draw (no THREE here):
@@ -9,8 +10,7 @@ import { EL, rowWidth } from '../../engine/model.js';
 //   - medians end before the crosswalk with a rounded nose
 // One rule for every junction in every area.
 // =====================================================================
-const RANK = { motorway: 5, trunk: 5, primary: 4, secondary: 3, tertiary: 2, residential: 1, unclassified: 1, service: 0, unknown: 0 };
-const SKIP_LEG = (e) => e.s === 'driveway' || e.s === 'alley' || e.prof?.k === 'plain';
+const SKIP_LEG = (e) => e.xmed || e.s === 'driveway' || e.s === 'alley' || e.prof?.k === 'plain';
 const BOX_MIN = 4, CW_HALF = 1.5, BAR_GAP = 1.3, NOSE_GAP = 0.6, NOSE_R = 1.75;
 
 // point and tangent (a to b) at distance d from the start of polyline p
@@ -41,6 +41,13 @@ function zones(prof) {
   return z;
 }
 
+// three legs where two head the same way and the third the opposite way: a road splitting, not a crossing
+function isFork(d) {
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  for (let k = 0; k < 3; k++) { const a = d[(k + 1) % 3], b = d[(k + 2) % 3]; if (dot(a, b) > 0.7 && dot(d[k], a) < -0.7 && dot(d[k], b) < -0.7) return true; }
+  return false;
+}
+
 function analyse(S) {
   const deg = new Map();
   for (const e of S.edges.values()) if (e.g && !SKIP_LEG(e)) for (const n of [e.a, e.b]) { if (!deg.has(n)) deg.set(n, []); deg.get(n).push(e); }
@@ -50,14 +57,15 @@ function analyse(S) {
   for (const [n, es] of deg) {
     if (es.length < 3 || es.some((e) => e.ring) || es.filter((e) => e.taper).length >= 2) continue; // a merge into the two-way road is not an intersection
     const dirs = es.map((e) => { const atEnd = e.b === n, p = e.p, q = atEnd ? at(p, polyLen(p) - 4) : at(p, 4); const x0 = p[atEnd ? p.length - 1 : 0]; return [q.x - x0[0], q.z - x0[1]].map((v, _, a) => v / (Math.hypot(a[0], a[1]) || 1)); });
+    if (es.length === 3 && isFork(dirs)) continue; // a fork or a swerve where one road splits in two: no box, crosswalks or stop bars
     es.forEach((e, i) => {
       const atEnd = e.b === n;
       // the box reaches as far as the widest street that crosses this one
       let box = BOX_MIN;
       es.forEach((q, j) => { if (j === i) return; const d = dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]; if (Math.abs(d) < 0.8) box = Math.max(box, rowWidth(q.prof) / 2); });
       // a main road meeting only minor streets has priority: its lines run through, nothing crosses it
-      const rk = (q) => RANK[q.c] ?? 1, priority = rk(e) >= 3 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 2);
-      if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); return; }
+      const rk = rankOf, priority = rk(e) >= 2 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 1);
+      if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); legs.push({ e, n, atEnd, D: box + 2.2, priority: true }); return; }
       const D = box + 2.2, len = polyLen(e.p);
       if (len < 2 * (D + CW_HALF + BAR_GAP) + 4) { const r = get(e); if (atEnd) r.t1 = len; else r.t0 = len; return; } // a short link inside the box: no markings at all
       const r = get(e), clear = D + CW_HALF + BAR_GAP;
@@ -68,6 +76,14 @@ function analyse(S) {
   return { info, legs };
 }
 
+// median nose: quarter disc at the end of each carriageway's half-median
+function noseFor(e, atEnd, D, len, z, noses) {
+  const m = z.find((q) => q.k === 'median'); if (!m || e.nose) return; // a nosed median is painted, it has no raised end
+  const first = z[0] === m, axis = first ? m.a : m.b, v = first ? 1 : -1, nd = atEnd ? len - (D + CW_HALF + NOSE_GAP + NOSE_R) : D + CW_HALF + NOSE_GAP + NOSE_R, Q = at(e.p, nd);
+  const nx = -Q.tz, nz = Q.tx; // right of a to b
+  noses.push({ c: [Q.x + nx * axis, Q.z + nz * axis], u: atEnd ? [Q.tx, Q.tz] : [-Q.tx, -Q.tz], v: [nx * v, nz * v], r: NOSE_R, e });
+}
+
 // Everything to draw, in plain data:
 //   ladders: { p:[[x,z],[x,z]], o1, o2 }   white stripes (ribbon along p between lateral o1..o2)
 //   bars:    same shape, stop bars
@@ -75,9 +91,10 @@ function analyse(S) {
 function plan(S, walks = []) {
   const { info, legs } = analyse(S);
   const ladders = [], bars = [], noses = [], centres = [];
-  for (const { e, atEnd, D } of legs) {
+  for (const { e, atEnd, D, priority } of legs) {
     const len = polyLen(e.p), dist = atEnd ? len - D : D, P = at(e.p, dist), z = zones(e.prof), road = z.filter((q) => !q.curb);
     if (!road.length) continue;
+    if (priority) { noseFor(e, atEnd, D, len, z, noses); continue; } // the through road keeps its lines: no crosswalk or stop bar across it
     centres.push([P.x, P.z]);
     const lo = Math.min(...road.map((q) => q.a)), hi = Math.max(...road.map((q) => q.b));
     const path = [[P.x - P.tx * CW_HALF, P.z - P.tz * CW_HALF], [P.x + P.tx * CW_HALF, P.z + P.tz * CW_HALF]];
@@ -90,13 +107,7 @@ function plan(S, walks = []) {
       const a = Math.min(...lanes.map((q) => q.a)), b = Math.max(...lanes.map((q) => q.b)), d2 = dist + (atEnd ? -1 : 1) * (CW_HALF + 0.9), P2 = at(e.p, d2);
       bars.push({ p: [[P2.x - P2.tx * 0.22, P2.z - P2.tz * 0.22], [P2.x + P2.tx * 0.22, P2.z + P2.tz * 0.22]], o1: a + 0.15, o2: b - 0.15, e });
     }
-    // median nose: quarter disc at the end of each carriageway's half-median
-    const m = z.find((q) => q.k === 'median');
-    if (m) {
-      const first = z[0] === m, axis = first ? m.a : m.b, v = first ? 1 : -1, nd = atEnd ? len - (D + CW_HALF + NOSE_GAP + NOSE_R) : D + CW_HALF + NOSE_GAP + NOSE_R, Q = at(e.p, nd);
-      const nx = -Q.tz, nz = Q.tx; // right of a to b
-      noses.push({ c: [Q.x + nx * axis, Q.z + nz * axis], u: atEnd ? [Q.tx, Q.tz] : [-Q.tx, -Q.tz], v: [nx * v, nz * v], r: NOSE_R, e });
-    }
+    noseFor(e, atEnd, D, len, z, noses);
   }
   // mapped crossings away from any junction crossing keep their place, drawn as the same ladder
   const mid = [];
