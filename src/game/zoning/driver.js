@@ -47,8 +47,8 @@ function render() {
 }
 
 function startGrowth() {
-  const host = document.querySelector('.tr'); if (!host) return;
-  el = document.createElement('section'); el.className = 'plaque city'; el.setAttribute('aria-label', 'City growth'); host.append(el);
+  const host = document.getElementById('rcol') || document.querySelector('.tr'); if (!host) return;
+  el = document.createElement('section'); el.className = 'plaque city'; el.setAttribute('aria-label', 'City growth'); host.prepend(el);
   render();
   const stepOf = () => Math.floor((clock.day * 24 + clock.hour) / STEP_HOURS);
   let last = stepOf(), shown = clock.speed;

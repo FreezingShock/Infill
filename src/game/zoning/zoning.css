@@ -1,4 +1,4 @@
-.city { padding: 9px 14px; margin-top: 10px; width: 100%; font-size: 13px; }
+.city { padding: 9px 14px; flex: none; width: 100%; font-size: 13px; }
 .city h4 { margin: 0 0 6px; font: 700 14px var(--display); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .city h4 small { font: 12px var(--body); color: var(--ink-soft); }
 .city .dem { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 6px 8px; margin: 0; }
