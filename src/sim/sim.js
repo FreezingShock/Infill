@@ -4,6 +4,9 @@
 import { rng, sampleAt } from './geom.js';
 
 const CAR_LEN = 4.4, STRIDE = 7;
+// vehicle kinds: 0 sedan, 1 SUV, 2 pickup, 3 van, 4 bus. A look is colour (0..5) + 8 * kind.
+const LENS = [4.4, 4.7, 5.2, 5.0, 10.5];
+const kindOf = (look) => Math.floor(look / 8);
 const IDM = { a: 2.6, b: 3.4, T: 1.1, s0: 2.0 };
 const GREEN = 9, CYCLE = 12;
 const PARK_TIME = 1.4;
@@ -40,8 +43,8 @@ class Sim {
     for (const s of net.slots) {
       const o = oldSlots.get(s.id);
       if (o && (o.state === 1)) { s.state = 1; s.leaveAt = o.leaveAt; s.color = o.color; }
-      else if (!old && this.r() < this.parkedShare) { s.state = 1; s.leaveAt = this.t + 5 + this.r() * 200; s.color = Math.floor(this.r() * 6); }
-      else if (old && !o && this.r() < this.parkedShare) { s.state = 1; s.leaveAt = this.t + 5 + this.r() * 200; s.color = Math.floor(this.r() * 6); }
+      else if (!old && this.r() < this.parkedShare) { s.state = 1; s.leaveAt = this.t + 5 + this.r() * 200; s.color = this.look(false); }
+      else if (old && !o && this.r() < this.parkedShare) { s.state = 1; s.leaveAt = this.t + 5 + this.r() * 200; s.color = this.look(false); }
     }
     this.fill(0.8);
   }
@@ -57,12 +60,16 @@ class Sim {
     if (atPortal && this.portals.length) { lane = this.portals[Math.floor(this.r() * this.portals.length)]; s = 1; }
     else { const x = this.r() * this.spawnW.at(-1); let i = this.spawnW.findIndex((w) => w >= x); if (i < 0) i = 0; lane = this.spawnLanes[i]; s = 6 + this.r() * (lane.len - 12); }
     if (!lane.conns.length && !atPortal) return false;
-    for (const c of lane.cars) if (Math.abs(c.s - s) < CAR_LEN + 9) return false;
-    this.add(lane, s, lane.speed * 0.5, Math.floor(this.r() * 6), 0, 150 + this.r() * 900);
+    for (const c of lane.cars) if (Math.abs(c.s - s) < 16) return false;
+    const look = this.look(lane.rank >= 2), len = LENS[kindOf(look)];
+    for (const c of lane.cars) if (Math.abs(c.s - s) < len + 9) return false;
+    this.add(lane, s, lane.speed * 0.5, look, 0, 150 + this.r() * 900);
     return true;
   }
+  look(bus) { const r = this.r(), k = r < 0.46 ? 0 : r < 0.7 ? 1 : r < 0.82 ? 2 : r < 0.94 ? 3 : bus ? 4 : 0; return Math.floor(this.r() * 6) + 8 * k; }
   add(lane, s, v, color, lat, trip) {
-    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: CAR_LEN, fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0 };
+    if (kindOf(color) === 4) trip = 1e9;
+    const c = { id: this.nextId++, seg: lane, isConn: false, s, v, len: LENS[kindOf(color)], fac: 0.85 + this.r() * 0.3, color, lat, plan: null, granted: null, stopped: false, arrive: undefined, trip, park: null, i: 0, acc: 0, wait: 0 };
     c.plan = this.choose(lane); lane.cars.push(c); this.cars.push(c); return c;
   }
   choose(lane) {
@@ -85,7 +92,7 @@ class Sim {
   roomFor(conn, car) {
     const tl = conn.to, rear = tl.cars[tl.cars.length - 1];
     const free = rear ? rear.s - rear.len : tl.len;
-    const unit = Math.min(CAR_LEN + 1.5, tl.len);
+    const unit = Math.min(car.len + 1.5, tl.len);
     return free - tl.reserved * unit >= Math.min(unit + car.v * 0.4, tl.len);
   }
   canGo(conn, car) {
@@ -195,7 +202,7 @@ class Sim {
   seekSlot(c, from) {
     const lane = c.seg;
     for (const s of lane.slots) {
-      const ft = s.s + CAR_LEN / 2;
+      const ft = s.s + c.len / 2;
       if (s.state === 0 && ft >= Math.max(from, c.s + 14) && ft < lane.len - 4) { s.state = 2; c.park = { slot: s, ft, phase: 0, timer: 0 }; return; }
     }
   }
@@ -206,7 +213,7 @@ class Sim {
       for (const c of lane.cars) if (c.s > s.s - 18 && c.s - c.len < s.s + 6) { clear = false; break; }
       if (!clear || !lane.conns.length || this.cars.length >= this.target() * 1.1) { s.leaveAt = this.t + 3; continue; }
       s.state = 0;
-      this.add(lane, s.s + CAR_LEN / 2, 0, s.color ?? 0, s.lat, 150 + this.r() * 700);
+      this.add(lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, 0, s.color ?? 0, s.lat, 150 + this.r() * 700);
     }
   }
   remove(dead) {
@@ -242,14 +249,14 @@ class Sim {
     const out = new Float32Array((this.cars.length + parked.length) * STRIDE);
     let o = 0, wait = 0, sum = 0;
     const put = (id, seg, s, lat, v, color) => {
-      const p = sampleAt(seg.pts, seg.cum, Math.max(0, s - CAR_LEN / 2));
+      const p = sampleAt(seg.pts, seg.cum, Math.max(0, s - LENS[kindOf(color)] / 2));
       out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color;
     };
     for (const c of this.cars) { put(c.id, c.seg, c.s, c.lat, c.v, c.color); sum += c.v; if (c.v < 0.3) wait++; }
-    for (const s of parked) put(1e6 + net.slots.indexOf(s), s.lane, s.s + CAR_LEN / 2, s.lat, 0, s.color ?? 0);
+    for (const s of parked) put(1e6 + net.slots.indexOf(s), s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
     this.stats = { moving: this.cars.length, parked: parked.length, waiting: wait, avg: this.cars.length ? sum / this.cars.length : 0, broken: this.broken };
     return out;
   }
 }
 
-export { CAR_LEN, STRIDE, Sim };
+export { CAR_LEN, LENS, STRIDE, Sim };
