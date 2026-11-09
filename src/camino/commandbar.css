@@ -1,19 +1,46 @@
-/* sfvOS command bar: a dark glass panel with a white transit-style rule, mono key hints, white selected row.
-   Everything is scoped to html[data-theme=camino] and to .cmdbar, so nothing else on the page is touched. */
-[data-theme=camino] .cmdbar { position: absolute; inset: 0; z-index: 15; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(2, 3, 4, .38); }
+/* sfvOS command bar: a dark glass panel with a white transit-style rule, mono key hints, a white highlight that slides
+   between rows. Motion follows the HUD: corner brackets and a cyan scanline draw the panel in, rows reveal in a short stagger,
+   and close folds the panel up fast. Everything is scoped to html[data-theme=camino] and to .cmdbar, so nothing else is touched.
+   Motion tokens (--ease, --ease-io) come from hud2.css on #app. Reduced motion turns every animation off (see the end). */
+[data-theme=camino] .cmdbar { position: absolute; inset: 0; z-index: 15; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(2, 3, 4, .38); animation: cmdFade .2s ease-out both; }
 [data-theme=camino] .cmdbar[hidden] { display: none; }
-[data-theme=camino] .cmdpanel { width: min(600px, 100%); max-height: 72vh; display: flex; flex-direction: column; background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; box-shadow: 0 16px 48px rgba(0, 0, 0, .5); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); color: var(--ink); animation: cmdIn .22s cubic-bezier(.2, .8, .2, 1); overflow: hidden; }
-@keyframes cmdIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+[data-theme=camino] .cmdbar.closing { animation: cmdFadeOut .17s var(--ease-io, ease-in) both; pointer-events: none; }
+@keyframes cmdFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cmdFadeOut { from { opacity: 1; } to { opacity: 0; } }
 
-[data-theme=camino] .cmdsearch { display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--hair); cursor: text; }
+/* the panel: the frame is drawn in (clip reveal), then the scanline runs once and the brackets settle */
+[data-theme=camino] .cmdpanel { position: relative; width: min(600px, 100%); max-height: 72vh; display: flex; flex-direction: column; background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; box-shadow: 0 16px 48px rgba(0, 0, 0, .5); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); color: var(--ink); animation: cmdOpen .34s var(--ease, cubic-bezier(.2, .8, .2, 1)) both; }
+@keyframes cmdOpen { from { opacity: 0; transform: translateY(-8px); clip-path: inset(0 0 100% 0); } 45% { opacity: 1; } to { opacity: 1; transform: none; clip-path: inset(-16px -16px -16px -16px); } }
+[data-theme=camino] .cmdbar.closing .cmdpanel { animation: cmdClose .17s var(--ease-io, ease-in) both; }
+@keyframes cmdClose { from { opacity: 1; transform: none; clip-path: inset(-16px -16px -16px -16px); } to { opacity: 0; transform: translateY(-4px); clip-path: inset(0 0 100% 0); } }
+
+[data-theme=camino] .cmdpanel::before { content: ""; position: absolute; inset: -4px; pointer-events: none; z-index: 3; opacity: .75; --c: rgba(242, 243, 241, .85);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 9px 1px, linear-gradient(var(--c), var(--c)) top left / 1px 9px,
+    linear-gradient(var(--c), var(--c)) top right / 9px 1px, linear-gradient(var(--c), var(--c)) top right / 1px 9px,
+    linear-gradient(var(--c), var(--c)) bottom left / 9px 1px, linear-gradient(var(--c), var(--c)) bottom left / 1px 9px,
+    linear-gradient(var(--c), var(--c)) bottom right / 9px 1px, linear-gradient(var(--c), var(--c)) bottom right / 1px 9px;
+  background-repeat: no-repeat; animation: cmdBrackets .5s var(--ease, cubic-bezier(.2, .8, .2, 1)) backwards; }
+@keyframes cmdBrackets { from { inset: 14px; opacity: 0; } to { inset: -4px; opacity: .75; } }
+[data-theme=camino] .cmdpanel::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 4; pointer-events: none; background: var(--cyan); box-shadow: 0 0 14px 2px rgba(47, 216, 232, .6); animation: cmdScan .55s var(--ease-io, ease-in-out) backwards; }
+@keyframes cmdScan { from { top: 0; opacity: 1; } 85% { opacity: 1; } to { top: 100%; opacity: 0; } }
+
+[data-theme=camino] .cmdsearch { display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--hair); cursor: text; border-radius: 2px 2px 0 0; animation: cmdField .3s var(--ease, ease-out) .08s backwards; }
+@keyframes cmdField { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
 [data-theme=camino] .cmdkey { font: 500 12px/1 var(--mono); color: var(--cyan); border: 1px solid var(--hair-hi); border-radius: 2px; padding: 5px 7px; background: transparent; }
 [data-theme=camino] .cmdsearch input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--ink); font: 500 15px var(--display); padding: 14px 0; }
 [data-theme=camino] .cmdsearch input::placeholder { color: var(--ink-soft); }
 
-[data-theme=camino] .cmdlist { list-style: none; margin: 0; padding: 4px 0 6px; overflow: auto; flex: 1 1 auto; min-height: 0; }
+/* the scroll box holds the highlight, so the highlight scrolls with the rows */
+[data-theme=camino] .cmdbody { position: relative; overflow: auto; flex: 1 1 auto; min-height: 0; }
+[data-theme=camino] .cmdlist { list-style: none; margin: 0; padding: 4px 0 6px; }
+/* one white bar that slides to the active row (JS sets its transform and height) */
+[data-theme=camino] .cmdhi { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 0; background: var(--white); opacity: 0; pointer-events: none; transition: transform .18s var(--ease, ease-out), height .18s var(--ease, ease-out), opacity .15s; }
+[data-theme=camino] .cmdhi.show { opacity: 1; }
+
 [data-theme=camino] .cmdhead { font: 500 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); padding: 12px 14px 6px; }
-[data-theme=camino] .cmdrow { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; background: transparent; border: 0; border-radius: 0; color: var(--ink); font: 500 13px/1.2 var(--display); padding: 7px 14px; cursor: pointer; text-align: left; }
-[data-theme=camino] .cmdrow.on { background: var(--white); color: #050607; }
+[data-theme=camino] .cmdrow { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; background: transparent; border: 0; border-radius: 0; color: var(--ink); font: 500 13px/1.2 var(--display); padding: 7px 14px; cursor: pointer; text-align: left; }
+[data-theme=camino] .cmdrow.on { background: transparent; color: #050607; }
 [data-theme=camino] .cmdrow:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
 [data-theme=camino] .cmdlabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-theme=camino] .cmdrow kbd { flex: none; font: 500 9.5px/1.4 var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); border-radius: 0; padding: 0 5px; background: transparent; }
@@ -24,10 +51,19 @@
 [data-theme=camino] .cmdrow.on .cmdsub { color: #384047; }
 [data-theme=camino] .cmdempty { padding: 16px 14px; font: 500 10.5px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 
-[data-theme=camino] .cmdfoot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 9px 14px; border-top: 1px solid var(--hair); font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+/* results reveal in a short stagger on open only (JS adds .stagger for that moment), so typing does not replay it */
+[data-theme=camino] .cmdlist.stagger > li { animation: cmdRow .32s var(--ease, ease-out) both; animation-delay: calc(min(var(--i, 0), 14) * 22ms + 80ms); }
+@keyframes cmdRow { from { opacity: 0; transform: translateX(-10px); clip-path: inset(0 100% 0 0); } to { opacity: 1; transform: none; clip-path: inset(-4px -4px -4px -4px); } }
+
+[data-theme=camino] .cmdfoot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 9px 14px; border-top: 1px solid var(--hair); font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); animation: cmdField .3s var(--ease, ease-out) .2s backwards; }
 
 @media (max-width: 760px) {
   [data-theme=camino] .cmdbar { padding: 8vh 12px 12px; }
   [data-theme=camino] .cmdsub, [data-theme=camino] .cmdfoot { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { [data-theme=camino] .cmdpanel { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme=camino] .cmdbar, [data-theme=camino] .cmdbar.closing, [data-theme=camino] .cmdbar.closing .cmdpanel, [data-theme=camino] .cmdpanel,
+  [data-theme=camino] .cmdpanel::before, [data-theme=camino] .cmdpanel::after, [data-theme=camino] .cmdlist.stagger > li,
+  [data-theme=camino] .cmdsearch, [data-theme=camino] .cmdfoot { animation: none; }
+  [data-theme=camino] .cmdhi { transition: none; }
+}
