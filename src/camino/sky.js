@@ -1,5 +1,5 @@
 // Camino sky: a smooth physical-looking gradient (no paper bands, no ink clouds), a soft sun with glow,
-// stars and a moon at night, and a black data sky in scan view. Same interface as views/sky.js.
+// stars and a moon at night, and a black data sky in scan view.
 // update(L) runs first inside applyLight, so it also tunes L (fog haze colour, light warmth) for the realistic look.
 import * as THREE from 'three';
 

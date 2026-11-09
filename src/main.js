@@ -1,6 +1,5 @@
 // Entry point: pick the area from ?area=, load its pack, then start the game.
 // The engine reads the pack when its modules evaluate, so it is imported only after the pack is in.
-import { CAMINO } from './camino/theme.js'; // picks the look before any material exists
 import { bootArea, bootDone, bootFail, bootProgress, bootStep } from './app/loader.js'; // the boot screen in index.html
 const $ = (id) => document.getElementById(id);
 
@@ -27,7 +26,7 @@ async function boot() {
   await import('./app/input.js');
   await import('./ui/index.js'); // info views, clock and advisor
   bootProgress(92);
-  if (CAMINO) { bootStep('Placing real infrastructure'); await import('./camino/index.js'); } // sfvOS Camino: realistic street view, scan view, real infrastructure
+  bootStep('Placing real infrastructure'); await import('./camino/index.js'); // sfvOS Camino: realistic street view, scan view, real infrastructure
   bootDone();
 }
 

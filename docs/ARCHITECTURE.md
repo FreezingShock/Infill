@@ -3,11 +3,10 @@
 How the pieces fit, and the recipes you need most. Rules and ownership are in [../CLAUDE.md](../CLAUDE.md).
 
 ## Boot sequence (`src/main.js`)
-1. `camino/theme.js` picks the look before any material exists.
-2. Fetch `public/areas/index.json`, choose the area (`?area=`, else the manifest default), fetch its pack, put it on `globalThis.__RENOVATED_PACK__` (the engine reads it when its modules evaluate, so it must be in before any engine import).
+1. Fetch `public/areas/index.json`, choose the area (`?area=`, else the manifest default), fetch its pack, put it on `globalThis.__RENOVATED_PACK__` (the engine reads it when its modules evaluate, so it must be in before any engine import).
 3. `assets/boot.js` loads optional sidecars next to the pack: `<id>.looks.json`, `.streets.json`, `.canopy.json`. Missing or mismatched files are skipped, never fatal.
 4. Import `app/input.js` (builds the world, lots on the worker pool), then `ui/index.js` (gauges, advisor, info views).
-5. If Camino: import `camino/index.js` (infrastructure from `<id>.infra.json`, scan view, HUD dock, command bar).
+5. Import `camino/index.js` (infrastructure from `<id>.infra.json`, scan view, HUD dock, command bar).
 Progress is reported to the boot screen in `index.html` via `app/loader.js`.
 
 ## Data flow
@@ -18,8 +17,8 @@ Progress is reported to the boot screen in `index.html` via `app/loader.js`.
 - **Info views** (`views/`): metrics are estimates until a provider (`provide('edgeFlow', ...)`) supplies live data, then they switch with no other change.
 
 ## Theme system
-- **Camino is the only theme.** The old paper look was dropped at nate's request; any leftover switch or paper-toon style code is dead and may be deleted, never extended. Materials are chosen at load in `camino/theme.js`.
-- `index.html` sets `data-theme="camino"` and links `camino.css` before first paint (no flash). CSS for Camino hangs off `html[data-theme=camino]`; do not edit `layout.css` for theme work.
+- **Camino is the only theme.** The old paper look is gone (nate's request) and there is no switch. Materials are always lit standard materials; `toon()` in `app/render.js` keeps its name only.
+- `index.html` sets `data-theme="camino"` and links `base.css` (layout and controls, with the Camino palette as its `:root` tokens) and `camino.css` before first paint (no flash). Camino rules hang off `html[data-theme=camino]`; do not edit `layout.css` for theme work.
 - Camino pieces: `look.js` (realistic street view: lighting, PBR-ish materials), `sky.js`, `scan.js` + `infra*.js` + `tags.js` (scan view, key **F**), `hud.js`/`hud2.js` (title, dossier, FPS, bottom dock with popovers, status strip), `commandbar.js` (`/` or Ctrl+K), `notify.css`.
 - Scan view draws **only real data** from the `<id>.infra.json` sidecar (`tools/pack/infra.py`): lights, hydrants, transmission, transit stops. Do not add modeled layers.
 - Design kit for outside use: `/mnt/project-files/camino-design-system/`.
