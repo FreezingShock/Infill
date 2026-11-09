@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { PACK } from '../engine/pack.js';
 import { hasCanopy, streetTreesAll } from '../engine/streettrees.js';
 import { addBulbs } from '../engine/bulbs.js';
-import { drawPath, medianKeep } from '../tools/roads/divided.js';
+import { drawPath } from '../tools/roads/divided.js';
 import { roadwayIndex } from '../tools/roads/roadway.js';
-import { plan as roadPlan, trimPath } from '../tools/roads/markings.js';
-import { Acc, C, HG, T, UP, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
+import { medianPaths, plan as roadPlan, trimPath } from '../tools/roads/markings.js';
+import { Acc, C, HG, T, decal, X0, X1, Z0, Z1, alongPts, area, bbox, dashed, densify, disposeTree, elev, inPoly, lineGeo, obox, offsetLine, ribbon, rng } from '../engine/core.js';
 import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { BASE } from '../engine/commands.js';
@@ -88,14 +88,6 @@ function instCars(list) {
   a.castShadow = true; grp.add(a, b); return grp;
 }
 
-// The painted buffer where a divided road's median ends and the two-way road begins: a flush lens that narrows to a point.
-// This draws one white edge line of it along the drawn path (e.nose); the other half of the lens is the partner carriageway's.
-function noseLine(marks, path, o, w, first, e, y, col, d0 = 0) {
-  const P = densify(path, 2), N = offsetLine(P, 1); let d = d0;
-  const at = (i, off) => { const x = P[i][0] + (N[i][0] - P[i][0]) * off, z = P[i][1] + (N[i][1] - P[i][1]) * off; return [x, elev(x, z) + y, z]; };
-  const offs = P.map((q, i) => { if (i) d += Math.hypot(q[0] - P[i - 1][0], q[1] - P[i - 1][1]); const k = w * medianKeep(e, d); return first ? o + k : o + w - k; });
-  for (let i = 0; i < P.length - 1; i++) { if (offs[i] === (first ? o : o + w) && offs[i + 1] === (first ? o : o + w)) continue; marks.quad(at(i, offs[i] - 0.09), at(i, offs[i] + 0.09), at(i + 1, offs[i + 1] + 0.09), at(i + 1, offs[i + 1] - 0.09), col, UP); }
-}
 // ---------- streets from cross-section profiles ----------
 const ROAD_ORDER = { service: 0, unknown: 0, unclassified: 1, residential: 1, tertiary: 2, secondary: 3, primary: 4, motorway: 5 };
 function buildRoads(S) {
@@ -112,11 +104,16 @@ function buildRoads(S) {
       i0++; const d = EL[k] || EL.lane, curb = !!d.curb;
       if ((pass === 0) === curb) {
         const col = (k === 'lane' || k === 'turn' || k === 'park') && e.prof.k === 'asbuilt' ? (k === 'park' ? ASPH[e.c].clone().offsetHSL(0, 0, 0.03) : ASPH[e.c]) : C(d.c);
-        const mpath = k === 'median' && RP.info.get(e.id) ? trimPath(P, RP.info.get(e.id).mt0, RP.info.get(e.id).mt1) : P; // medians stop short of each junction
-        if (mpath !== P || (k === 'median' && e.nose)) ribbon(acc, P, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the part where the median stops or narrows
-        if (!(k === 'median' && e.nose)) ribbon(acc, mpath, o, o + w, curb ? (k === 'median' ? base + 0.06 : 0.16) : base, col); // a nosed median is painted, not raised: see the markings below
-        if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(mpath, o + w / 2), 9, (x, z) => trees.push([x, elev(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
-        if (k === 'median' && i0 === 0 && !e.nose) alongPts(offsetLine(mpath, o), 14, (x, z) => trees.push([x, elev(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median, not in the nose
+        if (k === 'median') {
+          ribbon(acc, P, o, o + w, base, ASPH[e.c] || ASPH.primary); // road under the median: openings and painted merges show it
+          if (!e.nose) for (const seg of medianPaths(P, RP.info.get(e.id))) { // raised strips between the junction openings
+            ribbon(acc, seg, o, o + w, base + 0.06, col);
+            if (i0 === 0) alongPts(offsetLine(seg, o), 14, (x, z) => trees.push([x, elev(x, z), z, 0.8, 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5])); // one row down the middle of the median
+          }
+        } else {
+          ribbon(acc, P, o, o + w, curb ? 0.16 : base, col);
+          if (k === 'trees' && !(hasCanopy() && e.prof.k === 'asbuilt' && ['residential', 'unclassified', 'tertiary'].includes(e.c))) alongPts(offsetLine(P, o + w / 2), 9, (x, z) => trees.push([x, elev(x, z), z, 0.9, e.c === 'primary' && e.prof.k === 'complete' ? 2 : 0, Math.floor(Math.abs(x * 7 + z * 3)) % 5]));
+        }
       }
       o += w;
     }
@@ -124,7 +121,7 @@ function buildRoads(S) {
       let o2 = -row / 2; const pos = [];
       for (const [k, w] of els) { pos.push([k, o2, o2 + w]); o2 += w; }
       const hasTurn = pos.some((p) => p[0] === 'turn');
-      const R = RP.info.get(e.id), mp = R && (R.t0 || R.t1) ? trimPath(P, R.t0, R.t1) : P, mm = R && (R.mt0 || R.mt1) ? trimPath(P, R.mt0, R.mt1) : P; // no lane or centre lines inside the junction box
+      const R = RP.info.get(e.id), mp = R && (R.t0 || R.t1) ? trimPath(P, R.t0, R.t1) : P; // no lane or centre lines inside the junction box
       for (let i = 0; i < pos.length; i++) {
         const [k, a, b] = pos[i], nk = pos[i + 1]?.[0];
         if (k === 'turn') { ribbon(marks, mp, a + 0.1, a + 0.28, base + 0.16, YEL, 2); ribbon(marks, mp, b - 0.28, b - 0.1, base + 0.16, YEL, 2); }
@@ -132,9 +129,9 @@ function buildRoads(S) {
           if (!hasTurn && !e.oneway && Math.abs(b) < 0.6) { ribbon(marks, mp, b - 0.32, b - 0.14, base + 0.16, YEL, 2); ribbon(marks, mp, b + 0.14, b + 0.32, base + 0.16, YEL, 2); }
           else dashed(marks, mp, b - 0.08, b + 0.08, base + 0.16, WHITE, 3, 6);
         }
-        if (k === 'median' && e.nose) noseLine(marks, mm, a, b - a, i === 0, e, base + 0.16, WHITE, R?.mt0 || 0);
-        if (k === 'median' && (nk === 'lane' || nk === 'turn')) ribbon(marks, mm, b + 0.02, b + 0.2, base + 0.16, YEL, 2); // yellow beside a median
-        if (nk === 'median' && (k === 'lane' || k === 'turn')) ribbon(marks, mm, b - 0.2, b - 0.02, base + 0.16, YEL, 2);
+        const yel = e.nose ? [P] : medianPaths(P, R); // beside a median; along a painted merge it closes up into the double yellow
+        if (k === 'median' && (nk === 'lane' || nk === 'turn')) for (const sg of yel) ribbon(marks, sg, b + 0.02, b + 0.2, base + 0.16, YEL, 2);
+        if (nk === 'median' && (k === 'lane' || k === 'turn')) for (const sg of yel) ribbon(marks, sg, b - 0.2, b - 0.02, base + 0.16, YEL, 2);
         if (k === 'bike' && (nk === 'lane' || nk === 'park' || nk === 'turn')) ribbon(marks, mp, b - 0.12, b + 0.04, base + 0.16, WHITE, 3);
         if ((nk === 'bike') && (k === 'lane' || k === 'park' || k === 'turn')) ribbon(marks, mp, b - 0.04, b + 0.12, base + 0.16, WHITE, 3);
         if (k === 'shared' && nk === 'shared') dashed(marks, mp, b - 0.06, b + 0.06, base + 0.16, C(0xf0e2c8), 1, 2);
@@ -157,10 +154,13 @@ function buildRoads(S) {
 }
 function buildWalks() { // mapped sidewalks, paths and crossings from the data
   const acc = new Acc(), marks = new Acc(), WALK = C(0xe6ddcc), PATH = C(0xd3c19c);
+  const RW = roadwayIndex([...BASE.edges.values()]);
   for (const w of PACK.walks) {
     if (w.k === 'crosswalk') continue; // ladders are generated at every junction (src/tools/roads/markings.js)
-    if (w.k === 'sidewalk') ribbon(acc, w.p, -0.9, 0.9, 0.38, WALK, 3);
-    else ribbon(acc, w.p, -0.7, 0.7, 0.36, PATH, 3);
+    for (const p of RW.clipWalk(w.p)) { // paths stop at the kerb: no sidewalk through the pavement
+      if (w.k === 'sidewalk') ribbon(acc, p, -0.9, 0.9, 0.38, WALK, 3);
+      else ribbon(acc, p, -0.7, 0.7, 0.36, PATH, 3);
+    }
   }
   const g = new THREE.Group();
   g.add(new THREE.Mesh(acc.geo(), toon({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));

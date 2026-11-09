@@ -16,7 +16,7 @@ function roadwayIndex(edges) {
     if (!e.g || e.xmed || !e.prof || !e.p || e.p.length < 2 || e.s === 'driveway') continue;
     let o = 0, lo = Infinity, hi = -Infinity;
     const row = e.prof.els.reduce((s, q) => s + q[1], 0); o = -row / 2;
-    for (const [k, w] of e.prof.els) { if (!NOT_ROADWAY.has(k)) { lo = Math.min(lo, o); hi = Math.max(hi, o + w); } o += w; }
+    for (const [k, w] of e.prof.els) { if (!NOT_ROADWAY.has(k) || (k === 'median' && e.nose)) { lo = Math.min(lo, o); hi = Math.max(hi, o + w); } o += w; }
     if (lo === Infinity) continue;
     const P = drawPath(e), reach = Math.max(Math.abs(lo), Math.abs(hi)) + 1, b = bbox(P), it = { e, P, lo, hi, reach };
     items.push(it);
@@ -38,7 +38,15 @@ function roadwayIndex(edges) {
     const t = h.lat < (h.it.lo + h.it.hi) / 2 ? h.it.lo - gap : h.it.hi + gap;
     return [h.q.x + h.n[0] * t, h.q.z + h.n[1] * t];
   }
-  return { hit, nudge, count: items.length };
+  // A mapped footpath runs across the street in the data. Keep only the parts off the pavement; the crosswalks are drawn at junctions.
+  function clipWalk(p) {
+    const out = []; let cur = [];
+    const pts = []; for (let i = 1; i < p.length; i++) { const a = p[i - 1], b = p[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.5)); for (let k = i === 1 ? 0 : 1; k <= n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+    const flush = () => { if (cur.length >= 2) out.push(cur); cur = []; };
+    for (const q of pts) { if (hit(q[0], q[1], -0.2)) flush(); else cur.push(q); }
+    flush(); return out;
+  }
+  return { hit, nudge, clipWalk, count: items.length };
 }
 
 export { roadwayIndex };

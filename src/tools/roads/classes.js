@@ -78,8 +78,8 @@ function classify(S) {
 }
 
 // The cross-section of one half of an arterial, outside in: sidewalk, curbside parking/bus lane, lanes.
-// Divided and undivided carriageways come from the same numbers, so the road is the same width where the
-// raised median stops and the centre turn lane starts.
-const ARTERIAL = { walk: 2.2, park: 2, lane: 3.25, n: 2, median: 3 };
+// Divided and undivided carriageways share lane and parking widths, so where the raised median stops the lanes
+// just slide together into a double yellow; the road narrows by the median's width, gently, with no island left over.
+const ARTERIAL = { walk: 2.2, park: 2, lane: 3.1, n: 2, median: 3 };
 
 export { ARTERIAL, RANK, classify, frontage, rankOf, roadClassOf, withFrontage };

@@ -1,7 +1,7 @@
 import PC from 'polygon-clipping';
 import { PACK } from './pack.js';
 import { markDivided } from '../tools/roads/divided.js';
-import { classify } from '../tools/roads/classes.js';
+import { ARTERIAL, classify } from '../tools/roads/classes.js';
 import { smoothSwerves } from '../tools/roads/swerves.js';
 import { area, bbox, centroid, elev, inPoly, nearestOnLine, pcSafe, pick, ringDistToLine, rng, segDist2, toPC } from './core.js';
 
@@ -68,7 +68,10 @@ function defaultProfile(e) {
 }
 function defaultProfile2(e) {
   const w = e.w;
-  if (e.c === 'primary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2], ['lane', 3.25], ['lane', 3.25], ['turn', w - 17], ['lane', 3.25], ['lane', 3.25], ['park', 2], ['walk', 2.2]] };
+  if (e.c === 'primary') { // arterial: four lanes and a double yellow; a centre turn lane only where the map shows a really wide road
+    const A = ARTERIAL, L = [['lane', A.lane], ['lane', A.lane]];
+    return { k: 'asbuilt', els: [['walk', A.walk], ['park', A.park], ...L, ...(w >= 25 ? [['turn', w - 2 * A.park - 4 * A.lane]] : []), ...L, ['park', A.park], ['walk', A.walk]] };
+  }
   if (e.c === 'secondary') return { k: 'asbuilt', els: [['walk', 2.2], ['park', 2.5], ['lane', (w - 5) / 2], ['lane', (w - 5) / 2], ['park', 2.5], ['walk', 2.2]] };
   if (['tertiary', 'residential', 'unclassified'].includes(e.c) && e.s !== 'link') {
     const p = w >= 10 ? 2 : 1.6, l = (w - 2 * p) / 2;

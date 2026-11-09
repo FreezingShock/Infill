@@ -46,7 +46,7 @@ function buildNet(edges, opts = {}) {
     if (!lay.fwd.length && !lay.bwd.length) continue;
     const a = node(e.p[0]), b = node(e.p[e.p.length - 1]);
     if (a === b) continue;
-    const item = { e, xm: e.xm, dv: e.dv, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
+    const item = { e, xm: e.xm, dv: e.dv, tp: e.tp, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
     a.legs.push({ item, end: 0 }); b.legs.push({ item, end: 1 });
     list.push(item);
   }
@@ -94,7 +94,8 @@ function buildNet(edges, opts = {}) {
     const major = new Set(n.legs.filter((l) => l.item.rank >= 3).map((l) => l.group)).size; // crossing roads, not carriageways of one divided road
     const set = control[n.id];
     if (nlegs >= 3 && set) {
-      if (set === 'signal') n.control = 'signal';
+      if (set === 'none') n.control = 'none'; // a merge: free flow, nobody stops
+      else if (set === 'signal') n.control = 'signal';
       else if (set === 'allway') n.control = 'allway';
       else { n.control = n.legs.some((l) => l.item.rank < n.rank) ? 'priority' : 'allway'; n.noStop = set === 'yield' || set === 'roundabout'; }
     } else if (nlegs >= 3 && (sig || (major >= 2 && nlegs >= 3 && n.phases > 1))) n.control = 'signal';
@@ -117,6 +118,7 @@ function buildNet(edges, opts = {}) {
         const M = group[idx];
         // the box between the carriageways of a divided road: only the arterial's own traffic may enter it (left turns into the side street); side-street traffic cannot cross
         const fi = n.legs.find((q) => q.item.e.id === L.eid)?.item, ti = n.legs.find((q) => q.item.e.id === M.eid)?.item;
+        if (fi?.tp && ti?.tp) continue; // the two carriageways of a merge never connect to each other (no U-turn at the merge)
         if (ti?.xm && !fi?.dv) continue;
         if (fi?.xm && ti?.dv) continue;
         made.push({ L, M, type, ang: ang2 });
@@ -166,7 +168,7 @@ function drivableEdges(edgeMap) {
   const out = [];
   for (const e of edgeMap.values()) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
-    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
+    out.push({ id: e.id, p: e.p, c: e.c, xm: e.xmed ? 1 : 0, dv: e.divided ? 1 : 0, tp: e.taper ? 1 : 0, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
   }
   inferDivided(out);
   return out;

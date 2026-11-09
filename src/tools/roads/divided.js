@@ -5,17 +5,16 @@ import { ARTERIAL, rankOf, roadClassOf } from './classes.js';
 // Divided roads (corridors). Map data draws a boulevard as two one-way pieces with whatever gap the mapper
 // left between them, and the pieces that close up into the two-way road as a long V.
 //
-// Model: a divided road is the undivided road with its centre turn lane replaced by a narrow raised median.
-// Both come from the same class numbers (classes.js ARTERIAL), so the total width never changes:
-//   - the two carriageways are pulled to exactly parallel, medians touching, one median of ARTERIAL.median wide
-//   - where the pair meets the two-way road at a merge node the carriageways keep running parallel and
-//     the median narrows to a point (a nose) over a gradual taper; pavement stays one constant width
-//   - the traffic polyline (e.p) still ends on the merge node so the lane graph connects; the drawn path
-//     (e.dp) carries on parallel to the axis, so nothing is ever drawn as a wedge
+// Model: a divided road is the undivided road with a narrow raised median in the middle (ARTERIAL.median wide) and the same
+// lane and parking widths. Where it ends the lanes simply slide together into a double yellow:
+//   - the two carriageways are pulled to exactly parallel, medians touching, one median strip
+//   - at a merge node they keep their lane width, and the two lane blocks close up along a smooth S to touch on the axis,
+//     taking the sidewalks with them, so there is no island, lens or wedge, just lanes and a double yellow
+//   - the traffic polyline (e.p) still ends on the merge node so the lane graph connects; the drawn path (e.dp) is the smooth S
 // Runs once while the base city is built. Pure data, no THREE.
 // =====================================================================
 const MAJOR = new Set(['primary', 'secondary', 'tertiary', 'trunk']);
-const NOSE_CLEAR = 18; // median stays full width this far from the cross street, then narrows
+const SHIFT_FROM = 8; // the carriageways start closing up this far from the junction, just past the crosswalk
 const rowWidth = (prof) => prof.els.reduce((s, e) => s + e[1], 0);
 
 function tangentAt(p, i) { const a = p[Math.max(0, i)], b = p[Math.min(p.length - 1, i + 1)]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; }
@@ -91,15 +90,19 @@ function rebuildMerge(S, m, es) {
   if (side[0] === side[1] || !side[0]) return false;
   const T = (rowWidth(es[0].prof) + rowWidth(es[1].prof)) / 2;
   es.forEach((e, k) => { S.nodes[farNode[k]] = [mid[0] + nv[0] * side[k] * T / 2, mid[1] + nv[1] * side[k] * T / 2]; });
+  // South of the junction the road is just lanes with a double yellow: the lane blocks slide in until they touch on the axis
+  // (a smooth S over the merge), taking the sidewalk with them. Same lane width the whole way, no island, nothing in the middle.
+  const hm = es[0].prof.els.find((q) => q[0] === 'median')?.[1] || 0, from = Math.min(SHIFT_FROM, L * 0.25), to = L - 3;
+  const shift = (s) => { const t = clamp((s - from) / Math.max(1, to - from), 0, 1); return hm * t * t * (3 - 2 * t); };
   const st = Math.min(9, L * 0.25), n = Math.max(4, Math.ceil(L / 3));
   es.forEach((e, k) => {
-    const o = side[k] * T / 2, at = (s) => [mid[0] + u[0] * s + nv[0] * o, mid[1] + u[1] * s + nv[1] * o];
+    const at = (s) => { const o = side[k] * (T / 2 - shift(s)); return [mid[0] + u[0] * s + nv[0] * o, mid[1] + u[1] * s + nv[1] * o]; };
     const dp = [], p = [];
     for (let i = 0; i <= n; i++) { const s = L * i / n; dp.push(at(s)); if (s <= L - st + 1e-6) p.push(at(s)); }
     p.push(M.slice()); // the lane graph ends on the node; the last few metres bend in to meet the two-way road
     const rev = e.a === m;
     e.p = rev ? p.reverse() : p; e.dp = rev ? dp.reverse() : dp; e.bb = bbox(e.dp);
-    e.nose = { from: Math.min(NOSE_CLEAR, L * 0.3), to: L - 1.5, rev: rev ? 1 : 0, len: L };
+    e.nose = { from, to, rev: rev ? 1 : 0, len: L };
   });
   snapEnds(S, farNode);
   return true;
@@ -175,11 +178,4 @@ function drawPath(e) {
   const a = e.p[0], b = d[0], c = e.p[e.p.length - 1], f = d[d.length - 1];
   return (Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.5 || Math.hypot(c[0] - f[0], c[1] - f[1]) < 0.5) ? d : e.p;
 }
-// How much of the median remains at distance d along the drawn path (1 full, 0 gone). Full for pieces without a nose.
-function medianKeep(e, d) {
-  const n = e.nose; if (!n) return 1;
-  const s = n.rev ? n.len - d : d, t = clamp((s - n.from) / Math.max(1, n.to - n.from), 0, 1);
-  return 1 - t * t * (3 - 2 * t);
-}
-
-export { drawPath, markDivided, medianKeep };
+export { drawPath, markDivided };
