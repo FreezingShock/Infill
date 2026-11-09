@@ -3,6 +3,7 @@
 import { AREA, PACK } from '../engine/pack.js';
 import { GEN, genCached, lotHash } from '../app/scene.js';
 import { work } from '../app/store.js';
+import { bootProgress } from '../app/loader.js';
 import { decodeBatch } from './codec.js';
 import { WorkerPool } from './pool.js';
 
@@ -71,10 +72,10 @@ function warmFor(S, fn, onBusy) {
   chain = chain.then(() => prewarm(S)).catch((e) => console.warn(e)).then(() => { pending--; fn(); });
 }
 
-// Start-up: build the first view with the page showing progress instead of a frozen tab.
+// Start-up: build the first view with the boot screen showing progress instead of a frozen tab.
+// main.js has the bar at 25% when this starts; lot building fills it up to 90%.
 async function warmStart(S) {
-  const el = typeof document !== 'undefined' && document.getElementById('loading');
-  const off = work.subscribe((s) => { if (el && s.total) el.textContent = `Building the city… ${Math.round((100 * s.done) / s.total)}%`; });
+  const off = work.subscribe((s) => { if (s.total) bootProgress(25 + (65 * s.done) / s.total); });
   try { await prewarm(S); } finally { off(); }
 }
 
