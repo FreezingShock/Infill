@@ -176,6 +176,16 @@ def main():
     except Exception as e:  # noqa: BLE001
         say('backdrop', f'Surroundings skipped ({type(e).__name__}: {e})', 95)
 
+    infra = None
+    try:  # real lights, hydrants, stops and power lines for the scan view; never fail the build over them
+        import infra as infra_mod
+        say('infra', 'Linking street lights, hydrants, bus stops and power lines', 96)
+        ip = os.path.join(AREAS, f'{a.id}.infra.json')
+        infra_mod.build(out, ip + '.tmp', get, os.path.join(work, 'infra.geojson'), log=lambda m: say('infra', m, 97))
+        os.replace(ip + '.tmp', ip); infra = f'{a.id}.infra.json'
+    except Exception as e:  # noqa: BLE001
+        say('infra', f'Infrastructure skipped ({type(e).__name__}: {e})', 97)
+
     # name the area from its roads when the caller did not
     from collections import defaultdict
     tot = defaultdict(float)
@@ -189,6 +199,7 @@ def main():
            'bbox': list(bbox), 'pack': f'{a.id}.json', 'status': 'ready', 'built': pack['built'], 'lots': len(pack['lots']),
            'parcels': 'city' if city else 'estimated'}
     if bg: new['bg'] = bg
+    if infra: new['infra'] = infra
     manifest['areas'] = [new if x['id'] == a.id else x for x in manifest['areas']] if entry else manifest['areas'] + [new]
     json.dump(manifest, open(mpath + '.tmp', 'w'), indent=1); os.replace(mpath + '.tmp', mpath)
     say('done', f'{new["name"]}: {len(pack["lots"])} lots, {len(pack["edges"])} streets', 100, area=new, log=log.stdout[-600:])
