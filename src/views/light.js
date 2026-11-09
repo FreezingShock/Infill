@@ -34,14 +34,20 @@ export function lightAt(hour) {
   const hemiSky = mix(HEMI_SKY_NIGHT, HEMI_SKY_DAY, day);
   const skyTop = mix(mix(SKY.day[0], SKY.dusk[0], low * 0.8), SKY.night[0], night);
   const skyBottom = mix(mix(SKY.day[1], SKY.dusk[1], low * 0.8), SKY.night[1], night);
-  return { dir: dir.map((v) => v / len), sunCol, sunI, hemiI, hemiSky, hemiGround: HEMI_GROUND, skyTop, skyBottom, night, glow: night, isNight: night > 0.5 };
+  // true sky positions (the shadow dir above is clamped): sun rises east, moon crosses the night half
+  const nightT = h >= set ? (h - set) / (24 - set + rise) : (h + 24 - set) / (24 - set + rise);
+  const mEl = Math.sin(Math.min(1, Math.max(0, nightT)) * Math.PI);
+  const skyDir = el > 0 || dayT > -0.03 && dayT < 1.03 ? [az * 0.85, Math.sin(Math.min(1, Math.max(-0.03, dayT)) * Math.PI) * 0.92 - 0.0, 0.45] : [0, -1, 0];
+  const moonDir = [-Math.min(1, Math.max(0, nightT)) * 1.6 + 0.8, mEl * 0.9 + 0.02, -0.4];
+  return { skyDir, moonDir, golden: low, dir: dir.map((v) => v / len), sunCol, sunI, hemiI, hemiSky, hemiGround: HEMI_GROUND, skyTop, skyBottom, night, glow: night, isNight: night > 0.5 };
 }
 
 export const SUN_DIST = 520;
 
 /** Push a lightAt() result onto the scene. Cheap; call when the hour moves. */
 export function applyLight(env, L) {
-  const { sun, hemi, scene, glassMat, lampMat, app } = env;
+  const { sun, hemi, scene, glassMat, lampMat, app, sky } = env;
+  if (sky) sky.update(L);
   sun.userData.dir = L.dir;
   sun.color.setRGB(...L.sunCol); sun.intensity = L.sunI;
   hemi.intensity = L.hemiI; hemi.color.setRGB(...L.hemiSky); hemi.groundColor.setRGB(...L.hemiGround);
