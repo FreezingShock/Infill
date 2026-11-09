@@ -1,6 +1,6 @@
 import { nearestOnLine, polyLen } from '../../engine/core.js';
 import { EL, rowWidth } from '../../engine/model.js';
-import { rankOf } from './classes.js';
+import { isFreewayJoin, rankOf } from './classes.js';
 
 // =====================================================================
 // Intersection-aware road details, as plain geometry for buildRoads to draw (no THREE here):
@@ -55,7 +55,7 @@ function analyse(S) {
   const legs = [], openings = [];
   const get = (e) => { let r = info.get(e.id); if (!r) { r = { t0: 0, t1: 0, mt0: 0, mt1: 0, gaps: [] }; info.set(e.id, r); } return r; };
   for (const [n, es] of deg) {
-    if (es.length < 3 || es.some((e) => e.ring) || es.filter((e) => e.taper).length >= 2) continue; // a merge into the two-way road is not an intersection
+    if (es.length < 3 || es.some((e) => e.ring) || es.filter((e) => e.taper).length >= 2 || isFreewayJoin(es)) continue; // a merge into the two-way road is not an intersection
     const dirs = es.map((e) => { const atEnd = e.b === n, p = e.p, q = atEnd ? at(p, polyLen(p) - 4) : at(p, 4); const x0 = p[atEnd ? p.length - 1 : 0]; return [q.x - x0[0], q.z - x0[1]].map((v, _, a) => v / (Math.hypot(a[0], a[1]) || 1)); });
     if (es.length === 3 && isFork(dirs)) continue; // a fork or a swerve where one road splits in two: no box, crosswalks or stop bars
     es.forEach((e, i) => {

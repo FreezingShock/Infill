@@ -24,6 +24,11 @@ function elev(x, z) {
   const a = HG[j * T.nx + i], b = HG[j * T.nx + i + 1], c = HG[(j + 1) * T.nx + i], d = HG[(j + 1) * T.nx + i + 1];
   return a * (1 - dx) * (1 - dz) + b * dx * (1 - dz) + c * (1 - dx) * dz + d * dx * dz;
 }
+// A road on a bridge or in a tunnel is drawn at its own height, not the ground's: the road builder sets a deck lookup
+// (x, z -> height or NaN) while it draws that edge, and every ribbon, dash and barrier below follows it (src/tools/roads/deck.js).
+let DECKFN = null;
+const setDeck = (fn) => { DECKFN = fn; };
+function ey(x, z) { if (DECKFN) { const v = DECKFN(x, z); if (v === v) return v; } return elev(x, z); }
 const X0 = T.minx, Z0 = T.minz, X1 = T.minx + (T.nx - 1) * T.cell, Z1 = T.minz + (T.nz - 1) * T.cell;
 
 const C = (hex) => new THREE.Color(hex);
@@ -76,14 +81,14 @@ const UP = [0, 1, 0];
 function ribbon(acc, pts, o1, o2, y, col, step = 4) {
   if (pts.length < 2) return;
   const P = densify(pts, step), N = normals(P);
-  const v = (i, o) => { const x = P[i][0] + N[i][0] * o, z = P[i][1] + N[i][1] * o; return [x, elev(x, z) + y, z]; };
+  const v = (i, o) => { const x = P[i][0] + N[i][0] * o, z = P[i][1] + N[i][1] * o; return [x, ey(x, z) + y, z]; };
   for (let i = 0; i < P.length - 1; i++) acc.quad(v(i, o1), v(i, o2), v(i + 1, o2), v(i + 1, o1), col, UP);
 }
 function dashed(acc, pts, o1, o2, y, col, dash, gap) {
   if (pts.length < 2) return;
   const P = densify(pts, 0.5), N = normals(P);
   let d = 0;
-  const v = (i, o) => { const x = P[i][0] + N[i][0] * o, z = P[i][1] + N[i][1] * o; return [x, elev(x, z) + y, z]; };
+  const v = (i, o) => { const x = P[i][0] + N[i][0] * o, z = P[i][1] + N[i][1] * o; return [x, ey(x, z) + y, z]; };
   for (let i = 0; i < P.length - 1; i++) {
     const L = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]);
     if ((d % (dash + gap)) < dash) acc.quad(v(i, o1), v(i, o2), v(i + 1, o2), v(i + 1, o1), col, UP);
@@ -322,6 +327,8 @@ export {
   densify,
   disposeTree,
   elev,
+  ey,
+  setDeck,
   esc,
   fmt,
   fromPC,

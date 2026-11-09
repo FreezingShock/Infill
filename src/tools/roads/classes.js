@@ -25,7 +25,10 @@ function roadClassOf(e) {
   if ((e.c === 'residential' || e.c === 'unclassified') && (e.w || 0) >= 12) return 'collector';
   return 'local';
 }
-const rankOf = (e) => RANK[roadClassOf(e)] ?? 1;
+const rankOf = (e) => (e.s === 'link' ? Math.min(RANK[roadClassOf(e)] ?? 1, 3) : RANK[roadClassOf(e)] ?? 1); // a ramp gives way where it meets a surface arterial
+const isFreeway = (e) => e.c === 'motorway' || e.c === 'trunk';
+// a freeway merge or diverge (two or more motorway-class legs meet): nobody stops, no stop bars or crosswalks
+const isFreewayJoin = (es) => es.filter(isFreeway).length >= 2;
 
 // What faces each street: 'commercial' | 'residential' | 'mixed' | 'open'. Lots remember the street they front (lot.rd);
 // lots within reach of the street's samples count too, so split pieces and cut streets still read right.
@@ -82,4 +85,4 @@ function classify(S) {
 // just slide together into a double yellow; the road narrows by the median's width, gently, with no island left over.
 const ARTERIAL = { walk: 2.2, park: 2, lane: 3.1, n: 2, median: 3 };
 
-export { ARTERIAL, RANK, classify, frontage, rankOf, roadClassOf, withFrontage };
+export { ARTERIAL, RANK, classify, frontage, isFreeway, isFreewayJoin, rankOf, roadClassOf, withFrontage };

@@ -2,7 +2,7 @@ import { bbox, bufferLine } from '../../engine/core.js';
 import { PACK } from '../../engine/pack.js';
 import { rowWidth } from '../../engine/model.js';
 import { ring } from './shapes.js';
-import { rankOf } from './classes.js';
+import { isFreewayJoin, rankOf } from './classes.js';
 
 // =====================================================================
 // Intersections and the road-graph API other systems (traffic sim, parking, routing) read.
@@ -40,6 +40,7 @@ function isOneWay(e) { return e.oneway === 1 || e.oneway === -1; }
 function nodeControl(S, n) {
   const set = S.ctrl && S.ctrl[n]; if (set) return set;
   const es = nodeEdges(S, n); if (es.length < 3) return 'none';
+  if (isFreewayJoin(es)) return es.some((e) => e.s === 'link') && es.some((e) => e.s !== 'link') ? 'yield' : 'none'; // ramps merge onto and leave a freeway without stopping (the ramp gives way by gap); a plain split just flows
   if (es.filter((e) => e.taper).length >= 2) return 'none'; // where a divided road merges into the two-way road nobody stops
   const p = S.nodes[n], big = es.filter((e) => BIG.has(e.c));
   // a divided road is one road, not two: two carriageways of the same street never make a signal by themselves
