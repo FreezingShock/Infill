@@ -501,9 +501,9 @@ function flyTo(x, z, zoom) {
 function cardShift(zoom) { if (canvas.clientWidth < 760) return new THREE.Vector3(); const viewW = viewHeightAt(distForZoom(zoom)) * cam.aspect, right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0); right.y = 0; right.normalize(); return right.multiplyScalar(viewW * 0.12); }
 
 // ---------- street labels ----------
-let labels = [];
+let labels = [], viewKey = '';
 function buildLabels() {
-  const box = $('labels'); box.querySelectorAll('.st-label').forEach((l) => l.remove()); labels = [];
+  const box = $('labels'); box.querySelectorAll('.st-label').forEach((l) => l.remove()); labels = []; viewKey = '';
   const best = new Map();
   for (const e of STATE.edges.values()) { if (!e.n || !e.g || e.c === 'motorway') continue; const L = polyLen(e.p); if (!best.has(e.n) || best.get(e.n).L < L) best.set(e.n, { e, L }); }
   for (const [n, { e, L }] of best) {
@@ -513,6 +513,12 @@ function buildLabels() {
     el.textContent = n.replace(/ Street$/, ' St').replace(/ Avenue$/, ' Ave').replace(/ Drive$/, ' Dr').replace(/ Boulevard$/, ' Blvd').replace(/ Road$/, ' Rd'); box.appendChild(el);
     labels.push({ el, v: new THREE.Vector3(pt[0], elev(pt[0], pt[1]) + 2, pt[1]), major: el.classList.contains('major') || e.drawn });
   }
+}
+// The camera usually sits still, so the label and scale-bar DOM writes wait until the view actually moves.
+function viewMoved() {
+  const e = cam.matrixWorld.elements, w = canvas.clientWidth, h = canvas.clientHeight;
+  const k = e[12] + ',' + e[13] + ',' + e[14] + ',' + e[0] + ',' + e[2] + ',' + e[5] + ',' + cam.zoom + ',' + cam.right + ',' + cam.top + ',' + w + ',' + h + ',' + labels.length;
+  if (k === viewKey) return false; viewKey = k; return true;
 }
 function placeLabels() {
   const w = canvas.clientWidth, h = canvas.clientHeight, v = new THREE.Vector3();
@@ -570,7 +576,8 @@ function frame(now) {
     beforeW.group.visible = false; world.group.visible = true; overlays.visible = true; renderer.setScissor(sx, 0, w - sx, h); renderer.render(scene, cam);
     renderer.setScissorTest(false);
   } else { beforeW.group.visible = ui.asbuilt; world.group.visible = !ui.asbuilt; overlays.visible = !ui.asbuilt; renderer.render(scene, cam); }
-  placeLabels(); updateScale(); positionHandles();
+  if (viewMoved()) { placeLabels(); updateScale(); }
+  positionHandles();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.js",
-    "check": "eslint src tests && node --test tests/*.test.js && vite build"
+    "check": "eslint --max-warnings 0 src tests && node --test tests/*.test.js && vite build"
   },
   "engines": {
     "node": ">=20"

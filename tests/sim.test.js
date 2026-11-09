@@ -109,3 +109,31 @@ test('a divided road drawn as two parallel two-way edges becomes two one-way car
   // x east, z south: heading east the right-hand side is south (+z), so B (z = 12) carries traffic east, A carries it west
   assert.equal(B.oneway, 1); assert.equal(A.oneway, -1); assert.equal(C.oneway, undefined);
 });
+
+// ---------- the host shared by the worker and the main-thread fallback ----------
+import { advance, applyMessage } from '../src/sim/host.js';
+
+test('host: a net message carries the node controls through to the lane graph', () => {
+  const sim = new Sim(3);
+  const edges = JSON.parse(JSON.stringify(drivableEdges(new Map(cross().map((e) => [e.id, { ...e, g: true, prof: { k: e.c, els: e.els }, a: e.id + 'a', b: e.id + 'b' }])))));
+  applyMessage(sim, { type: 'net', edges, control: { '0,0': 'allway' }, bounds: [-300, -300, 300, 300] });
+  assert.equal(sim.net.nodes.find((n) => n.legs.length === 4).control, 'allway');
+});
+
+test('host: cfg sets density, running and speed; advance steps in fixed ticks', () => {
+  const sim = new Sim(3);
+  applyMessage(sim, { type: 'cfg', density: 0.5, running: true, speed: 2, max: 10 });
+  assert.equal(sim.density, 0.5); assert.equal(sim.timeScale, 2); assert.equal(sim.maxCars, 10);
+  advance(sim, 1); // no net yet: a no-op, must not throw
+});
+
+test('snapshot gives every parked car a stable slot id', () => {
+  const sim = new Sim(5);
+  const net = buildNet(drivableEdges(new Map(cross().map((e) => [e.id, { ...e, g: true, prof: { k: e.c, els: e.els }, a: e.id + 'a', b: e.id + 'b' }]))), {});
+  sim.setNet(net);
+  const buf = sim.snapshot();
+  const ids = [];
+  for (let o = 0; o < buf.length; o += STRIDE) if (buf[o] >= 1e6) ids.push(buf[o]);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const s of net.slots) assert.equal(net.slots[s.ix], s);
+});
