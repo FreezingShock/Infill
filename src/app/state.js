@@ -89,6 +89,7 @@ function refresh(anim) {
   for (const id of [...ui.edgeSel]) if (!STATE.edges.has(id)) ui.edgeSel.delete(id);
   if (hold.size) startRise([...hold]);
   buildLotLines(); buildColor(); buildFlags(); buildSel(); buildEdgeSel(); buildLabels(); renderHud();
+  dispatchEvent(new Event('infill:state')); // info views and the HUD listen
 }
 function startRise(ids) {
   const t0 = performance.now(), span = Math.min(1600, 300 + ids.length * 6), grp = new THREE.Group(); overlays.add(grp);
