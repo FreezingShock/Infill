@@ -40,6 +40,7 @@ function isOneWay(e) { return e.oneway === 1 || e.oneway === -1; }
 function nodeControl(S, n) {
   const set = S.ctrl && S.ctrl[n]; if (set) return set;
   const es = nodeEdges(S, n); if (es.length < 3) return 'none';
+  if (es.filter((e) => e.taper).length >= 2) return 'none'; // where a divided road merges into the two-way road nobody stops
   const p = S.nodes[n], big = es.filter((e) => BIG.has(e.c));
   // a divided road is one road, not two: two carriageways of the same street never make a signal by themselves
   if (new Set(big.map((e) => e.n || e.id)).size >= 2) return 'signal';

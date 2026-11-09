@@ -1,4 +1,4 @@
-import { polyLen } from '../../engine/core.js';
+import { nearestOnLine, polyLen } from '../../engine/core.js';
 import { EL, rowWidth } from '../../engine/model.js';
 import { rankOf } from './classes.js';
 
@@ -52,8 +52,8 @@ function analyse(S) {
   const deg = new Map();
   for (const e of S.edges.values()) if (e.g && !SKIP_LEG(e)) for (const n of [e.a, e.b]) { if (!deg.has(n)) deg.set(n, []); deg.get(n).push(e); }
   const info = new Map(); // edge id -> { t0, t1, mt0, mt1 } distances to keep markings / median clear of the box
-  const legs = [];
-  const get = (e) => { let r = info.get(e.id); if (!r) { r = { t0: 0, t1: 0, mt0: 0, mt1: 0, nose: [] }; info.set(e.id, r); } return r; };
+  const legs = [], openings = [];
+  const get = (e) => { let r = info.get(e.id); if (!r) { r = { t0: 0, t1: 0, mt0: 0, mt1: 0, gaps: [] }; info.set(e.id, r); } return r; };
   for (const [n, es] of deg) {
     if (es.length < 3 || es.some((e) => e.ring) || es.filter((e) => e.taper).length >= 2) continue; // a merge into the two-way road is not an intersection
     const dirs = es.map((e) => { const atEnd = e.b === n, p = e.p, q = atEnd ? at(p, polyLen(p) - 4) : at(p, 4); const x0 = p[atEnd ? p.length - 1 : 0]; return [q.x - x0[0], q.z - x0[1]].map((v, _, a) => v / (Math.hypot(a[0], a[1]) || 1)); });
@@ -65,7 +65,12 @@ function analyse(S) {
       es.forEach((q, j) => { if (j === i) return; const d = dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]; if (Math.abs(d) < 0.8) box = Math.max(box, rowWidth(q.prof) / 2); });
       // a main road meeting only minor streets has priority: its lines run through, nothing crosses it
       const rk = rankOf, priority = rk(e) >= 2 && es.every((q, j) => j === i || Math.abs(dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1]) >= 0.8 || rk(q) <= rk(e) - 1);
-      if (priority) { const r = get(e), D2 = box + 2.2 + CW_HALF + NOSE_GAP + NOSE_R * 2; if (atEnd) r.mt1 = Math.max(r.mt1, D2); else r.mt0 = Math.max(r.mt0, D2); legs.push({ e, n, atEnd, D: box + 2.2, priority: true }); return; }
+      const mw = e.prof.els.find((q) => q[0] === 'median')?.[1] || 0;
+      if (priority) { // the through road: lane lines stop before the box, the median opens as wide as the side street, ends rounded
+        const r = get(e), half = box + 1 + mw; if (atEnd) { r.t1 = Math.max(r.t1, box + 0.5); r.mt1 = Math.max(r.mt1, half); } else { r.t0 = Math.max(r.t0, box + 0.5); r.mt0 = Math.max(r.mt0, half); }
+        if (mw && !e.nose) openings.push({ x: S.nodes[n][0], z: S.nodes[n][1], half, name: e.n, e });
+        legs.push({ e, n, atEnd, D: box + 2.2, priority: true }); return;
+      }
       const D = box + 2.2, len = polyLen(e.p);
       if (len < 2 * (D + CW_HALF + BAR_GAP) + 4) { const r = get(e); if (atEnd) r.t1 = len; else r.t0 = len; return; } // a short link inside the box: no markings at all
       const r = get(e), clear = D + CW_HALF + BAR_GAP;
@@ -73,15 +78,45 @@ function analyse(S) {
       legs.push({ e, n, atEnd, D });
     });
   }
+  // the other carriageway of a divided road opens opposite the side street, so the median is cut straight across
+  for (const o of openings) for (const f of S.edges.values()) {
+    if (f === o.e || !f.g || !f.divided || f.nose || f.n !== o.name || !f.prof.els.some((q) => q[0] === 'median')) continue;
+    const q = nearestOnLine(f.p, o.x, o.z); if (q.d > 30) continue;
+    let s = 0; for (let i = 1; i <= q.i; i++) s += Math.hypot(f.p[i][0] - f.p[i - 1][0], f.p[i][1] - f.p[i - 1][1]);
+    s += Math.hypot(f.p[q.i + 1][0] - f.p[q.i][0], f.p[q.i + 1][1] - f.p[q.i][1]) * q.t;
+    get(f).gaps.push([s - o.half, s + o.half]);
+  }
   return { info, legs };
 }
 
-// median nose: quarter disc at the end of each carriageway's half-median
-function noseFor(e, atEnd, D, len, z, noses) {
-  const m = z.find((q) => q.k === 'median'); if (!m || e.nose) return; // a nosed median is painted, it has no raised end
-  const first = z[0] === m, axis = first ? m.a : m.b, v = first ? 1 : -1, nd = atEnd ? len - (D + CW_HALF + NOSE_GAP + NOSE_R) : D + CW_HALF + NOSE_GAP + NOSE_R, Q = at(e.p, nd);
-  const nx = -Q.tz, nz = Q.tx; // right of a to b
-  noses.push({ c: [Q.x + nx * axis, Q.z + nz * axis], u: atEnd ? [Q.tx, Q.tz] : [-Q.tx, -Q.tz], v: [nx * v, nz * v], r: NOSE_R, e });
+// the stretches of an edge's median that are not cut by a junction opening, as [from, to] distances along the edge
+function medianRuns(len, r) {
+  const gaps = [];
+  if (r) { if (r.mt0 > 0) gaps.push([-1, r.mt0]); if (r.mt1 > 0) gaps.push([len - r.mt1, len + 1]); for (const g of r.gaps) gaps.push(g); }
+  gaps.sort((a, b) => a[0] - b[0]);
+  const merged = []; for (const g of gaps) { const l = merged[merged.length - 1]; if (l && g[0] <= l[1]) l[1] = Math.max(l[1], g[1]); else merged.push(g.slice()); }
+  const runs = []; let at0 = 0;
+  for (const g of merged) { if (g[0] - at0 > 0.5) runs.push([at0, g[0]]); at0 = Math.max(at0, g[1]); }
+  if (len - at0 > 0.5) runs.push([at0, len]);
+  return runs;
+}
+// the sub-polylines of P that the median occupies
+function medianPaths(P, r) {
+  const len = polyLen(P); return medianRuns(len, r).map(([a, b]) => trimPath(P, a, len - b)).filter((q) => q.length >= 2);
+}
+
+// Rounded noses: a quarter disc per carriageway's half-median at every end the junction openings cut, its flat side flush with the median strip.
+function mediansNoses(S, info, noses) {
+  for (const e of S.edges.values()) {
+    if (!e.g || !e.divided || e.nose || e.xmed) continue;
+    const z = zones(e.prof), m = z.find((q) => q.k === 'median'); if (!m) continue;
+    const mw = m.b - m.a, first = z[0] === m, axis = first ? m.a : m.b, v = first ? 1 : -1, len = polyLen(e.p), runs = medianRuns(len, info.get(e.id));
+    for (const [a, b] of runs) for (const [d, dir] of [[a, -1], [b, 1]]) {
+      if (d < 0.5 || d > len - 0.5) continue; // the strip carries on into the next piece
+      const Q = at(e.p, d), nx = -Q.tz, nz = Q.tx;
+      noses.push({ c: [Q.x + nx * axis, Q.z + nz * axis], u: [Q.tx * dir, Q.tz * dir], v: [nx * v, nz * v], r: mw, e });
+    }
+  }
 }
 
 // Everything to draw, in plain data:
@@ -94,7 +129,7 @@ function plan(S, walks = []) {
   for (const { e, atEnd, D, priority } of legs) {
     const len = polyLen(e.p), dist = atEnd ? len - D : D, P = at(e.p, dist), z = zones(e.prof), road = z.filter((q) => !q.curb);
     if (!road.length) continue;
-    if (priority) { noseFor(e, atEnd, D, len, z, noses); continue; } // the through road keeps its lines: no crosswalk or stop bar across it
+    if (priority) continue; // the through road: no crosswalk or stop bar across it
     centres.push([P.x, P.z]);
     const lo = Math.min(...road.map((q) => q.a)), hi = Math.max(...road.map((q) => q.b));
     const path = [[P.x - P.tx * CW_HALF, P.z - P.tz * CW_HALF], [P.x + P.tx * CW_HALF, P.z + P.tz * CW_HALF]];
@@ -107,8 +142,8 @@ function plan(S, walks = []) {
       const a = Math.min(...lanes.map((q) => q.a)), b = Math.max(...lanes.map((q) => q.b)), d2 = dist + (atEnd ? -1 : 1) * (CW_HALF + 0.9), P2 = at(e.p, d2);
       bars.push({ p: [[P2.x - P2.tx * 0.22, P2.z - P2.tz * 0.22], [P2.x + P2.tx * 0.22, P2.z + P2.tz * 0.22]], o1: a + 0.15, o2: b - 0.15, e });
     }
-    noseFor(e, atEnd, D, len, z, noses);
   }
+  mediansNoses(S, info, noses);
   // mapped crossings away from any junction crossing keep their place, drawn as the same ladder
   const mid = [];
   for (const w of walks) {
@@ -121,4 +156,4 @@ function plan(S, walks = []) {
   return { info, ladders: ladders.concat(mid), bars, noses };
 }
 
-export { at, plan, trimPath, zones };
+export { at, medianPaths, plan, trimPath, zones };

@@ -102,6 +102,12 @@ class Sim {
     const n = conn.node;
     if (n.control === 'signal') { if (!this.green(n, conn.group)) return false; }
     else if (n.control !== 'none') {
+      // gap acceptance: a car that must give way waits until nothing on the conflicting road is about to arrive (about 4 s away),
+      // so the main road never has to brake for a side street
+      for (const k of conn.conflicts) {
+        if (k.pv <= conn.pv || k.from === conn.from) continue;
+        for (const c of k.from.cars) if (k.from.len - c.s < 10 + Math.max(c.v, 6) * 6) return false;
+      }
       for (const k of conn.conflicts) {
         const f = k.from.cars[0]; if (!f || f === car || f.granted || f.plan !== k || !this.roomFor(k, f)) continue;
         const fd = k.from.len - f.s;

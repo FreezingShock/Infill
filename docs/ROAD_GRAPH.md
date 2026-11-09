@@ -31,3 +31,13 @@ Per-element lane direction (`dir` on cross-section elements) is not in yet.
 - A fork (one road splitting in two) gets no box, crosswalk or stop bar.
 - Trees, props and furniture are tested against `roadwayIndex` and kept off lanes and parking.
 - Not built yet: left-turn pocket at the nose, hatched yellow, per-element lane direction, upgrading a street in place.
+
+### Junction rules (apply to every area on load)
+These come from the data (OSM class, speed, width, names, zoning frontage) plus basic traffic rules; nothing is special-cased per street.
+- **Hierarchy decides right of way.** The higher class flows through; a lower class stops or yields (`nodeControl`, `givesWay`). Two big roads with distinct names signal; merge nodes of a divided road have no control at all.
+- **Yielding means waiting for a gap.** A yielding connector only goes when no higher-priority car is within `10 + max(v,6)*6` m of the conflict (`canGo`).
+- **Divided meets undivided: lanes slide together.** The carriageways keep their lane widths and move together over ~`to-from` m (smoothstep) into a double yellow. No lens, no centre object. Roads under 25 m wide get no centre turn lane.
+- **Side street into a divided road (`xmed`).** The median is opened symmetrically in both carriageways, ends are rounded noses flush with the strip, the box is paved as the major road. Major-road traffic may turn off; minor-road traffic is limited to right turns unless the opening allows more.
+- **Lane lines never enter a box.** Lines are trimmed to the box plus 0.5 m on every priority leg.
+- **Pavement is exclusive.** Trees, props and footpaths are clipped or nudged by `roadwayIndex`; paths cross only at crosswalks.
+- **Not modelled yet:** left-turn pockets, hatching and arrows, left turns from a side street in the sim.
