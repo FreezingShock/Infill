@@ -5,7 +5,7 @@ import { rng, sampleAt } from './geom.js';
 
 const CAR_LEN = 4.4, STRIDE = 7;
 const IDM = { a: 2.6, b: 3.4, T: 1.1, s0: 2.0 };
-const GREEN = 13, CYCLE = 16;
+const GREEN = 9, CYCLE = 12;
 const PARK_TIME = 1.4;
 
 class Sim {
@@ -184,7 +184,7 @@ class Sim {
         c.seg = conn; c.isConn = true; conn.cars.push(c); c.i = conn.cars.length - 1;
       } else {
         const tl = seg.to; seg.reserved--; tl.reserved--; c.s -= seg.len; seg.cars.splice(seg.cars.indexOf(c), 1);
-        if (c.trip < -700) { dead.push(c); return; }
+        if (c.trip < -200) { dead.push(c); return; }
         c.seg = tl; c.isConn = false; tl.cars.push(c); c.i = tl.cars.length - 1;
         c.granted = null; c.stopped = false; c.arrive = undefined; c.plan = this.choose(tl);
         if (c.trip <= 0 && !c.park && tl.idx === 0 && tl.slots.length) this.seekSlot(c, 6);

@@ -11,7 +11,7 @@ import { Sim, STRIDE } from '../sim/sim.js';
 
 const COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const BODY = new THREE.BoxGeometry(1.8, 1.0, 4.3).translate(0, 0.5, 0), TOP = new THREE.BoxGeometry(1.6, 0.75, 2.2).translate(0, 1.35, -0.2);
-const MODES = [['Calm', 0.3], ['Normal', 0.6], ['Rush', 1.1]];
+const MODES = [['Calm', 0.2], ['Normal', 0.4], ['Rush', 0.8]];
 const MOVING_CAP = 1400, PARKED_CAP = 6000;
 
 const root = new THREE.Group(); root.name = 'traffic'; scene.add(root);
@@ -19,7 +19,7 @@ const bodyMat = toon({ color: 0xffffff }), topMat = toon({ color: 0x3a4a55 });
 function fleet(cap) {
   const a = new THREE.InstancedMesh(BODY, bodyMat, cap), b = new THREE.InstancedMesh(TOP, topMat, cap);
   for (const m of [a, b]) { m.frustumCulled = false; m.count = 0; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); root.add(m); }
-  a.castShadow = true; a.setColorAt(0, COLS[0]);
+  a.setColorAt(0, COLS[0]); // no cast shadow: moving cars threw blurry grey ghosts over the lanes
   return { a, b };
 }
 const moving = fleet(MOVING_CAP), parked = fleet(PARKED_CAP);
