@@ -17,7 +17,6 @@ function run(sim, secs) {
   for (let i = 0; i < secs * 20; i++) {
     sim.step(0.05);
     for (const seg of sim.segs) {
-      if (seg.len < 8) continue; // slivers between nodes a few metres apart can't hold a car; cars span the connector there
       const c = seg.cars.slice().sort((a, b) => b.s - a.s);
       for (let k = 1; k < c.length; k++) worst = Math.min(worst, c[k - 1].s - c[k - 1].len - c[k].s);
     }
