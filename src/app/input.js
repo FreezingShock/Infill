@@ -10,6 +10,7 @@ import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, render
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
 import { clock, setHour, tickClock } from '../game/clock.js';
+import { tickTraffic } from '../views/traffic.js';
 import { ROAD, roadClick, roadHover, roadPath } from '../tools/roads/ui.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
 import { startGrowth } from '../game/zoning/driver.js';
@@ -522,7 +523,7 @@ function frame(now) {
   const nf = nearFar(dist, polar); if (Math.abs(nf.near - cam.near) > 0.05 || Math.abs(nf.far - cam.far) > 5) { cam.near = nf.near; cam.far = nf.far; cam.updateProjectionMatrix(); }
   const fr = fogRange(dist, polar); scene.fog.near = fr.near; scene.fog.far = fr.far;
   if (tickClock((now - lastNow) / 1000 || 0)) { if (Math.abs(clock.hour - lastLightHour) > 0.02) { const was = ui.night; refreshLight(); if (was !== ui.night) renderViews(); dock.sync(); } }
-  lastNow = now;
+  lastNow = now; tickTraffic(now);
   sun.position.copy(t).addScaledVector(sunDir, SUN_DIST); sun.target.position.copy(t);
   const zoom = zoomForDist(dist);
   if (Math.abs(zoom - lastShadowZoom) / zoom > 0.04) { const half = Math.min(520, Math.max(70, 330 / zoom * 1.1)); Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 1600 }); sun.shadow.camera.updateProjectionMatrix(); lastShadowZoom = zoom; }

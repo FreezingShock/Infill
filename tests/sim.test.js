@@ -45,6 +45,14 @@ test('cars flow through the crossing without overlapping or stalling', () => {
   assert.ok(sim.stats.waiting < sim.stats.moving, 'everyone is stopped');
 });
 
+test('one-way streets only get lanes in their direction, and set controls win', () => {
+  const edges = cross(); edges[0].oneway = 1; edges[1].oneway = 1;
+  const net = buildNet(edges, { control: { '0,0': 'allway' } });
+  assert.ok(net.lanes.filter((l) => l.eid === 'W').every((l) => l.dir > 0));
+  assert.equal(net.nodes.find((n) => n.legs.length === 4).control, 'allway');
+  const sim = new Sim(2); sim.setNet(net); assert.ok(run(sim, 60) > -0.5);
+});
+
 test('cars park in free curb slots and pull out again', () => {
   const sim = new Sim(5); sim.density = 2;
   const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] });
@@ -75,8 +83,11 @@ test('the real Woodland Hills streets run for ten minutes of traffic', async () 
   const { BASE } = await import('../src/engine/commands.js');
   const T = globalThis.__RENOVATED_PACK__.terrain;
   const bounds = [T.minx, T.minz, T.minx + (T.nx - 1) * T.cell, T.minz + (T.nz - 1) * T.cell];
-  const signals = globalThis.__RENOVATED_PACK__.props.filter((p) => p[0] === 'signal').map((p) => [p[1], p[2]]);
-  const net = buildNet(drivableEdges(BASE.edges), { signals, bounds });
+  const { nodeControl } = await import('../src/tools/roads/graph.js');
+  const { keyOf } = await import('../src/sim/net.js');
+  const control = {};
+  for (const e of BASE.edges.values()) if (e.g) for (const n of [e.a, e.b]) control[keyOf(BASE.nodes[n])] = nodeControl(BASE, n);
+  const net = buildNet(drivableEdges(BASE.edges), { control, bounds });
   assert.ok(net.lanes.length > 100 && net.connectors.length > 100, `lanes ${net.lanes.length} connectors ${net.connectors.length}`);
   const sim = new Sim(11); sim.setNet(net);
   const t0 = Date.now();

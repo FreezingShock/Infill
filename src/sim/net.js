@@ -9,7 +9,7 @@ const RANK = { motorway: 5, primary: 4, secondary: 3, tertiary: 2, residential: 
 const SPEED = { motorway: 19, primary: 14, secondary: 12, tertiary: 10.5, residential: 8.5, unclassified: 8.5, service: 5, unknown: 5 };
 const DRIVE_EL = new Set(['lane', 'bus', 'shared', 'drive']);
 const SLOT_LEN = 6.2, SLOT_END = 9;
-const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
+const keyOf = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
 
 // Lane offsets (metres right of the edge centerline) per travel direction, outer lane first.
 function laneLayout(e) {
@@ -34,9 +34,9 @@ function laneLayout(e) {
 }
 
 function buildNet(edges, opts = {}) {
-  const signals = opts.signals || [], bounds = opts.bounds || null;
+  const signals = opts.signals || [], bounds = opts.bounds || null, control = opts.control || {};
   const nodes = new Map(), lanes = [], connectors = [];
-  const node = (pt) => { const k = key(pt); let n = nodes.get(k); if (!n) { n = { id: k, x: pt[0], z: pt[1], legs: [], ins: [], outs: [], conns: [], control: 'none', rank: 0 }; nodes.set(k, n); } return n; };
+  const node = (pt) => { const k = keyOf(pt); let n = nodes.get(k); if (!n) { n = { id: k, x: pt[0], z: pt[1], legs: [], ins: [], outs: [], conns: [], control: 'none', rank: 0 }; nodes.set(k, n); } return n; };
   const half = (e) => { let r = 0; for (const [, w] of e.els) r += w; return r / 2; };
   // pass 1: nodes and legs
   const list = [];
@@ -46,7 +46,7 @@ function buildNet(edges, opts = {}) {
     if (!lay.fwd.length && !lay.bwd.length) continue;
     const a = node(e.p[0]), b = node(e.p[e.p.length - 1]);
     if (a === b) continue;
-    const item = { e, lay, a, b, h: half(e), rank: RANK[e.c] ?? 0, speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
+    const item = { e, lay, a, b, h: half(e), rank: (RANK[e.c] ?? 0) + (e.ring ? 1 : 0), speed: e.speed || SPEED[e.c] || 8.5, len: cumLen(e.p).at(-1) };
     a.legs.push({ item, end: 0 }); b.legs.push({ item, end: 1 });
     list.push(item);
   }
@@ -92,7 +92,12 @@ function buildNet(edges, opts = {}) {
     n.phases = groups.length;
     const sig = signals.some((s) => Math.hypot(s[0] - n.x, s[1] - n.z) < 30);
     const major = n.legs.filter((l) => l.item.rank >= 3).length;
-    if (nlegs >= 3 && (sig || (major >= 2 && nlegs >= 3 && n.phases > 1))) n.control = 'signal';
+    const set = control[n.id];
+    if (nlegs >= 3 && set) {
+      if (set === 'signal') n.control = 'signal';
+      else if (set === 'allway') n.control = 'allway';
+      else { n.control = n.legs.some((l) => l.item.rank < n.rank) ? 'priority' : 'allway'; n.noStop = set === 'yield' || set === 'roundabout'; }
+    } else if (nlegs >= 3 && (sig || (major >= 2 && nlegs >= 3 && n.phases > 1))) n.control = 'signal';
     else if (nlegs >= 3) { const top = n.rank, low = n.legs.some((l) => l.item.rank < top); n.control = low ? 'priority' : 'allway'; }
     n.cycleOff = (Math.abs(n.x * 7.3 + n.z * 3.1) % 17);
     // connectors
@@ -157,9 +162,9 @@ function drivableEdges(edgeMap) {
   const out = [];
   for (const e of edgeMap.values()) {
     if (!e.g || e.s === 'driveway' || !e.prof) continue;
-    out.push({ id: e.id, p: e.p, c: e.c, els: e.prof.els, oneway: e.oneway, speed: e.speed });
+    out.push({ id: e.id, p: e.p, c: e.c, els: e.prof.els, oneway: e.oneway, ring: e.ring, speed: e.speed ? e.speed * 0.447 : 0 });
   }
   return out;
 }
 
-export { RANK, SLOT_LEN, buildNet, drivableEdges };
+export { RANK, SLOT_LEN, buildNet, drivableEdges, keyOf };

@@ -103,7 +103,7 @@ class Sim {
     return true;
   }
   mayEnter(conn, car, d) {
-    const n = conn.node, stop = n.control === 'allway' || (n.control === 'priority' && conn.rank < n.rank);
+    const n = conn.node, stop = n.control === 'allway' || (n.control === 'priority' && conn.rank < n.rank && !n.noStop);
     if (stop) {
       if (!car.stopped) { if (d < 3.6 && car.v < 0.35) { car.stopped = true; car.arrive = this.t; } else return false; }
     } else if (d > Math.max(10, car.v * car.v / 6 + 5)) return false;
