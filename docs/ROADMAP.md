@@ -11,7 +11,8 @@ Many threads, one focused PR each, CI-gated auto-merge into `integration`, stric
 | --- | --- | --- | --- |
 | A | **Live traffic**: lane graph, cars (IDM), turns, signals and stops, on-street and lot parking, parked cars, trips from lots | `src/sim/`, `src/views/traffic.js` | thread running |
 | B | **Areas: load and update**: area picker, build-from-game, versioned packs with stable lot ids, "Refresh area" that rebases your edit log onto new data, save migration | `src/areas/`, `tools/pack/`, `public/areas/` | thread running |
-| C | **CS2-style road tools**: straight, curve, arc and grid-in-3-clicks presets, snapping, upgrade or replace in place, lane editor, one-ways, intersection control, speed limits | `src/tools/roads/` | proposed |
+| C | **CS2-style road tools and intersection edits**: curve, arc and grid-in-3-clicks presets, snapping, upgrade or replace in place, lane editor, one-ways, intersection control, speed limits, quick house/commercial edits | `src/tools/roads/` | thread running ("Add road tools and easy intersection edits") |
+| J | **Realistic building models**: open-licensed models and imagery-derived looks for buildings, loaded as assets | `src/assets/`, `public/models/`, `src/engine/looks.js` | thread running ("Get realistic building models") |
 | D | **Zoning and growth**: paint districts with a brush, demand bars (homes, shops, work), buildings level up on their own, the city reacts to your edits | `src/game/zoning/`, `src/game/growth.js` | proposed |
 | E | **Camera, light and feel**: CS2-like orbit/pitch camera, soft shadows, day/night tied to the clock, placement ghosts, sound, reduced-motion | `src/app/camera.js`, `src/views/light.js`, `src/audio/` | proposed |
 | F | **Info views and HUD**: Traffic, Parking, Zones, Happiness views, CS2-style info panels and advisor bar, clock controls | `src/views/`, `src/ui/` | proposed |
