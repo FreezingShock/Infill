@@ -82,3 +82,23 @@ test('a measured right of way becomes a sidewalk plus planted parkway, and bulbs
   const made = addBulbs(acc, B, {}, {}); assert.ok(made > 0 && acc.n > 0, `bulbs drawn ${made}`);
   const S2 = { edges: new Map() }; assert.equal(addBulbs(acc, S2, {}, {}), 0);
 });
+
+test('pitched roofs cover every wall of L, U and rotated footprints', async () => {
+  const { obb, inPoly } = await import('../src/engine/core.js');
+  const shapes = [
+    [[0, 0], [14, 0], [14, 6], [6, 6], [6, 14], [0, 14]], // L
+    [[0, 0], [16, 0], [16, 12], [11, 12], [11, 5], [5, 5], [5, 12], [0, 12]], // U
+    [[0, 0], [20, 0], [20, 7], [0, 7]], // plain
+  ];
+  for (const base of shapes) for (const ang of [0, 0.5, 1.2]) {
+    const c = Math.cos(ang), n = Math.sin(ang), ring = base.map(([x, z]) => [x * c - z * n + 40, x * n + z * c + 40]);
+    const R = obb(ring), W = looks.wings(ring, R);
+    assert.ok(W.cover > 0.9, `cover ${W.cover}`);
+    const inRect = (x, z) => W.rects.some((q) => { const dx = x - q.x, dz = z - q.z, s = dx * q.ux + dz * q.uz, t = dx * q.vx + dz * q.vz; return Math.abs(s) <= q.hw + 0.45 && Math.abs(t) <= q.hd + 0.45; });
+    for (let i = 0; i < ring.length; i++) for (let k = 0; k < 10; k++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length], x = a[0] + (b[0] - a[0]) * k / 10, z = a[1] + (b[1] - a[1]) * k / 10;
+      assert.ok(inRect(x, z), `wall point ${x.toFixed(1)},${z.toFixed(1)} left open`);
+    }
+    void inPoly;
+  }
+});

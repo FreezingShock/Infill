@@ -128,7 +128,9 @@ function maxRect(g, nu, nv) { // largest all-true rectangle in a boolean grid (h
   }
   return best;
 }
-function wings(ring, R, maxN = 3) {
+// Roof pieces for a footprint: greedy rectangles until the polygon is (almost) fully covered. Each is grown by half a grid cell so the
+// quantised edge reaches the real wall; oroof adds its own eave on top, so no wall is left open to the sky.
+function wings(ring, R, maxN = 7) {
   const cell = clamp(Math.max(R.hw, R.hd) / 40, 0.35, 0.9), nu = Math.ceil(R.hw * 2 / cell), nv = Math.ceil(R.hd * 2 / cell);
   const g = new Array(nu * nv);
   let on = 0;
@@ -139,11 +141,11 @@ function wings(ring, R, maxN = 3) {
   if (!on) return { rects: [], cover: 0 };
   const rects = []; let covered = 0;
   for (let n = 0; n < maxN; n++) {
-    const m = maxRect(g, nu, nv); if (!m || m.area < Math.max(10, on * 0.1)) break;
+    const m = maxRect(g, nu, nv); if (!m || m.area < Math.max(3, on * 0.012) || covered / on > 0.985) break;
     for (let j = m.j0; j < m.j1; j++) for (let i = m.i0; i < m.i1; i++) g[j * nu + i] = false;
     covered += m.area;
     const s0 = -R.hw + m.i0 * cell, s1 = -R.hw + m.i1 * cell, t0 = -R.hd + m.j0 * cell, t1 = -R.hd + m.j1 * cell, sm = (s0 + s1) / 2, tm = (t0 + t1) / 2;
-    rects.push({ x: R.x + R.ux * sm + R.vx * tm, z: R.z + R.uz * sm + R.vz * tm, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, hw: (s1 - s0) / 2, hd: (t1 - t0) / 2 });
+    rects.push({ x: R.x + R.ux * sm + R.vx * tm, z: R.z + R.uz * sm + R.vz * tm, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, hw: (s1 - s0) / 2 + cell * 0.5, hd: (t1 - t0) / 2 + cell * 0.5 });
   }
   return { rects, cover: covered / on };
 }
@@ -231,7 +233,7 @@ function drawHouse(ctx, b, idx, L, o) {
   const fe = frontEdges(ctx, edges, 3);
   const pitched = roofKind !== 'flat' && roofKind !== 'garden' && b.a < 900;
   const W = pitched ? wings(b.r, geo.R) : { rects: [], cover: 0 };
-  if (pitched && W.rects.length && W.cover > 0.82) {
+  if (pitched && W.rects.length && W.cover > 0.9) {
     W.rects.forEach((R, i) => {
       let G = R; if (meta && meta.rx && i === 0) G = { ...R, hw: R.hd, hd: R.hw, ux: R.vx, uz: R.vz, vx: R.ux, vz: R.uz }; // ridge across the long side when the picture says so
       oroof(ctx.s, G, y1, roofKind === 'shed' ? 'shed' : roofKind, rcol, C(P.w), 0.3 + (i ? -0.04 : 0));
