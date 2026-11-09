@@ -26,3 +26,16 @@ export function fogRange(dist, polar) {
   const tilt = Math.max(0, Math.sin(polar) - 0.55) / 0.45;
   return { near: dist * (1.6 + (1 - tilt) * 6), far: dist * (4.5 + (1 - tilt) * 14) + 900 };
 }
+
+/** Intro orbit framing: a bird's-eye ring that fits a whole area. bounds = [minx, minz, maxx, maxz], aspect = width / height. */
+export const ORBIT_POLAR = 0.95;
+export const ORBIT_PERIOD = 90; // seconds per full turn
+export function fitOrbit(bounds, aspect) {
+  const [x0, z0, x1, z1] = bounds;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  // Half the diagonal covers the area at any heading; the 0.9 trims empty corners of a long thin box.
+  const r = Math.max(60, Math.hypot(x1 - x0, z1 - z0) / 2 * 0.9);
+  const half = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * Math.max(aspect, 0.2)));
+  const dist = Math.min(MAX_DIST, Math.max(MIN_DIST, (r / Math.sin(half)) * 1.05));
+  return { cx, cz, r, dist, polar: ORBIT_POLAR };
+}
