@@ -1,4 +1,4 @@
-/* One docked layout, loaded last. Top-left: brand, area, search, advisor. Top-right: clock (with scrub slider) and the 3-number HUD.
+/* One docked layout, loaded last. Top-left: brand, then one area card (area, change, search), then the advisor. Top-right: clock (with scrub slider) and the 3-number HUD.
    Right column (#rcol): city demand over the inspector card, so they stack and never overlap. Bottom-left: tools and info views, then view toggles.
    Bottom-right: traffic chip, scale and compass. Every plaque is placed here, none float on their own. */
 #app .tl { gap: 8px; }

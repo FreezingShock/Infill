@@ -28,22 +28,22 @@ html[data-theme=camino] #app .tr > :nth-child(2) { animation-delay: .08s; }
 html[data-theme=camino] #app #cdock { animation-delay: .18s; } html[data-theme=camino] #app .br { animation-delay: .26s; } html[data-theme=camino] #app #rcol .city { animation-delay: .22s; }
 @keyframes hudBoot { from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(-6px); } to { opacity: 1; clip-path: inset(-12px); transform: none; } }
 
-/* ---- top left: sfvOS, area, search ---- */
-html[data-theme=camino] #app .tl { gap: 6px; width: auto; max-width: min(340px, calc(100% - 32px)); }
+/* ---- top left: sfvOS brand, one area card (area, change, search), then the advisor. Three cards, one width, one 8px gap ---- */
+html[data-theme=camino] #app .tl { gap: 8px; width: min(330px, calc(100% - 32px)); max-width: none; align-items: stretch; }
 html[data-theme=camino] #app .brand { padding: 8px 14px 8px 14px; gap: 10px; align-items: baseline; }
 html[data-theme=camino] #app .brand h1 { font-size: 20px; }
-html[data-theme=camino] #app .area-pl { padding: 6px 8px 6px 14px; gap: 14px; }
+html[data-theme=camino] #app .area-pl { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; gap: 0; }
+html[data-theme=camino] #app .area-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 8px 7px 14px; }
 html[data-theme=camino] #app .area-pl b { font: 600 12px/1.1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 html[data-theme=camino] #app .area-pl small { font: 500 9.5px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 html[data-theme=camino] #app .area-pl .btn { padding: 4px 9px; font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
-html[data-theme=camino] #app .search { padding: 0; width: 40px; height: 34px; overflow: hidden; transition: width .34s var(--ease), height .2s; }
-html[data-theme=camino] #app .search:focus-within { width: min(330px, calc(100vw - 32px)); height: auto; overflow: visible; }
-html[data-theme=camino] #app .search-row { gap: 0; }
-html[data-theme=camino] #app .search input { height: 34px; border: 0; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%23e9eff1' stroke-width='1.5'/%3E%3Cpath d='M10.5 10.5L14 14' stroke='%23e9eff1' stroke-width='1.5'/%3E%3C/svg%3E") 11px center / 15px no-repeat; padding: 0 10px 0 36px; font: 500 12px var(--mono); letter-spacing: .02em; cursor: pointer; }
-html[data-theme=camino] #app .search input:focus { cursor: text; outline: none; }
-html[data-theme=camino] #app .search input::placeholder { color: var(--ink-soft); opacity: 0; transition: opacity .2s .1s; }
-html[data-theme=camino] #app .search:focus-within input::placeholder { opacity: 1; }
-html[data-theme=camino] #app .search .btn { border-radius: 0; height: 34px; padding: 0 12px; }
+/* the search lives inside the area card, under a hairline: always visible, full card width */
+html[data-theme=camino] #app .search { margin: 0; padding: 8px 8px 9px 8px; border-top: 1px solid var(--hair); }
+html[data-theme=camino] #app .search-row { gap: 6px; }
+html[data-theme=camino] #app .search input { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--hair); border-radius: 2px; background: rgba(233, 239, 241, .05) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%23e9eff1' stroke-width='1.5'/%3E%3Cpath d='M10.5 10.5L14 14' stroke='%23e9eff1' stroke-width='1.5'/%3E%3C/svg%3E") 10px center / 14px no-repeat; padding: 0 10px 0 32px; font: 500 12px var(--mono); letter-spacing: .02em; color: var(--ink); }
+html[data-theme=camino] #app .search input:focus { outline: none; border-color: var(--hair-hi); background-color: rgba(233, 239, 241, .09); }
+html[data-theme=camino] #app .search input::placeholder { color: var(--ink-soft); opacity: 1; }
+html[data-theme=camino] #app .search .btn { border-radius: 0; height: 32px; padding: 0 12px; }
 html[data-theme=camino] #app .results { margin: 0; padding: 4px; border-top: 1px solid var(--hair); }
 html[data-theme=camino] #app .results:empty { display: none; }
 
