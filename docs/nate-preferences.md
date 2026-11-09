@@ -12,6 +12,7 @@ Seeded 9 Nov 2026 from the Infill project chat and from nate's Deepstack notes. 
 - **Name**: the game is sfvOS; the in-game OS/theme label is Camino (not Vantage). Camino is the only look; the classic paper look is removed. 2026-11-09.
 - **Scan view shows only real data**, never modeled utilities. Street view should look realistic; scan is the full surveillance-OS view. 2026-11-09.
 - **No emoji in the UI**; drawn glyphs only. 2026-11-09.
+- **Notices are a stack**, not one line: newest on top, older ones tucked back and fading, a type tag, a drawn glyph and a timer bar, hover pauses. He wants the ctOS feel. 2026-11-09.
 - **Reported fixes are general**: fix the recognition method for every area and every future area, not one lot. 2026-11-09.
 
 ## Process

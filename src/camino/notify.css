@@ -23,5 +23,31 @@
 [data-theme=camino] #app .adv-act .btn.ghost:hover { background: #ffffff; border-color: var(--cyan); }
 [data-theme=camino] #app .adv-act .btn.ghost:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
-/* toast: a mono notice with a cyan rule, no shadow stack, text wraps instead of clipping */
-[data-theme=camino] #app .toast { font: 500 11.5px/1.5 var(--mono); letter-spacing: .02em; color: var(--ink); background: rgba(9, 12, 14, .82); border: 1px solid var(--hair); border-left: 2px solid var(--cyan); border-radius: 0; padding: 9px 14px 9px 12px; white-space: normal; max-width: min(540px, calc(100% - 32px)); }
+/* toast stack (src/ui/toasts.js): newest notice on top, older ones tuck back under it, dim and shrink.
+   The container ignores the pointer so the map under it stays clickable; each notice takes its own. */
+[data-theme=camino] #app .toast { bottom: 24px; left: 50%; width: min(420px, calc(100% - 32px)); padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; font: 500 11.5px/1.4 var(--mono); letter-spacing: .02em; color: var(--ink); pointer-events: none; }
+[data-theme=camino] #app .tn-row { --d: 0; position: relative; display: grid; grid-template-rows: 0fr; margin-top: calc(var(--d) * -11px); z-index: calc(20 - var(--d)); opacity: calc(1 - var(--d) * .22); transform: scale(calc(1 - var(--d) * .035)); transform-origin: 50% 100%; pointer-events: auto; transition: grid-template-rows .36s var(--ease), margin .34s var(--ease), opacity .3s ease, transform .34s var(--ease); }
+[data-theme=camino] #app .tn-row.in { grid-template-rows: 1fr; }
+[data-theme=camino] #app .tn-row.out { opacity: 0; transition: grid-template-rows .36s var(--ease), opacity .22s ease; }
+[data-theme=camino] #app .tn-row > .tn { --kc: var(--cyan); position: relative; min-height: 0; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 0 4px 0 0; background: rgba(8, 11, 13, .86); border: 1px solid var(--hair); border-radius: 2px; box-shadow: 0 10px 26px rgba(0, 0, 0, .38); backdrop-filter: blur(14px) saturate(130%); -webkit-backdrop-filter: blur(14px) saturate(130%); }
+[data-theme=camino] #app .tn-row > .tn[data-kind=done] { --kc: var(--ok); }
+[data-theme=camino] #app .tn-row > .tn[data-kind=warn] { --kc: var(--gold); }
+[data-theme=camino] #app .tn-row.in > .tn { animation: tnIn .42s var(--ease) both; }
+/* type tag: a solid plate in the notice colour, mono caps */
+[data-theme=camino] #app .tn-tag { align-self: stretch; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 9px; background: var(--kc); color: #050607; font: 600 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; white-space: nowrap; }
+[data-theme=camino] #app .tn-tag svg { width: 11px; height: 11px; flex: 0 0 auto; }
+/* the notice itself: one tight line of copy, wrapping instead of clipping */
+[data-theme=camino] #app .tn-msg { margin: 0; padding: 9px 0 10px; min-width: 0; font: 500 11.5px/1.4 var(--mono); letter-spacing: .02em; color: var(--ink); overflow-wrap: anywhere; }
+[data-theme=camino] #app .tn-x { width: 22px; height: 22px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 2px; background: transparent; color: var(--ink-soft); cursor: pointer; transition: color .15s, background .15s; }
+[data-theme=camino] #app .tn-x svg { width: 9px; height: 9px; }
+[data-theme=camino] #app .tn-x:hover { color: var(--ink); background: rgba(233, 239, 241, .08); }
+[data-theme=camino] #app .tn-x:focus-visible { outline: 1px solid var(--cyan); outline-offset: -1px; }
+/* hairline corner tick, like a drawn ctOS frame */
+[data-theme=camino] #app .tn-row > .tn::before { content: ""; position: absolute; right: 0; top: 0; width: 7px; height: 7px; border-top: 1px solid var(--kc); border-right: 1px solid var(--kc); pointer-events: none; }
+/* timer bar along the bottom edge: it drains from full to empty, and stops while the notice is held */
+[data-theme=camino] #app .tn-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--kc); transform-origin: 0 50%; transform: scaleX(1); opacity: .9; }
+@keyframes tnBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes tnIn { from { clip-path: inset(0 100% 0 0); transform: translateX(-8px); } to { clip-path: inset(0 0 0 0); transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme=camino] #app .tn-row, [data-theme=camino] #app .tn-row > .tn { transition: none; animation: none; }
+}
