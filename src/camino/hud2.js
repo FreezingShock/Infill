@@ -3,7 +3,6 @@
 // Nothing is rebuilt: the existing bars and card are moved or wrapped, so every feature and key still works.
 // The app re-renders #tools, #views, #infobar, #card and .city with innerHTML, so everything here either
 // lives on the stable containers or re-applies itself from a MutationObserver.
-import { setTheme } from './theme.js';
 
 const $ = (id) => document.getElementById(id);
 const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -50,7 +49,7 @@ function mountDock() {
     <button class="cd-row" data-go="areaBtn"><span>Change area</span><em>Valley map</em></button>
     <button class="cd-row" data-go="vKeys"><span>Keys and mouse</span><kbd>?</kbd></button>
     <button class="cd-row" data-go="vCred"><span>Credits</span><em>data sources</em></button>
-    <button class="cd-row" data-go="theme"><span>Classic paper look</span><em>reloads the page</em></button></div>`);
+    </div>`);
 
   // popovers: one open at a time, close on outside click, Escape, or choosing a row
   const pops = [...dock.querySelectorAll('.cd-pop')], btns = [...dock.querySelectorAll('[data-pop]')];
@@ -63,8 +62,7 @@ function mountDock() {
   addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, true);
   $('pMore').addEventListener('click', (e) => {
     const r = e.target.closest('[data-go]'); if (!r) return; const g = r.dataset.go; close();
-    if (g === 'theme') setTheme('nexus');
-    else if (g === 'cmd') document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+    if (g === 'cmd') document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
     else $(g)?.click();
   });
   $('pLayers').addEventListener('click', (e) => { if (e.target.closest('[data-view]')) setTimeout(close, 180); });

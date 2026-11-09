@@ -29,7 +29,7 @@ Inventory from going through every module of the builder preview (now `src/`).
 
 ### Rendering (`app/render.js`, `app/scene.js`)
 
-Orthographic toon view with ink outlines (Nexus look). Lots generate into meshes and merge into 110 m chunks; only dirty chunks rebuild. Trees and cars are instanced. Streets are built from their cross-section with lane markings. Night lighting, before/after compare slider, as-built view, color lots by type or zone, street labels, scale bar and compass.
+Orthographic view with faint edge lines (Camino look). Lots generate into meshes and merge into 110 m chunks; only dirty chunks rebuild. Trees and cars are instanced. Streets are built from their cross-section with lane markings. Night lighting, before/after compare slider, as-built view, color lots by type or zone, street labels, scale bar and compass.
 
 ### Templates (`engine/templates.js`)
 

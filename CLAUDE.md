@@ -22,4 +22,4 @@ Infill (the game is called Renovated) is a Vite + Three.js city builder on real 
 - Saves: key `renovated.builder.<area>.v2` plus an edit log. Add fields additively; add a migration in `src/areas/` if a shape must change.
 - Tests: new files in `tests/`, named for the feature (`tests/sim.test.js`). Engine and sim tests run in plain node.
 - Don't edit `package.json` or the lockfile unless you need a dependency. Big refactors get their own PR, announced first, when few threads are in flight.
-- Colors and fonts: reuse `src/styles/nexus.css` tokens (cream paper, terracotta, ink outlines).
+- Colors and fonts: reuse the tokens in `src/styles/base.css` (dark glass, cyan accent, Helvetica and mono). Camino is the only look.

@@ -1,14 +1,5 @@
 /* sfvOS Camino: dark frosted panels, Helvetica-style type, mono data labels, cyan accents.
    Everything is scoped to html[data-theme=camino]; panel placement stays in src/styles/layout.css. */
-html[data-theme=camino] {
-  color-scheme: dark;
-  --paper: #0c1013; --paper-2: rgba(233, 239, 241, .07); --ink: #e9eff1; --ink-soft: #8a99a3;
-  --terracotta: #2fd8e8; --terracotta-dk: #1db8c7; --sage: #3ce07a; --sky: #2fd8e8; --gold: #f2c94c; --ok: #3ce07a; --warn: #ff4436;
-  --glass: rgba(9, 12, 14, .64); --hair: rgba(226, 238, 240, .14); --hair-hi: rgba(226, 238, 240, .3); --cyan: #2fd8e8; --cyan-ink: #031417; --alert: #ff4436; --white: #f2f3f1;
-  --display: "Helvetica Neue", Helvetica, "Arimo", Arial, sans-serif;
-  --body: "Helvetica Neue", Helvetica, "Arimo", Arial, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-}
 [data-theme=camino] body { background: #05080a; color: var(--ink); -webkit-font-smoothing: antialiased; }
 [data-theme=camino] #app { background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 70%); }
 

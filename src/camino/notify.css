@@ -1,5 +1,5 @@
 /* sfvOS Camino notifications: the advisor as a system alert, and the toast as a mono notice.
-   Loaded only with the Camino theme (src/camino/index.js). Markup and copy live in src/ui/index.js and src/app/state.js. */
+   Loaded by src/camino/index.js. Markup and copy live in src/ui/index.js and src/app/state.js. */
 
 /* advisor card: frosted plate with a severity rule across the top */
 [data-theme=camino] #app .advisor { border: 1px solid var(--hair); border-top: 3px solid var(--sev); border-radius: 2px; color: var(--ink); padding: 11px 12px 12px; gap: 9px; }

@@ -57,7 +57,7 @@ Edits autosave to the browser per area. Saved designs are kept in the browser ac
 ## Layout
 
 ```
-index.html            page shell (Nexus look: cream plaques, Fraunces + Capriola)
+index.html            page shell (Camino look: dark glass panels, Helvetica + IBM Plex Mono)
 src/main.js           picks the area from ?area=, loads its pack, starts the app
 src/engine/           pure data and generation, runs in node too
   pack.js             the loaded area pack
@@ -66,12 +66,13 @@ src/engine/           pure data and generation, runs in node too
   templates.js        template buildings and the lot generator
   commands.js         the edit log: every command and replay
 src/app/              rendering and UI
-  render.js           renderer, camera, controls, toon materials
+  render.js           renderer, camera, controls, materials
   scene.js            chunked lot meshes, roads, trees, cars, terrain, props
   state.js            city state, undo/redo, overlays, scores, saves, selection
   inspector.js        the right-hand card (build, tweak, lot, select tabs, street and area panels)
   input.js            tools, picking, drawing, modals, area picker, start-up and frame loop
-src/styles/nexus.css  all styles
+src/styles/base.css   layout and controls; its :root tokens are the Camino palette
+  src/camino/         the Camino look (camino.css), HUD, scan view, real infrastructure, sky
 public/areas/         area manifest (index.json) and area packs
 tools/pack/           Python scripts that build area packs from open data
 tests/                node tests

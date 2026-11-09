@@ -40,10 +40,10 @@
 #app .tr > .plaque { min-height: 58px; display: flex; align-items: center; }
 #app .clockbar { gap: 14px; }
 #app .clockbar > * + * { position: relative; }
-#app .clockbar .speeds, #app .clockbar .gauges { padding-left: 14px; border-left: 1.5px dashed rgba(43,36,32,.3); }
+#app .clockbar .speeds, #app .clockbar .gauges { padding-left: 14px; border-left: 1px solid var(--hair); }
 #app .clockbar .speeds { padding: 3px 3px 3px 3px; border-left: 0; }
-#app .clockbar .clockdock { padding-left: 14px; border-left: 1.5px dashed rgba(43,36,32,.3); }
-#app .br .trafficchip { padding-right: 14px; border-right: 1.5px dashed rgba(43,36,32,.3); }
+#app .clockbar .clockdock { padding-left: 14px; border-left: 1px solid var(--hair); }
+#app .br .trafficchip { padding-right: 14px; border-right: 1px solid var(--hair); }
 #app .hud .stat { min-width: 60px; }
 #app .toast { bottom: 24px; }
 #app .advisor p { font-size: 12.5px; }

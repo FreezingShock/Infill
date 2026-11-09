@@ -8,7 +8,6 @@ import { EL, liveBuildings, rowWidth } from '../engine/model.js';
 import { genLot } from '../engine/templates.js';
 import { BASE } from '../engine/commands.js';
 import { INK, MAT, toon } from './render.js';
-import { CAMINO } from '../camino/theme.js';
 
 // =====================================================================
 // Generated scene: never saved, rebuilt from programs. Lots merge into chunks.
@@ -61,23 +60,21 @@ const TREE_KINDS = (() => {
     { f: mk(new THREE.IcosahedronGeometry(1.1, 0), 0.8), t: null },
   ];
 })();
-const TRUNK = toon({ color: 0x7a5636 }), SHELL = new THREE.MeshBasicMaterial({ color: 0x2b2420, side: THREE.BackSide });
+const TRUNK = toon({ color: 0x7a5636 });
 const FOL = toon({ color: 0xffffff });
-SHELL.visible = !CAMINO; // Camino street view drops the ink outline around crowns
 const CAR_COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const CAR_BODY = new THREE.BoxGeometry(1.8, 1.0, 4.3).translate(0, 0.5, 0), CAR_TOP = new THREE.BoxGeometry(1.6, 0.75, 2.2).translate(0, 1.35, -0.2);
 function instTrees(list) {
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
   TREE_KINDS.forEach((K, k) => {
     const items = list.filter((t) => t[4] === k); if (!items.length) return;
-    const f = new THREE.InstancedMesh(K.f, FOL, items.length), sh = new THREE.InstancedMesh(K.f, SHELL, items.length), tr = K.t ? new THREE.InstancedMesh(K.t, TRUNK, items.length) : null;
+    const f = new THREE.InstancedMesh(K.f, FOL, items.length), tr = K.t ? new THREE.InstancedMesh(K.t, TRUNK, items.length) : null;
     items.forEach((t, i) => {
       v.set(t[0], t[1], t[2]); sc.setScalar(t[3]); m4.compose(v, q, sc); f.setMatrixAt(i, m4); if (tr) tr.setMatrixAt(i, m4);
-      sc.setScalar(t[3] * 1.09); v.y = t[1] - 0.1 * t[3]; m4.compose(v, q, sc); sh.setMatrixAt(i, m4);
       f.setColorAt(i, TREE_COLS[t[5] % 5]);
     });
     f.castShadow = true; if (tr) tr.castShadow = true;
-    grp.add(f, sh); if (tr) grp.add(tr);
+    grp.add(f); if (tr) grp.add(tr);
   });
   return grp;
 }
