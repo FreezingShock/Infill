@@ -68,7 +68,7 @@ class Demand {
     if (!hz && !jz) { // no lots known: local streets are where people live, busier roads where they go
       for (const n of real) {
         if (n.rank <= 1) { home.set(n, n.legs.length * 1.5); hz += n.legs.length * 1.5; }
-        else if (n.legs.length >= 3) { job.set(n, 3); jz += 3; }
+        else { job.set(n, n.legs.length >= 3 ? 3 : 1); jz += n.legs.length >= 3 ? 3 : 1; }
       }
     }
     this.homes = hz; this.jobs = jz;
@@ -112,7 +112,7 @@ class Demand {
     for (let i = 0; i < 8; i++) {
       const o = from.sample(r), d = to.sample(r);
       if (!o || !d || o === d) continue;
-      if (type !== 'TT' && (o.x - d.x) ** 2 + (o.z - d.z) ** 2 < 120 * 120) continue;
+      if (type !== 'TT' && (o.x - d.x) ** 2 + (o.z - d.z) ** 2 < 60 * 60) continue;
       if (type === 'TT' && (o.x - d.x) ** 2 + (o.z - d.z) ** 2 < 300 * 300) continue;
       return { origin: o, dest: d, type };
     }
