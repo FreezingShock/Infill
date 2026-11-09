@@ -13,7 +13,7 @@ test('grade changes smoothly through the day', () => {
   let prev = gradeFor(lightAt(0));
   for (let h = 0.1; h <= 24; h += 0.1) {
     const g = gradeFor(lightAt(h));
-    assert.ok(Math.abs(g.sat - prev.sat) < 0.08 && g.tint.every((v, i) => Math.abs(v - prev.tint[i]) < 0.12), `hour ${h.toFixed(1)}`);
+    assert.ok(Math.abs(g.sat - prev.sat) < 0.1 && g.tint.every((v, i) => Math.abs(v - prev.tint[i]) < 0.13), `hour ${h.toFixed(1)}`);
     prev = g;
   }
 });

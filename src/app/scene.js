@@ -72,7 +72,7 @@ function instTrees(list) {
     const f = new THREE.InstancedMesh(K.f, FOL, items.length), tr = K.t ? new THREE.InstancedMesh(K.t, TRUNK, items.length) : null;
     items.forEach((t, i) => {
       v.set(t[0], t[1], t[2]); sc.setScalar(t[3]); m4.compose(v, q, sc); f.setMatrixAt(i, m4); if (tr) tr.setMatrixAt(i, m4);
-      f.setColorAt(i, TREE_COLS[t[5] % 5]);
+      f.setColorAt(i, TREE_COLS[t[5] % TREE_COLS.length]);
     });
     f.castShadow = true; if (tr) tr.castShadow = true;
     grp.add(f); if (tr) grp.add(tr);
