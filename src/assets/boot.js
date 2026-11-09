@@ -5,7 +5,9 @@ export async function bootAssets(area, pack) {
     if (!area.pack) return false;
     const res = await fetch(`areas/${area.pack.replace(/\.json$/, '.looks.json')}`);
     const { setLooksData, packChecksum } = await import('../engine/looks.js');
-    const ok = res.ok && setLooksData(await res.json(), pack.buildings.length, packChecksum(pack.buildings));
+    const sidecar = res.ok ? await res.json() : null;
+    const ok = !!sidecar && setLooksData(sidecar, pack.buildings.length, packChecksum(pack.buildings));
+    if (ok) globalThis.__RENOVATED_LOOKS__ = sidecar; // the lot workers load the same looks
     try { // street trees from the City of LA inventory, per named street
       const st = await fetch(`areas/${area.pack.replace(/\.json$/, '.streets.json')}`);
       if (st.ok) (await import('../engine/streettrees.js')).setStreetTrees(await st.json());

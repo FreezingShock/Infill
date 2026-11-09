@@ -18,7 +18,7 @@ Many threads, one focused PR each, CI-gated auto-merge into `integration`, stric
 | F | **Info views and HUD**: Traffic, Parking, Zones, Happiness views, CS2-style info panels and advisor bar, clock controls | `src/views/`, `src/ui/` | proposed |
 | G | **Renovate and repurpose**: keep-the-shell upgrades, strip mall to homes over shops, centers as one thing | `src/engine/renovate.js`, `src/tools/renovate/` | first slice in PR (Repurpose shelf: shops, mixed, homes, offices, facelift, one center) |
 | H | **People and transit**: pedestrians at crossings, bus routes from mapped stops, bikes | `src/sim/people/`, `src/sim/transit/` | later (after A) |
-| I | **Infra and speed**: shared worker pool, lot-gen and chunk meshing off the main thread, perf baseline, store module for edit-log state | `src/workers/`, `src/app/store.js`, `docs/perf-baseline.md` | proposed, runs alone |
+| I | **Infra and speed**: shared worker pool, lot-gen and chunk meshing off the main thread, perf baseline, store module for edit-log state | `src/workers/`, `src/app/store.js`, `docs/perf-baseline.md` | first slice in PR: lot geometry on a worker pool, work store, perf baseline. Next: view metrics, edit-log store, feature registry |
 
 ### Contracts between threads (so A, B, C, D can build in parallel)
 1. **Pack and area id.** B owns the pack schema. Lots keep a stable id (county AIN where it exists), streets a stable edge id. New fields are optional. A reads streets, profiles, parking polygons and props from `World`/`BASE`; it never reads the pack file directly.
