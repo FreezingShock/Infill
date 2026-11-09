@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Acc, C, FT, UP, area, clamp, decal, elev, fmt, inPoly, obb, obox, ofacade, oroof, pick, rcorners, ribbon, rng, segDist2, subR } from './core.js';
+import { FLOOR_H, addedFloors, dressUse, useOf, useTotals } from './renovate.js';
 import { BLD, DREAM, PAL, fitRect, frameOf, liveBuildings, zfam, zrule } from './model.js';
 
 // =====================================================================
@@ -130,13 +131,16 @@ function benches(ctx, n) { const bb = ctx.lot.bb; for (let k = 0, m = 0; k < n *
 // ---------- as-built ----------
 function genAsBuilt(ctx) {
   const { lot, S, prog } = ctx, blds = liveBuildings(lot, S), P = PAL[prog.pl] || PAL.sand;
-  const k = lot.st0 && prog.st && prog.st !== lot.st0 ? prog.st / lot.st0 : 1;
+  const k = lot.st0 && prog.st && prog.st !== lot.st0 ? prog.st / lot.st0 : 1, U = useOf(prog), tally = [];
   for (const i of blds) {
-    const b = BLD[i]; const h = b.h * k; let r = b.r; const n = r.length, y0 = b.b - 1, y1 = b.b + h;
+    const b = BLD[i]; let r = b.r; const n = r.length, y0 = b.b - 1;
+    const h0 = b.h * k, floors0 = Math.max(1, Math.round(h0 / 3.2)), added = b.a > 40 && b.t !== 'outbuilding' ? addedFloors(prog, floors0) : 0;
+    const h = h0 + added * FLOOR_H, y1 = b.b + h;
     const res = b.t === 'residential' || b.t === 'unknown' || b.t === 'outbuilding';
-    const wall = C(res ? P.w : ({ commercial: 0xe1e4e6, education: 0xdcd5e6, civic: 0xdcd5e6 }[b.t] || P.w));
+    const wall = C(U ? U.wall : res ? P.w : ({ commercial: 0xe1e4e6, education: 0xdcd5e6, civic: 0xdcd5e6 }[b.t] || P.w));
     const cx = b.r.reduce((s, p) => s + p[0], 0) / n, cz = b.r.reduce((s, p) => s + p[1], 0) / n;
     const floors = Math.max(1, Math.round(h / 3.2)), fh = h / floors;
+    if (U && b.t !== 'outbuilding') { dressUse(ctx, { r, y0, floors: floors0, fh, added, seed: lot.sd + i }); tally.push({ a: b.a, floors: floors0, added }); }
     for (let e = 0; e < n; e++) {
       const a = r[e], c = r[(e + 1) % n], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
       let nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
@@ -174,6 +178,7 @@ function genAsBuilt(ctx) {
   if (['house', 'multi', 'apts', 'civic'].includes(lot.lt)) yardTrees(ctx, clamp(Math.round(lot.m2 / (lot.lt === 'house' ? 300 : 420)), 0, 5));
   if (prog.trees) yardTrees(ctx, 4, 1.6);
   ctx.units = lot.lt === 'apts' || lot.lt === 'multi' ? Math.round(lot.u0 * k) : lot.u0;
+  const tot = U && tally.length ? useTotals(prog, tally) : null; if (tot) { ctx.units = tot.homes; ctx.cost += tot.cost; }
   if (prog.adu) { const f = fitRect(lot, 7, 6, { front: ctx.sb.front + 6, side: 1.2, rear: 1.2 }, { pref: 'rear', avoid: ctx.avoid, minScale: 0.75, gap: 2.5 }); if (f) { mass(ctx, f.R, 1, 'shed', 'sage', { noFloor: true }); ctx.units += 1; ctx.cost += 260000; } else ctx.warn = 'No room for an ADU behind the existing house'; }
   if (prog.fence && prog.fence !== 'none') fenceAround(ctx, prog.fence);
   return true;

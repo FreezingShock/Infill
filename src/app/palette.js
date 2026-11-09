@@ -4,6 +4,7 @@ import { CATS, TPL, TPL_BY_CAT, availability, genLot } from '../engine/templates
 import { exec, uid } from '../engine/commands.js';
 import { genCached } from './scene.js';
 import { STATE, ui, world } from './state.js';
+import { repurposeItem, repurposeShelf } from '../tools/renovate/items.js';
 
 // =====================================================================
 // The Build palette: every way to change a lot as one clickable item, applied by clicking or dragging across lots.
@@ -79,6 +80,7 @@ function shelves() {
   const mine = [...(ui.copied ? [lookItem('copied', ui.copied)] : []), ...designs.map((d, k) => lookItem('my:' + k, d))];
   if (mine.length) out.push({ k: 'mine', name: 'Copied and my designs', items: mine });
   out.push({ k: 'up', name: 'Upgrade what is there', items: UPGRADES });
+  out.push(repurposeShelf());
   out.push({ k: 'roof', name: 'Roofs', items: ROOFS });
   out.push({ k: 'pal', name: 'Colours', items: COLOURS });
   for (const c of CATS) out.push({ k: c, name: 'Rebuild · ' + LT[c].name.replace(' lot', ''), items: TPL_BY_CAT[c].map(tplItem), col: LT[c].col });
@@ -89,6 +91,7 @@ function itemById(id) {
   if (id === 'copied') return ui.copied ? lookItem('copied', ui.copied) : null;
   if (id.startsWith('my:')) { const d = designs[+id.slice(3)]; return d ? lookItem(id, d) : null; }
   if (id.startsWith('tpl:')) { const t = TPL[id.slice(4)]; return t ? tplItem(t) : null; }
+  if (id.startsWith('use.')) return repurposeItem(id);
   return [...UPGRADES, ...ROOFS, ...COLOURS].find((i) => i.id === id) || null;
 }
 
@@ -125,7 +128,7 @@ const SUGGEST = {
   house: ['up.adu', 'up.floor', 'tpl:sb9.duplex', 'tpl:mf.court4'],
   multi: ['up.floor', 'up.solar', 'tpl:mf.stacked', 'tpl:apt.court'],
   apts: ['up.floor', 'rf.garden', 'up.solar', 'tpl:apt.mid'],
-  main: ['tpl:ms.mixed', 'up.floor', 'tpl:ms.market', 'tpl:pk.park'],
+  main: ['use.mixed', 'use.homes', 'use.center', 'tpl:ms.mixed', 'up.floor', 'tpl:ms.market', 'tpl:pk.park'],
   parking: ['tpl:pk.solar', 'tpl:pk.plaza', 'tpl:pk.park', 'tpl:pk.apts'],
   civic: ['up.trees', 'tpl:cv.library', 'tpl:cv.play', 'tpl:cv.garden'],
   vacant: ['tpl:garden.house', 'tpl:cottage.pair', 'tpl:pk.park', 'tpl:cv.garden'],
