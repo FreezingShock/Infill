@@ -216,7 +216,7 @@ function subR(R, s0, t0, w, d) { // sub-rectangle in R's local (s from -hw, t fr
   return { x: R.x + R.ux * s + R.vx * t, z: R.z + R.uz * s + R.vz * t, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, hw: w / 2, hd: d / 2 };
 }
 function oroof(acc, R, y, type, roofCol, wallCol, pitch = 0.3) {
-  const o = 0.45, hw = R.hw + o, hd = R.hd + o;
+  const o = R.eave ? (R.eave[0] + R.eave[1] + R.eave[2] + R.eave[3]) / 4 : 0.45, hw = R.hw + o, hd = R.hd + o;
   const P = (s, t, yy) => [R.x + R.ux * s + R.vx * t, yy, R.z + R.uz * s + R.vz * t];
   const ctr = [R.x, y - 1, R.z];
   const hintOf = (...pts) => { const m = pts.reduce((a, p) => [a[0] + p[0] / pts.length, a[1] + p[1] / pts.length, a[2] + p[2] / pts.length], [0, 0, 0]); return [m[0] - ctr[0], m[1] - ctr[1], m[2] - ctr[2]]; };
@@ -235,17 +235,23 @@ function oroof(acc, R, y, type, roofCol, wallCol, pitch = 0.3) {
     return;
   }
   const short = along ? hd : hw, rise = short * pitch * 2;
-  if (type === 'gable') {
+  if (type === 'gable') { // eaves can differ per side (R.eave) so abutting wings meet without overhang slabs
+    const e = R.eave || [o, o, o, o], sMin = -R.hw - e[0], sMax = R.hw + e[1], tMin = -R.hd - e[2], tMax = R.hd + e[3];
+    const sc = (sMin + sMax) / 2, tc = (tMin + tMax) / 2, half = (along ? tMax - tMin : sMax - sMin) / 2, gr = half * pitch * 2;
     if (along) {
-      const r0 = P(-hw, 0, y + rise), r1 = P(hw, 0, y + rise);
-      F([P(-hw, -hd, y), P(hw, -hd, y), r1, r0], roofCol); F([P(-hw, hd, y), P(hw, hd, y), r1, r0], roofCol);
-      F([P(-R.hw, -R.hd, y), P(-R.hw, R.hd, y), P(-R.hw, 0, y + rise * (R.hd / hd))], wallCol);
-      F([P(R.hw, -R.hd, y), P(R.hw, R.hd, y), P(R.hw, 0, y + rise * (R.hd / hd))], wallCol);
+      const r0 = P(sMin, tc, y + gr), r1 = P(sMax, tc, y + gr);
+      F([P(sMin, tMin, y), P(sMax, tMin, y), r1, r0], roofCol); F([P(sMin, tMax, y), P(sMax, tMax, y), r1, r0], roofCol);
+      for (const sw of [-R.hw, R.hw]) {
+        const hl = gr * (1 - Math.abs(-R.hd - tc) / half), hr = gr * (1 - Math.abs(R.hd - tc) / half);
+        F([P(sw, -R.hd, y), P(sw, R.hd, y), P(sw, R.hd, y + hr), P(sw, -R.hd, y + hl)], wallCol); F([P(sw, -R.hd, y + hl), P(sw, R.hd, y + hr), P(sw, tc, y + gr)], wallCol);
+      }
     } else {
-      const r0 = P(0, -hd, y + rise), r1 = P(0, hd, y + rise);
-      F([P(-hw, -hd, y), P(-hw, hd, y), r1, r0], roofCol); F([P(hw, -hd, y), P(hw, hd, y), r1, r0], roofCol);
-      F([P(-R.hw, -R.hd, y), P(R.hw, -R.hd, y), P(0, -R.hd, y + rise * (R.hw / hw))], wallCol);
-      F([P(-R.hw, R.hd, y), P(R.hw, R.hd, y), P(0, R.hd, y + rise * (R.hw / hw))], wallCol);
+      const r0 = P(sc, tMin, y + gr), r1 = P(sc, tMax, y + gr);
+      F([P(sMin, tMin, y), P(sMin, tMax, y), r1, r0], roofCol); F([P(sMax, tMin, y), P(sMax, tMax, y), r1, r0], roofCol);
+      for (const tw of [-R.hd, R.hd]) {
+        const hl = gr * (1 - Math.abs(-R.hw - sc) / half), hr = gr * (1 - Math.abs(R.hw - sc) / half);
+        F([P(-R.hw, tw, y), P(R.hw, tw, y), P(R.hw, tw, y + hr), P(-R.hw, tw, y + hl)], wallCol); F([P(-R.hw, tw, y + hl), P(R.hw, tw, y + hr), P(sc, tw, y + gr)], wallCol);
+      }
     }
     return;
   }

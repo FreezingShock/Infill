@@ -128,8 +128,9 @@ function maxRect(g, nu, nv) { // largest all-true rectangle in a boolean grid (h
   }
   return best;
 }
-// Roof pieces for a footprint: greedy rectangles until the polygon is (almost) fully covered. Each is grown by half a grid cell so the
-// quantised edge reaches the real wall; oroof adds its own eave on top, so no wall is left open to the sky.
+// Roof pieces for a footprint: greedy rectangles (largest first) until the polygon is (almost) fully covered. A side that faces open air
+// gets an eave grown to reach the real wall; a side that touches another piece gets none, so wings meet the main roof instead of stacking
+// slabs over it. R.eave = [s-, s+, t-, t+] in the piece's own frame.
 function wings(ring, R, maxN = 7) {
   const cell = clamp(Math.max(R.hw, R.hd) / 40, 0.35, 0.9), nu = Math.ceil(R.hw * 2 / cell), nv = Math.ceil(R.hd * 2 / cell);
   const g = new Array(nu * nv);
@@ -139,13 +140,17 @@ function wings(ring, R, maxN = 7) {
     const v = inPoly(R.x + R.ux * s + R.vx * t, R.z + R.uz * s + R.vz * t, ring); g[j * nu + i] = v; if (v) on++;
   }
   if (!on) return { rects: [], cover: 0 };
+  const inside = g.slice(), at = (i, j) => i >= 0 && j >= 0 && i < nu && j < nv && inside[j * nu + i];
+  const touches = (cells) => cells.filter(([i, j]) => at(i, j)).length > cells.length * 0.85; // another roof piece continues beyond this whole side
   const rects = []; let covered = 0;
   for (let n = 0; n < maxN; n++) {
     const m = maxRect(g, nu, nv); if (!m || m.area < Math.max(3, on * 0.012) || covered / on > 0.985) break;
     for (let j = m.j0; j < m.j1; j++) for (let i = m.i0; i < m.i1; i++) g[j * nu + i] = false;
     covered += m.area;
+    const col = (i) => { const c = []; for (let j = m.j0; j < m.j1; j++) c.push([i, j]); return c; }, row = (j) => { const c = []; for (let i = m.i0; i < m.i1; i++) c.push([i, j]); return c; };
+    const out = cell * 0.5 + 0.45, e = [touches(col(m.i0 - 1)) ? 0 : out, touches(col(m.i1)) ? 0 : out, touches(row(m.j0 - 1)) ? 0 : out, touches(row(m.j1)) ? 0 : out];
     const s0 = -R.hw + m.i0 * cell, s1 = -R.hw + m.i1 * cell, t0 = -R.hd + m.j0 * cell, t1 = -R.hd + m.j1 * cell, sm = (s0 + s1) / 2, tm = (t0 + t1) / 2;
-    rects.push({ x: R.x + R.ux * sm + R.vx * tm, z: R.z + R.uz * sm + R.vz * tm, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, hw: (s1 - s0) / 2 + cell * 0.5, hd: (t1 - t0) / 2 + cell * 0.5 });
+    rects.push({ x: R.x + R.ux * sm + R.vx * tm, z: R.z + R.uz * sm + R.vz * tm, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, hw: (s1 - s0) / 2, hd: (t1 - t0) / 2, eave: e });
   }
   return { rects, cover: covered / on };
 }
@@ -235,8 +240,9 @@ function drawHouse(ctx, b, idx, L, o) {
   const W = pitched ? wings(b.r, geo.R) : { rects: [], cover: 0 };
   if (pitched && W.rects.length && W.cover > 0.9) {
     W.rects.forEach((R, i) => {
-      let G = R; if (meta && meta.rx && i === 0) G = { ...R, hw: R.hd, hd: R.hw, ux: R.vx, uz: R.vz, vx: R.ux, vz: R.uz }; // ridge across the long side when the picture says so
-      oroof(ctx.s, G, y1, roofKind === 'shed' ? 'shed' : roofKind, rcol, C(P.w), 0.3 + (i ? -0.04 : 0));
+      let G = R; if (meta && meta.rx && i === 0) G = { ...R, hw: R.hd, hd: R.hw, ux: R.vx, uz: R.vz, vx: -R.ux, vz: -R.uz, eave: [R.eave[2], R.eave[3], R.eave[1], R.eave[0]] }; // ridge across the long side when the picture says so
+      // one roof family, one pitch: a lone piece keeps the chosen form, several pieces are gables so wings meet the main roof cleanly
+      oroof(ctx.s, G, y1, roofKind === 'shed' ? 'shed' : W.rects.length > 1 && roofKind === 'hip' ? 'gable' : roofKind, rcol, C(P.w), 0.3);
     });
   } else flatTop(ctx, b, edges, y1, o, rcol, false);
   windowsOn(ctx, edges, b.b, floors, fh, { ww: 1.2, wh: 1.35, bay: 3.4, skip: (e, f, w, n) => fe.includes(e) && f === 0 && w === Math.floor(n / 2) });

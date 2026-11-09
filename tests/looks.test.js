@@ -94,7 +94,7 @@ test('pitched roofs cover every wall of L, U and rotated footprints', async () =
     const c = Math.cos(ang), n = Math.sin(ang), ring = base.map(([x, z]) => [x * c - z * n + 40, x * n + z * c + 40]);
     const R = obb(ring), W = looks.wings(ring, R);
     assert.ok(W.cover > 0.9, `cover ${W.cover}`);
-    const inRect = (x, z) => W.rects.some((q) => { const dx = x - q.x, dz = z - q.z, s = dx * q.ux + dz * q.uz, t = dx * q.vx + dz * q.vz; return Math.abs(s) <= q.hw + 0.45 && Math.abs(t) <= q.hd + 0.45; });
+    const inRect = (x, z) => W.rects.some((q) => { const dx = x - q.x, dz = z - q.z, s = dx * q.ux + dz * q.uz, t = dx * q.vx + dz * q.vz; return s >= -q.hw - q.eave[0] - 0.01 && s <= q.hw + q.eave[1] + 0.01 && t >= -q.hd - q.eave[2] - 0.01 && t <= q.hd + q.eave[3] + 0.01; });
     for (let i = 0; i < ring.length; i++) for (let k = 0; k < 10; k++) {
       const a = ring[i], b = ring[(i + 1) % ring.length], x = a[0] + (b[0] - a[0]) * k / 10, z = a[1] + (b[1] - a[1]) * k / 10;
       assert.ok(inRect(x, z), `wall point ${x.toFixed(1)},${z.toFixed(1)} left open`);
