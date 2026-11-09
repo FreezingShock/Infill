@@ -151,7 +151,7 @@ function wings(ring, R, maxN = 3) {
 // ---------- the look of one building ----------
 // o: { h, P: {w, r} palette, solar(R, y, roof), overridden: user picked a palette/roof in the game }
 function lookFor(ctx, b, idx, o) {
-  const meta = metaOf(idx), geo = geometry(b), prog = ctx.prog;
+  const meta = metaOf(idx), geo = geometry(b);
   if (!geo.R) return null;
   const floorsHint = meta && meta.f ? meta.f : Math.max(1, Math.round(o.h / 3.2));
   const kind = classify(b, meta, geo, floorsHint);

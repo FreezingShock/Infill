@@ -40,6 +40,7 @@ class Sim {
     }
     this.cars = keep;
     // parking slots: carry over what still exists, seed the rest
+    net.slots.forEach((s, ix) => { s.ix = ix; });
     for (const s of net.slots) {
       const o = oldSlots.get(s.id);
       if (o && (o.state === 1)) { s.state = 1; s.leaveAt = o.leaveAt; s.color = o.color; }
@@ -253,7 +254,7 @@ class Sim {
       out[o++] = id; out[o++] = p[0] - p[3] * lat; out[o++] = p[1] + p[2] * lat; out[o++] = Math.atan2(p[2], p[3]); out[o++] = p[2] * v; out[o++] = p[3] * v; out[o++] = color;
     };
     for (const c of this.cars) { put(c.id, c.seg, c.s, c.lat, c.v, c.color); sum += c.v; if (c.v < 0.3) wait++; }
-    for (const s of parked) put(1e6 + net.slots.indexOf(s), s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
+    for (const s of parked) put(1e6 + s.ix, s.lane, s.s + LENS[kindOf(s.color ?? 0)] / 2, s.lat, 0, s.color ?? 0);
     this.stats = { moving: this.cars.length, parked: parked.length, waiting: wait, avg: this.cars.length ? sum / this.cars.length : 0, broken: this.broken };
     return out;
   }

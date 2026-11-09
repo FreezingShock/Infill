@@ -7,8 +7,9 @@ import { X0, X1, Z0, Z1, elev } from '../engine/core.js';
 import { clock } from '../game/clock.js';
 import { nodeControl } from '../tools/roads/graph.js';
 import { provide } from './providers.js';
-import { buildNet, drivableEdges, keyOf } from '../sim/net.js';
+import { drivableEdges, keyOf } from '../sim/net.js';
 import { Sim, STRIDE } from '../sim/sim.js';
+import { advance, applyMessage } from '../sim/host.js';
 
 const COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const MODES = [['Calm', 0.2], ['Normal', 0.4], ['Rush', 0.8]];
@@ -48,7 +49,7 @@ function fleet(cap) {
 }
 const moving = fleet(MOVING_CAP), parked = fleet(PARKED_CAP);
 
-const st = { on: true, mode: 1, key: '', snap: new Float32Array(0), snapT: 0, stats: { moving: 0, parked: 0, waiting: 0, avg: 0, ms: 0 }, cfgKey: '', lastCfg: 0, fresh: false, lastEdges: null };
+const st = { mvOff: new Int32Array(0), mvN: 0, parkSig: 0, parkCnt: [-1, 0, 0, 0, 0], netMsg: null, on: true, mode: 1, key: '', snap: new Float32Array(0), snapT: 0, stats: { moving: 0, parked: 0, waiting: 0, avg: 0, ms: 0 }, cfgKey: '', lastCfg: 0, fresh: false, lastEdges: null };
 
 // ---------- backend: a module worker, or the same sim on the main thread if workers are unavailable ----------
 let backend = null;
@@ -56,19 +57,19 @@ function startBackend() {
   try {
     const w = new Worker(new URL('../sim/worker.js', import.meta.url), { type: 'module' });
     w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); };
-    w.onerror = () => { backend = localBackend(); };
+    w.onerror = () => { backend = localBackend(); if (st.netMsg) backend.post(st.netMsg); sendCfg(true); }; // fall back, and hand the new backend the street network it missed
     return { post: (m) => w.postMessage(m) };
   } catch (err) { return localBackend(); }
 }
 function localBackend() {
-  const sim = new Sim(7); let last = performance.now(), acc = 0, tick = 0;
+  const sim = new Sim(7); let last = performance.now(), tick = 0;
   setInterval(() => {
     const now = performance.now(), el = Math.min(0.25, (now - last) / 1000); last = now;
     if (!sim.net) return;
-    const t0 = performance.now(); if (sim.running) { acc += el; let n = 0; while (acc >= 0.05 && n < 2) { sim.step(0.05); acc -= 0.05; n++; } if (n === 2) acc = 0; }
+    const t0 = performance.now(); advance(sim, el, 2);
     const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0 }, ++tick % 20 === 1 ? sim.edgeStats() : null);
   }, 50);
-  return { post: (m) => { if (m.type === 'net') sim.setNet(buildNet(m.edges, { bounds: m.bounds, control: m.control })); else if (m.type === 'cfg') { if (m.density != null) sim.density = m.density; if (m.running != null) sim.running = m.running; } } };
+  return { post: (m) => applyMessage(sim, m) };
 }
 
 const live = { flow: null, curb: null };
@@ -77,18 +78,35 @@ provide('edgeFlow', () => (live.flow && st.on ? live.flow : null));
 provide('curbOcc', () => (live.curb && st.on ? live.curb : null));
 function onSnap(buf, stats, edges) {
   if (edges) { live.flow = new Map(Object.entries(edges.flow)); live.curb = new Map(Object.entries(edges.curb)); }
-  st.snap = buf; st.snapT = performance.now(); st.stats = stats; st.fresh = true;
-  // colours only change when the list does, so set them here and leave the per-frame work to positions
-  const nm = [0, 0, 0, 0, 0], np = [0, 0, 0, 0, 0];
+  st.snap = buf; st.snapT = performance.now(); st.stats = stats;
+  // Per snapshot (20 Hz): list the moving cars once so the 60 Hz frame loop only walks those, and recolour
+  // the parked cars only when that set changed (about 6000 of them, and they almost never do).
+  const nm = [0, 0, 0, 0, 0], np = [0, 0, 0, 0, 0], n = buf.length / STRIDE;
+  if (st.mvOff.length < n) st.mvOff = new Int32Array(n + 256);
+  let mv = 0, sig = 0;
   for (let o = 0; o < buf.length; o += STRIDE) {
-    const park = buf[o] >= 1e6, look = buf[o + 6] | 0, k = Math.min(4, look >> 3), n = park ? np : nm, cap = park ? PARKED_CAP : MOVING_CAP, i = n[k]++;
-    if (i < cap) (park ? parked : moving)[k].a.setColorAt(i, COLS[look % 8 % 6]);
+    const park = buf[o] >= 1e6, look = buf[o + 6] | 0, k = Math.min(4, look >> 3);
+    if (park) { np[k]++; sig = (Math.imul(sig, 31) + buf[o] + look * 7) | 0; continue; }
+    const i = nm[k]++;
+    st.mvOff[mv++] = o;
+    if (i < MOVING_CAP) moving[k].a.setColorAt(i, COLS[look % 8 % 6]);
+  }
+  st.mvN = mv;
+  const same = sig === st.parkSig && np.every((c, k) => c === st.parkCnt[k]);
+  if (!same) {
+    st.parkSig = sig; st.parkCnt = np.slice(); const at = [0, 0, 0, 0, 0];
+    for (let o = 0; o < buf.length; o += STRIDE) {
+      if (buf[o] < 1e6) continue;
+      const look = buf[o + 6] | 0, k = Math.min(4, look >> 3), i = at[k]++;
+      if (i < PARKED_CAP) parked[k].a.setColorAt(i, COLS[look % 8 % 6]);
+    }
   }
   for (let k = 0; k < 5; k++) {
     if (moving[k].a.instanceColor) moving[k].a.instanceColor.needsUpdate = true;
-    if (parked[k].a.instanceColor) parked[k].a.instanceColor.needsUpdate = true;
+    if (!same && parked[k].a.instanceColor) parked[k].a.instanceColor.needsUpdate = true;
     moving[k].a.count = moving[k].b.count = Math.min(nm[k], MOVING_CAP); parked[k].a.count = parked[k].b.count = Math.min(np[k], PARKED_CAP);
   }
+  if (!same) st.fresh = true; // parked matrices only need rewriting when the parked set changed
   paintChip();
 }
 
@@ -105,7 +123,8 @@ function syncTraffic(S) {
   const control = {};
   for (const e of S.edges.values()) if (e.g) for (const n of [e.a, e.b]) { if (n == null || !S.nodes[n]) continue; const k = keyOf(S.nodes[n]); if (control[k] === undefined) control[k] = nodeControl(S, n); }
   if (!backend) backend = startBackend();
-  backend.post({ type: 'net', edges: JSON.parse(JSON.stringify(drivableEdges(S.edges))), control, bounds: [X0, Z0, X1, Z1] });
+  st.netMsg = { type: 'net', edges: JSON.parse(JSON.stringify(drivableEdges(S.edges))), control, bounds: [X0, Z0, X1, Z1] };
+  backend.post(st.netMsg);
   sendCfg(true);
 }
 // quieter streets at night, busy at the morning and evening peaks
@@ -123,17 +142,29 @@ function tickTraffic(now) {
   root.visible = st.on;
   if (!st.on) return;
   const buf = st.snap, dt = Math.min(0.2, (now - st.snapT) / 1000);
-  const nm = [0, 0, 0, 0, 0], np = [0, 0, 0, 0, 0];
-  for (let o = 0; o < buf.length; o += STRIDE) {
-    const park = buf[o] >= 1e6, k = Math.min(4, (buf[o + 6] | 0) >> 3), n = park ? np : nm, i = n[k]++;
-    if (park && !st.fresh) continue;
-    if (i >= (park ? PARKED_CAP : MOVING_CAP)) continue;
-    const f = (park ? parked : moving)[k];
-    const x = buf[o + 1] + buf[o + 4] * dt, z = buf[o + 2] + buf[o + 5] * dt, h = buf[o + 3], c = Math.cos(h), s = Math.sin(h), y = elev(x, z) + 0.3, j = i * 16;
-    for (const M of [f.a.instanceMatrix.array, f.b.instanceMatrix.array]) { M[j] = c; M[j + 1] = 0; M[j + 2] = -s; M[j + 3] = 0; M[j + 4] = 0; M[j + 5] = 1; M[j + 6] = 0; M[j + 7] = 0; M[j + 8] = s; M[j + 9] = 0; M[j + 10] = c; M[j + 11] = 0; M[j + 12] = x; M[j + 13] = y; M[j + 14] = z; M[j + 15] = 1; }
+  const nm = [0, 0, 0, 0, 0];
+  for (let q = 0; q < st.mvN; q++) {
+    const o = st.mvOff[q], k = Math.min(4, (buf[o + 6] | 0) >> 3), i = nm[k]++;
+    if (i >= MOVING_CAP) continue;
+    writeCar(moving[k], i, buf[o + 1] + buf[o + 4] * dt, buf[o + 2] + buf[o + 5] * dt, buf[o + 3]);
   }
   for (const f of moving) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
-  if (st.fresh) { for (const f of parked) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true; st.fresh = false; }
+  if (st.fresh) {
+    const np = [0, 0, 0, 0, 0];
+    for (let o = 0; o < buf.length; o += STRIDE) {
+      if (buf[o] < 1e6) continue;
+      const k = Math.min(4, (buf[o + 6] | 0) >> 3), i = np[k]++;
+      if (i < PARKED_CAP) writeCar(parked[k], i, buf[o + 1], buf[o + 2], buf[o + 3]);
+    }
+    for (const f of parked) f.a.instanceMatrix.needsUpdate = f.b.instanceMatrix.needsUpdate = true;
+    st.fresh = false;
+  }
+}
+// one car's matrix into both of its instanced meshes (body and trim share it)
+function writeCar(f, i, x, z, h) {
+  const c = Math.cos(h), s = Math.sin(h), y = elev(x, z) + 0.3, j = i * 16, A = f.a.instanceMatrix.array, B = f.b.instanceMatrix.array;
+  A[j] = c; A[j + 1] = 0; A[j + 2] = -s; A[j + 3] = 0; A[j + 4] = 0; A[j + 5] = 1; A[j + 6] = 0; A[j + 7] = 0; A[j + 8] = s; A[j + 9] = 0; A[j + 10] = c; A[j + 11] = 0; A[j + 12] = x; A[j + 13] = y; A[j + 14] = z; A[j + 15] = 1;
+  B.set(A.subarray(j, j + 16), j);
 }
 
 // ---------- chip: on/off, how busy, live counts ----------
