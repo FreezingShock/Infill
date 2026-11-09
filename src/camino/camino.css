@@ -31,6 +31,16 @@ html[data-theme=camino] {
 [data-theme=camino] .tool[aria-pressed=true] { background: var(--white); color: #050607; }
 [data-theme=camino] .tool kbd, [data-theme=camino] .keys kbd { font: 500 9.5px/1.4 var(--mono); color: var(--ink-soft); border: 1px solid var(--hair); border-radius: 0; background: transparent; }
 [data-theme=camino] .tool[aria-pressed=true] kbd { color: #384047; border-color: rgba(0, 0, 0, .25); }
+/* Active (pressed or selected) controls. The base control rules above are #app-scoped (specificity 1,2,0), so a bare
+   attribute selector lost to them and put light text on the white active fill (Street, Look, N). Both forms are listed so
+   the rule also reaches controls outside #app; the #app form is the one that wins inside the HUD. */
+[data-theme=camino] :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true],
+[data-theme=camino] :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on,
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true],
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on { background: var(--white); color: #050607; }
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true]:hover,
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd).on:hover { background: #ffffff; color: #050607; }
+[data-theme=camino] #app :is(.tool, .kit, .chipb, .aitem, .tab, .mode, .spd)[aria-pressed=true] kbd { color: #384047; border-color: rgba(0, 0, 0, .25); }
 [data-theme=camino] .btn { border-radius: 2px; border: 1px solid var(--cyan); background: var(--cyan); color: var(--cyan-ink); box-shadow: none; font-weight: 600; }
 [data-theme=camino] .btn:hover { background: #63e6f1; }
 [data-theme=camino] .btn:active { transform: none; }
@@ -104,7 +114,11 @@ html[data-theme=camino] {
 /* Street / Scan switch */
 .camswitch { gap: 2px; }
 .camswitch .tool { font: 600 12px var(--display); letter-spacing: .02em; padding: 7px 12px; }
-.camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); }
+[data-theme=camino] #app .camswitch #camScan[aria-pressed=true] { background: var(--cyan); color: var(--cyan-ink); }
+[data-theme=camino] #app .camswitch #camScan[aria-pressed=true]:hover { background: #63e6f1; color: var(--cyan-ink); }
+
+/* area picker panel (picker.css paints it cream by default) */
+[data-theme=camino] .loadarea { background: var(--glass); border: 1px solid var(--hair); border-top: 3px solid var(--white); border-radius: 2px; color: var(--ink); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); }
 
 /* scan switch ring */
 .camring { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--cyan); box-shadow: 0 0 24px rgba(47, 216, 232, .5); opacity: 0; pointer-events: none; z-index: 2; }
@@ -124,26 +138,59 @@ html[data-theme=camino] {
 .bullet { display: inline-grid; place-items: center; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: #050607; color: var(--white); font: 700 9px/1 var(--display); letter-spacing: 0; }
 .ctag.cy .bullet { background: var(--cyan-ink); color: var(--cyan); }
 
-/* area dossier on load */
-.camdos { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(600px, calc(100vw - 32px)); z-index: 6; cursor: pointer; color: var(--ink); }
-.camdos .band { display: flex; align-items: flex-end; gap: 14px; }
-.camdos .band i { flex: 1; height: 22px; background: var(--white); clip-path: inset(0 100% 0 0); animation: camBand .6s cubic-bezier(.7, 0, .2, 1) .05s forwards; }
-.camdos .band h2 { margin: 0; font: 700 clamp(32px, 4vw, 50px)/.9 var(--display); letter-spacing: -.03em; color: var(--white); text-shadow: 0 2px 18px rgba(0, 0, 0, .6); white-space: nowrap; }
-.camdos .meta { display: grid; grid-template-columns: auto 1fr 1fr; gap: 0 18px; margin-top: 10px; padding: 12px 14px 14px; background: var(--glass); backdrop-filter: blur(16px) saturate(135%); -webkit-backdrop-filter: blur(16px) saturate(135%); border: 1px solid var(--hair); animation: camIn .4s cubic-bezier(.2, .8, .2, 1) .25s both; }
-.camdos .idx { font: 700 13px/1 var(--display); border-top: 2px solid var(--white); padding-top: 6px; min-width: 40px; }
-.camdos .col { display: grid; align-content: start; border-top: 2px solid var(--white); }
-.camdos .col div { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
-.camdos .col b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
-.camdos .foot { grid-column: 2 / -1; margin-top: 8px; font: 500 9px var(--mono); letter-spacing: .12em; color: var(--ink-soft); text-transform: uppercase; }
-.camdos.out { animation: camOut .45s cubic-bezier(.7, 0, .2, 1) forwards; }
-@keyframes camBand { to { clip-path: inset(0 0 0 0); } }
+/* area summary card on load: hero name, headline numbers, real infrastructure, sources. Any click or key closes it. */
+.camdos { --k: var(--cyan); position: absolute; left: 50%; top: 20%; transform: translateX(-50%); width: min(640px, calc(100vw - 32px)); z-index: 6; cursor: pointer; color: var(--ink); }
+/* one accent per data category, matching the scan view tags and the infrastructure colours */
+.camdos .k-land { --k: #2fd8e8; }
+.camdos .k-bldg { --k: #8fb6ff; }
+.camdos .k-street { --k: #f2f3f1; }
+.camdos .k-signal { --k: #ff8a3d; }
+.camdos .k-light { --k: #f2c94c; }
+.camdos .k-hydrant { --k: #ff4436; }
+.camdos .k-stop { --k: #3ce07a; }
+.camdos .k-board { --k: #c58bff; }
+.camdos .sheet { position: relative; overflow: hidden; padding: 18px 20px 12px; background: linear-gradient(180deg, rgba(9, 12, 14, .80), rgba(9, 12, 14, .66)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); border: 1px solid var(--hair); border-top: 4px solid var(--white); box-shadow: 0 24px 60px rgba(0, 0, 0, .45); animation: camIn .45s cubic-bezier(.2, .8, .2, 1) .05s both; }
+.camdos .sheet::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); opacity: .8; }
+.camdos .kick { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 8px; font: 500 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); }
+.camdos .kick span + span { color: var(--ink-soft); }
+.camdos h2 { margin: 0; font: 700 clamp(40px, 6.4vw, 66px)/.92 var(--display); letter-spacing: -.035em; color: var(--white); text-shadow: 0 2px 18px rgba(0, 0, 0, .6); overflow-wrap: anywhere; }
+.camdos .glabel { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; font: 500 9.5px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); }
+.camdos .glabel::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+.camdos .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.camdos .tile { position: relative; min-width: 0; padding: 10px 10px 9px; background: linear-gradient(180deg, color-mix(in srgb, var(--k) 24%, transparent), rgba(9, 12, 14, .30) 80%); border-top: 3px solid var(--k); animation: camIn .42s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(.22s + var(--i, 0) * 55ms); }
+.camdos .tile b { display: block; font: 500 19px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--k); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.camdos .tile span { display: block; margin-top: 8px; font: 600 12px/1.15 var(--display); color: var(--ink); }
+.camdos .tile small { display: block; margin-top: 4px; font: 500 9.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+/* the headline row is the biggest thing on the card: the four numbers you read first */
+.camdos .tiles.big .tile { padding: 12px 12px 11px; }
+.camdos .tiles.big .tile b { font-size: clamp(26px, 3.6vw, 36px); }
+.camdos .tiles.big .tile span { font-size: 13px; }
+.camdos .nolink { margin: 0; padding: 10px 12px; border-left: 3px solid var(--ink-soft); background: rgba(9, 12, 14, .30); font: 500 11px/1.4 var(--mono); letter-spacing: .02em; color: var(--ink-soft); }
+.camdos .src { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--hair); font: 500 9.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+.camdos .close { position: relative; display: flex; justify-content: space-between; margin-top: 12px; padding-bottom: 8px; font: 500 9px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); }
+.camdos .close i { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--cyan); transform-origin: left center; animation: camTimer 8s linear forwards; }
+.camdos.out { pointer-events: none; }
+.camdos.out .sheet > * { opacity: 0; transition: opacity .14s ease; }
+.camdos.out .sheet { animation: camCollapse .66s cubic-bezier(.6, 0, .2, 1) forwards; }
+.camdos.out .sheet::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 38%; background: linear-gradient(180deg, transparent, rgba(47, 216, 232, .32), transparent); pointer-events: none; animation: camScan .5s linear forwards; }
+@keyframes camTimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @keyframes camIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes camOut { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 100% 0 0); } }
+/* ctOS-style close: the panel flashes, folds down to one bright cyan line, then the line pulls in to a point */
+@keyframes camCollapse {
+  0% { transform: scale(1, 1); opacity: 1; filter: brightness(1); }
+  30% { transform: scale(1, 1); opacity: 1; filter: brightness(1.7); }
+  62% { transform: scale(1, .03); opacity: 1; filter: brightness(2.2); border-color: var(--cyan); box-shadow: 0 0 26px var(--cyan); }
+  80% { transform: scale(.42, .02); opacity: 1; filter: brightness(2.6); box-shadow: 0 0 22px var(--cyan); }
+  100% { transform: scale(0, .02); opacity: 0; filter: brightness(2.6); box-shadow: none; }
+}
+@keyframes camScan { from { transform: translateY(-100%); } to { transform: translateY(270%); } }
+/* the tooltip for the Valley backdrop would sit on top of the card, so it stays off while the card is up */
+body.camdos-up .bd-tip { display: none !important; }
 
 /* FPS readout */
 .camfps { font: 500 10px/1 var(--mono); letter-spacing: .08em; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .camfps.slow { color: var(--gold); }
 
-@media (max-width: 760px) { .camdos { top: 14%; } .camdos .meta { grid-template-columns: 1fr 1fr; } .camdos .idx { display: none; } .camdos .foot { grid-column: 1 / -1; } .camfps { display: none; } }
-@media (prefers-reduced-motion: reduce) { .camdos .band i { animation: none; clip-path: none; } .camdos .meta, .camring.go { animation: none; } }
+@media (max-width: 760px) { .camdos { top: 12%; } .camdos .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .camdos .sheet { padding: 14px 14px 10px; } .camdos .tiles.big .tile b { font-size: 26px; } .camfps { display: none; } }
+@media (prefers-reduced-motion: reduce) { .camdos .sheet, .camdos .tile, .camdos .close i, .camring.go { animation: none; } .camdos.out .sheet > * { transition: none; } }
 [data-theme=camino] .loadarea select, [data-theme=camino] .la-bar, [data-theme=camino] .bd-tip { background: rgba(9, 12, 14, .85); color: var(--ink); border: 1px solid var(--hair); border-radius: 2px; box-shadow: none; }

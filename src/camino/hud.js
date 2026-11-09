@@ -26,18 +26,70 @@ export function mountSwitch(setScan) {
 }
 
 export function showDossier(area, T) {
-  const el = document.createElement('section'); el.className = 'camdos'; el.setAttribute('aria-live', 'polite');
-  const row = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
+  // Every number here is counted from the loaded area or its real sidecars. Nothing is estimated: a layer that is not linked says so.
+  const areas = globalThis.__RENOVATED_AREAS__?.areas || [];
+  const at = areas.findIndex((a) => a.id === area.id);
+  const kick = at >= 0 ? `Area ${String(at + 1).padStart(2, '0')} / ${String(areas.length).padStart(2, '0')}` : 'Area';
   const sig = PACK.props.filter((p) => p[0] === 'signal').length;
-  const idx = (globalThis.__RENOVATED_AREAS__?.areas || []).findIndex((a) => a.id === area.id) + 1;
-  el.innerHTML = `<div class="band"><h2>${esc(area.name)}</h2><i></i></div>
-    <div class="meta"><div class="idx">${String(Math.max(1, idx)).padStart(2, '0')}</div>
-      <div class="col">${row('Parcels', nf.format(STATE.lots.size))}${row('Structures', nf.format(PACK.buildings?.length || 0))}${row('Streets', nf.format(STATE.edges.size))}${row('Traffic signals', sig)}</div>
-      <div class="col">${T ? row('Street lights', `${nf.format(T.lights)} · ${T.led}% LED`) + row('Hydrants', nf.format(T.hydrants)) + row('Bus stops', nf.format(T.stops)) + row('Boardings / day', nf.format(T.boardings)) : row('Infrastructure', 'not linked')}</div>
-      <div class="foot">${T && T.kv.length ? `Transmission ${T.kv.join(' / ')} kV · ` : ''}City of LA · LA Metro · CEC · Overture / OSM · click to close</div></div>`;
+  const tile = (cls, value, label, sub = '', i = 0) => `<div class="tile ${cls}" style="--i:${i}"><b>${value}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const headline = [
+    tile('k-land', nf.format(STATE.lots.size), 'Parcels', '', 0),
+    tile('k-bldg', nf.format(PACK.buildings?.length || 0), 'Structures', '', 1),
+    tile('k-street', nf.format(STATE.edges.size), 'Streets', '', 2),
+    tile('k-signal', nf.format(sig), 'Traffic signals', '', 3),
+  ].join('');
+  const infra = T
+    ? [
+      tile('k-light', nf.format(T.lights), 'Street lights', `${T.led}% LED`, 4),
+      tile('k-hydrant', nf.format(T.hydrants), 'Hydrants', '', 5),
+      tile('k-stop', nf.format(T.stops), 'Bus stops', '', 6),
+      tile('k-board', nf.format(T.boardings), 'Boardings / day', '', 7),
+    ].join('')
+    : '';
+  // Only name the sources whose data is in this area.
+  const src = ['City of LA parcels', 'Overture / OSM roads and buildings'];
+  if (T) {
+    if (T.lights || T.hydrants) src.push('City of LA lights and hydrants');
+    if (T.stops) src.push('LA Metro');
+    if (T.kv.length) src.push(`CEC transmission ${T.kv.join(' / ')} kV`);
+  }
+
+  const el = document.createElement('section');
+  el.className = 'camdos'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', `Area summary: ${area.name}`);
+  el.innerHTML = `<div class="sheet">
+    <header class="hero"><p class="kick"><span>${esc(kick)}</span><span>San Fernando Valley</span></p><h2>${esc(area.name)}</h2></header>
+    <section class="grp"><p class="glabel">Land and streets</p><div class="tiles big">${headline}</div></section>
+    <section class="grp"><p class="glabel">Real infrastructure</p>${T ? `<div class="tiles">${infra}</div>` : '<p class="nolink">Infrastructure layers are not linked for this area. Nothing is estimated.</p>'}</section>
+    <footer class="src">${src.map((s) => `<span>${esc(s)}</span>`).join('')}</footer>
+    <div class="close" aria-hidden="true"><span>Any click or key closes</span><i></i></div>
+  </div>`;
   $('app').appendChild(el);
-  let t = 0; const close = () => { clearTimeout(t); if (reduce) { el.remove(); return; } el.classList.add('out'); setTimeout(() => el.remove(), 460); };
-  el.onclick = close; t = setTimeout(close, 8000);
+  document.body.classList.add('camdos-up');
+
+  let closing = false, timer = 0, swallow = 0;
+  const finish = () => {
+    if (reduce) { el.remove(); return; }
+    el.classList.add('out'); setTimeout(() => el.remove(), 760);
+  };
+  const close = () => {
+    if (closing) return; closing = true; clearTimeout(timer);
+    removeEventListener('pointerdown', onPointer, true); removeEventListener('keydown', onKey, true);
+    document.body.classList.remove('camdos-up');
+    finish();
+  };
+  // A click on the card dismisses it and is not passed on, so it does not also press a button or pick a lot underneath.
+  const eatClick = (e) => { e.stopPropagation(); e.preventDefault(); removeEventListener('click', eatClick, true); clearTimeout(swallow); };
+  const onPointer = (e) => {
+    e.stopPropagation();
+    addEventListener('click', eatClick, true);
+    swallow = setTimeout(() => removeEventListener('click', eatClick, true), 500);
+    close();
+  };
+  // Keys close the card but still reach the game, so F or Space still does what it says.
+  const onKey = () => close();
+  addEventListener('pointerdown', onPointer, true);
+  addEventListener('keydown', onKey, true);
+  timer = setTimeout(close, 8000);
 }
 
 /** FPS and frame time over the last second, plus the worst frame. Shown bottom right. */
@@ -56,5 +108,5 @@ export function mountFps() {
 
 export function mountKeys() {
   const keys = document.querySelector('#keysm .keys');
-  if (keys) keys.insertAdjacentHTML('beforeend', '<div><kbd>F</kbd> Street / Scan view</div><div>Classic paper look: add <code>?theme=nexus</code></div>');
+  if (keys) keys.insertAdjacentHTML('beforeend', '<div><kbd>F</kbd> Street / Scan view</div><div><kbd>/</kbd> Command bar: views, tools, areas, addresses</div><div>Classic paper look: add <code>?theme=nexus</code></div>');
 }

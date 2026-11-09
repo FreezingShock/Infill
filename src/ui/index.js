@@ -54,16 +54,22 @@ function paintViews() {
 }
 onChange(paintViews); paintViews();
 
-// ---------- gauges and the advisor ----------
+// ---------- gauges and the advisor: a system alert with a severity tag, the place, one line of copy and one action ----------
 const adv = document.createElement('div'); adv.className = 'plaque advisor'; adv.id = 'advisor'; adv.setAttribute('role', 'status');
 document.querySelector('.tl')?.append(adv);
 let tip = null, lastStat = 0;
+// severity glyphs are drawn in the theme colour, never emoji: triangle = alert, diamond = watch, ring = all clear
+const SEV = {
+  alert: { label: 'Alert', glyph: '<path d="M6 1.2l5.2 9.4H.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.8v2.6M6 8.8v.2" stroke="currentColor" stroke-width="1.6"/>' },
+  warn: { label: 'Watch', glyph: '<path d="M6 .9l5.1 5.1L6 11.1.9 6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 3.8v2.8" stroke="currentColor" stroke-width="1.6"/><path d="M6 8.4v.2" stroke="currentColor" stroke-width="1.9"/>' },
+  ok: { label: 'Clear', glyph: '<circle cx="6" cy="6" r="4.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.9 6.1l1.4 1.4 2.8-2.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' },
+};
 function advise(s) {
   const out = [];
-  if (s.worstStreet && s.jam > 0) out.push({ icon: '🚗', text: `${s.worstStreet} is jammed. Give it more lanes, or a bus lane to carry more people.`, view: 'traffic' });
-  if (s.parkShort > 15) out.push({ icon: '🅿', text: `About ${s.parkShort} cars can't find a spot right now. Add stalls, or give them somewhere to go.`, view: 'parking' });
-  if (s.lonelyHomes > 25) out.push({ icon: '🏠', text: `${s.lonelyHomes} homes have no shop or park nearby. A corner shop or a pocket park helps.`, view: 'comfort' });
-  if (!out.length) out.push({ icon: '🙂', text: tripsAt() < 0.2 ? 'The city sleeps. Try fast-forward to see the morning rush.' : 'Things are running smoothly. Try something bold.', view: null });
+  if (s.worstStreet && s.jam > 0) out.push({ sev: 'alert', topic: 'Traffic', loc: s.worstStreet, text: 'Jammed right now. Add a lane, or a bus lane, to carry more people.', view: 'traffic' });
+  if (s.parkShort > 15) out.push({ sev: 'warn', topic: 'Parking', loc: null, text: `About ${s.parkShort} cars can't find a space. Add stalls, or give them somewhere to go.`, view: 'parking' });
+  if (s.lonelyHomes > 25) out.push({ sev: 'warn', topic: 'Comfort', loc: null, text: `${s.lonelyHomes} homes have no shop or park nearby. A corner shop or pocket park helps.`, view: 'comfort' });
+  if (!out.length) out.push({ sev: 'ok', topic: 'Status', loc: null, text: tripsAt() < 0.2 ? 'The city sleeps. Fast-forward to see the morning rush.' : 'Traffic is flowing and homes are settled. Try something bold.', view: null });
   return out[0];
 }
 function paintAdvisor() {
@@ -71,8 +77,12 @@ function paintAdvisor() {
   $('gTraffic').querySelector('i').style.width = Math.round(Math.min(1, s.traffic / 0.9) * 100) + '%';
   $('gTraffic').querySelector('i').style.background = s.traffic > 0.7 ? 'var(--warn)' : s.traffic > 0.45 ? 'var(--gold)' : 'var(--sage)';
   $('gMood').querySelector('i').style.width = Math.round(s.comfort * 100) + '%';
-  if (tip && tip.text === t.text) return; tip = t;
-  adv.innerHTML = `<span class="ai" aria-hidden="true">${t.icon}</span><p>${esc(t.text)}</p>${t.view ? `<button class="btn ghost small" data-show="${t.view}">Show me</button>` : ''}`;
+  const key = [t.sev, t.topic, t.loc, t.text, t.view].join('|');
+  if (tip === key) return; tip = key;
+  const sv = SEV[t.sev];
+  adv.dataset.sev = t.sev;
+  adv.innerHTML = `<div class="adv-head"><span class="adv-tag"><svg viewBox="0 0 12 12" aria-hidden="true">${sv.glyph}</svg>${sv.label}</span><span class="adv-loc"><b>${esc(t.topic)}</b>${t.loc ? ` · ${esc(t.loc)}` : ''}</span></div>`
+    + `<p>${esc(t.text)}</p>${t.view ? `<div class="adv-act"><button class="btn ghost small" data-show="${t.view}">Show me</button></div>` : ''}`;
   adv.querySelector('[data-show]')?.addEventListener('click', (e) => { const id = e.currentTarget.dataset.show; if (current()?.id !== id) setView(id); });
 }
 // statistics are cheap but not free: refresh about once a second, and right after an edit
