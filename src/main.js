@@ -1,5 +1,6 @@
 // Entry point: pick the area from ?area=, load its pack, then start the game.
 // The engine reads the pack when its modules evaluate, so it is imported only after the pack is in.
+import { CAMINO } from './camino/theme.js'; // picks the look before any material exists
 const $ = (id) => document.getElementById(id);
 
 async function boot() {
@@ -9,7 +10,7 @@ async function boot() {
   const area = ready.find((a) => a.id === want) || ready.find((a) => a.id === manifest.default) || ready[0];
   if (!area) throw new Error('No area pack is ready in public/areas/index.json');
   $('areaName').textContent = area.name; $('areaSub').textContent = area.sub || '';
-  document.title = `Renovated · ${area.name}`;
+  document.title = CAMINO ? `sfvOS · ${area.name}` : `Renovated · ${area.name}`;
   const res = await fetch(`areas/${area.pack}`);
   if (!res.ok) throw new Error(`Area pack ${area.pack} did not load (${res.status})`);
   globalThis.__RENOVATED_AREAS__ = manifest;
@@ -18,6 +19,7 @@ async function boot() {
   await (await import('./assets/boot.js')).bootAssets(area, globalThis.__RENOVATED_PACK__); // optional open-data building looks
   await import('./app/input.js');
   await import('./ui/index.js'); // info views, clock and advisor
+  if (CAMINO) await import('./camino/index.js'); // sfvOS Camino: realistic street view, scan view, real infrastructure
 }
 
 boot().catch((e) => {
