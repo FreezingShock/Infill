@@ -206,7 +206,7 @@ html[data-theme=camino] #app .cd-pop .tool:hover { background: rgba(233, 239, 24
 html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] { background: rgba(47, 216, 232, .1); color: var(--ink); box-shadow: inset 2px 0 0 var(--cyan); }
 html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] svg { color: var(--cyan); }
 html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view])::after { content: "ON"; margin-left: auto; font: 600 8.5px var(--mono); letter-spacing: .14em; color: var(--cyan); }
-html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] kbd { display: inline-block; }
+html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true] kbd { display: inline-block; color: var(--ink-soft); border-color: var(--hair); }
 html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view]) kbd { margin-left: 8px; order: 3; }
 html[data-theme=camino] #app .cd-pop .tool[aria-pressed=true]:not([data-view])::after { margin-left: 8px; order: 4; }
 html[data-theme=camino] #app #pView #vUndo, html[data-theme=camino] #app #pView #vRedo, html[data-theme=camino] #app #pView #vAdv, html[data-theme=camino] #app #pView #vKeys { display: none; }

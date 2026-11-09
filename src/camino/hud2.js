@@ -44,6 +44,7 @@ function mountDock() {
   take('infobar', $('pLayers'));
   take('views', $('pView'));
   $('pMore').insertAdjacentHTML('beforeend', `<div class="cd-list">
+    <button class="cd-row" data-go="cmd"><span>Command bar</span><kbd>/</kbd></button>
     <button class="cd-row" data-go="vAdv"><span>Advanced tools</span><em>box, lasso, brush, paint zones</em></button>
     <button class="cd-row" data-go="vLog"><span>Edit log</span><em>history, save and load</em></button>
     <button class="cd-row" data-go="areaBtn"><span>Change area</span><em>Valley map</em></button>
@@ -62,7 +63,9 @@ function mountDock() {
   addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, true);
   $('pMore').addEventListener('click', (e) => {
     const r = e.target.closest('[data-go]'); if (!r) return; const g = r.dataset.go; close();
-    if (g === 'theme') setTheme('nexus'); else $(g)?.click();
+    if (g === 'theme') setTheme('nexus');
+    else if (g === 'cmd') document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+    else $(g)?.click();
   });
   $('pLayers').addEventListener('click', (e) => { if (e.target.closest('[data-view]')) setTimeout(close, 180); });
 
