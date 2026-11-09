@@ -130,7 +130,7 @@ function buildNet(edges, opts = {}) {
         const pts = connectorPath(c.L, c.M, c.type);
         const cum = cumLen(pts);
         const conn = { id: `${c.L.id}>${c.M.id}`, node: n, from: c.L, to: c.M, type: c.type, pts, cum, len: cum.at(-1), cars: [], conflicts: [], reserved: 0,
-          rank: c.L.rank, speed: c.type === 'S' ? Math.min(c.L.speed, c.M.speed) : c.type === 'R' ? 4.2 : c.type === 'L' ? 5.2 : 3.2, group: legGroup(n, c.L) };
+          rank: c.L.rank, speed: turnSpeed(pts, Math.min(c.L.speed, c.M.speed)), group: legGroup(n, c.L) };
         conn.pv = conn.rank * 10 + (c.type === 'S' ? 3 : c.type === 'R' ? 2 : 1);
         c.L.conns.push(conn); n.conns.push(conn); connectors.push(conn);
       }
@@ -145,13 +145,24 @@ function buildNet(edges, opts = {}) {
   return { nodes: [...nodes.values()], lanes, connectors, slots, laneMeters, laneById: new Map(lanes.map((l) => [l.id, l])), connById: new Map(connectors.map((c) => [c.id, c])) };
 }
 
+// Speed a car can hold through a connector: limited by the tightest bend (lateral acceleration about 2.2 m/s^2) and the slower of the two streets.
+function turnSpeed(pts, cap) {
+  let rmin = 1e9;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+    const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+    if (area2 > 1e-6) rmin = Math.min(rmin, (ab * bc * ca) / (2 * area2));
+  }
+  return Math.max(2.8, Math.min(cap, Math.sqrt(2.2 * rmin)));
+}
 function legGroup(n, lane) { for (const lg of n.legs) if (lg.item.e.id === lane.eid) return lg.group; return 0; }
 function tail(p) { const a = p[p.length - 2], b = p[p.length - 1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; }
 function head(p) { const a = p[0], b = p[1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; }
 function connectorPath(L, M, type) {
   const p0 = L.pts.at(-1), p1 = M.pts[0], dIn = tail(L.pts), dOut = head(M.pts), chord = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
   if (type === 'U') return cubic(p0, [p0[0] + dIn[0] * 6, p0[1] + dIn[1] * 6], [p1[0] - dOut[0] * 6, p1[1] - dOut[1] * 6], p1, 14);
-  if (type === 'S' || chord < 1) return chord < 1 ? [p0, p1] : bezier(p0, [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2], p1, 6);
+  if (type === 'S' || chord < 1) return chord < 1 ? [p0, p1] : bezier(p0, [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2], p1, 8);
   const den = dIn[0] * dOut[1] - dIn[1] * dOut[0];
   let c;
   if (Math.abs(den) < 1e-3) c = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
@@ -160,7 +171,7 @@ function connectorPath(L, M, type) {
     const tt = Math.min(Math.max(t, 0.5), chord * 1.2);
     c = [p0[0] + dIn[0] * tt, p0[1] + dIn[1] * tt];
   }
-  return bezier(p0, c, p1, 10);
+  return bezier(p0, c, p1, 16);
 }
 
 // Edge list for the sim from the game state's edge map (kept here so every caller agrees on what drives).

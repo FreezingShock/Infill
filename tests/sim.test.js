@@ -137,3 +137,60 @@ test('snapshot gives every parked car a stable slot id', () => {
   assert.equal(new Set(ids).size, ids.length);
   for (const s of net.slots) assert.equal(net.slots[s.ix], s);
 });
+
+// ---------- junction behaviour: smooth turns, gap acceptance, clear box ----------
+test('turn connectors are slower than the street they leave, from the bend, never below a crawl', () => {
+  const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] });
+  const mid = net.nodes.find((n) => n.legs.length === 4);
+  for (const c of mid.conns) {
+    assert.ok(c.speed >= 2.8 && c.speed <= Math.min(c.from.speed, c.to.speed) + 1e-9, `${c.type} ${c.speed}`);
+    if (c.type !== 'S') assert.ok(c.speed < c.from.speed, `${c.type} turn is not slower than ${c.from.speed}`);
+  }
+});
+
+test('cars move smoothly through junctions: no jumps back or sideways, no sudden heading changes', () => {
+  const sim = new Sim(4); sim.density = 1.4;
+  sim.setNet(buildNet(cross(), { bounds: [-210, -210, 210, 210] }));
+  const prev = new Map(); let jumps = 0, snaps = 0;
+  for (let i = 0; i < 20 * 300; i++) {
+    sim.step(0.05);
+    if (i % 2) continue;
+    const b = sim.snapshot();
+    for (let o = 0; o < b.length; o += STRIDE) {
+      const id = b[o]; if (id >= 1e6) continue;
+      const p = prev.get(id);
+      if (p) {
+        const d = Math.hypot(b[o + 1] - p[0], b[o + 2] - p[1]); let dh = Math.abs(b[o + 3] - p[2]); if (dh > Math.PI) dh = 2 * Math.PI - dh;
+        if (d > Math.hypot(b[o + 4], b[o + 5]) * 0.1 + 0.8 || dh > 0.3) jumps++;
+        snaps++;
+      }
+      prev.set(id, [b[o + 1], b[o + 2], b[o + 3]]);
+    }
+  }
+  assert.ok(snaps > 1000);
+  assert.ok(jumps / snaps < 0.002, `${jumps} of ${snaps} snapshot steps jumped`);
+});
+
+test('the side street gets out onto a busy main road, and nobody sits inside the junction', () => {
+  const sim = new Sim(8); sim.density = 1.6;
+  const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] });
+  sim.setNet(net);
+  const through = new Set(); let boxStill = 0, boxSeen = 0;
+  for (let i = 0; i < 20 * 1200; i++) {
+    sim.step(0.05);
+    for (const c of sim.cars) if (c.isConn) { boxSeen++; if (c.v < 0.3) boxStill++; if (c.seg.from.eid === 'N' || c.seg.from.eid === 'S') through.add(c.id); }
+  }
+  assert.ok(through.size >= 5, `only ${through.size} side-street cars crossed`);
+  assert.ok(boxStill / Math.max(1, boxSeen) < 0.05, `${boxStill} of ${boxSeen} box samples were standing`);
+});
+
+test('gap acceptance counts time, not distance: a slow car 40 m out does not block a pull-out, a fast one does', () => {
+  const sim = new Sim(1); const net = buildNet(cross(), { bounds: [-210, -210, 210, 210] }); sim.setNet(net);
+  const mid = net.nodes.find((n) => n.legs.length === 4);
+  const k = mid.conns.find((c) => c.type === 'S' && c.from.eid === 'W'); // main-road through movement
+  for (const c of sim.cars.slice()) { c.seg.cars.splice(c.seg.cars.indexOf(c), 1); } sim.cars = [];
+  const car = { s: k.from.len - 40, v: 3, i: 0, wait: 0 }; k.from.cars.push(car);
+  assert.equal(sim.gapClear(k, 4.2), true); // 40 m at 3 m/s is far longer than 4 s
+  car.v = 14; assert.equal(sim.gapClear(k, 4.2), false); // under 3 s
+  car.v = 0; car.wait = 10; car.s = k.from.len - 1; assert.equal(sim.gapClear(k, 4.2), true); // a long-standing queue is not arriving
+});

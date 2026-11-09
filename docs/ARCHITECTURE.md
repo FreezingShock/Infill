@@ -14,6 +14,7 @@ Progress is reported to the boot screen in `index.html` via `app/loader.js`.
 - **Edit log**: every player action is a command in `engine/commands.js`, applied by `app/state.js` and replayed deterministically on load/undo/redo. The save is this log. A new command must replay from the log and be covered by a replay test.
 - **Lots**: `engine/looks.js` decides a kind and look per building; geometry is generated in `engine/` and, for large batches, on `workers/` (typed arrays, transferable).
 - **Traffic**: `sim/` runs a fixed 10 Hz step in `sim/worker.js` on the lane graph built from the street profile; `views/traffic.js` draws cars as one instanced mesh and registers live numbers with `views/providers.js`.
+  Junction rules (general, never per street): a car enters the box only if the exit lane has room; minor roads and turns give way by **time gap** (`GAP` in `sim/sim.js`), ignoring queues that have stood still; cars stop 0.8 m short of the line and hold braking once committed (`hold`); turn speed comes from the connector's bend (`turnSpeed` in `sim/net.js`) and cars plan their slowing at a comfortable 2.2 m/s2; accel changes are jerk-limited; snapshot poses use both axles so cars stay continuous across lane-to-turn handovers and turn smoothly. Signal phase logic is owned by the signals thread; `canGo` only asks `green(node, group)` plus a permissive-left gap check.
 - **Info views** (`views/`): metrics are estimates until a provider (`provide('edgeFlow', ...)`) supplies live data, then they switch with no other change.
 
 ## Theme system
