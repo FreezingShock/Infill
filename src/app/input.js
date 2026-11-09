@@ -3,10 +3,13 @@ import { AREA, AREAS, PACK } from '../engine/pack.js';
 import { $, Acc, C, FT, X0, X1, Z0, Z1, area, clamp, decal, elev, esc, fmt, inPoly, nearestOnLine, polyLen, reduceMotion, ribbon, smoothLine } from '../engine/core.js';
 import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
 import { BASE, uid } from '../engine/commands.js';
-import { CAM_OFF, MAT, SUN_OFF, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
+import { CAM_OFF, MAT, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
 import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
 import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
+import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
+import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
+import { clock, setHour, tickClock } from '../game/clock.js';
 import { itemById, preview, previewText, progAfter } from './palette.js';
 
 // =====================================================================
@@ -236,7 +239,7 @@ function alongUpdate() {
 
 // ---------- drawing streets ----------
 function snapPoint(g, e, prev, prev2) {
-  let [x, z] = g, label = null; const tol = 9 / Math.sqrt(cam.zoom);
+  let [x, z] = g, label = null; const tol = 9 / Math.sqrt(camZoom());
   // nodes first, then edge midpoints, then anywhere on a street
   let bn = -1, bd = tol; STATE.nodes.forEach((n, i) => { const d = Math.hypot(n[0] - x, n[1] - z); if (d < bd) { bd = d; bn = i; } });
   if (bn >= 0) return { p: STATE.nodes[bn].slice(), label: 'intersection' };
@@ -330,6 +333,7 @@ window.addEventListener('keydown', (e) => {
   const tool = [...TOOLS, ...(ui.adv ? ADV_TOOLS : [])].find((t) => t[2] && t[2].toLowerCase() === k); if (tool) { setTool(tool[0]); return; }
   if (k === 'b') toggleView('asbuilt'); else if (k === 'c') toggleView('split'); else if (k === 't') toggleView('color'); else if (k === 'n') toggleView('night');
   else if (k === 'q' || k === 'w') { const off = cam.position.clone().sub(controls.target); off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (k === 'q' ? 1 : -1) * Math.PI / 12); cam.position.copy(controls.target).add(off); }
+  else if (e.key === '[' || e.key === ']') { const off = cam.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.phi = clamp(sph.phi + (e.key === ']' ? 0.1 : -0.1), 0.12, 1.42); cam.position.copy(controls.target).add(off.setFromSpherical(sph)); }
   else if (e.key === '?') { $('keysm').hidden = false; }
 });
 
@@ -346,16 +350,20 @@ function renderViews() {
   if (!$('advbar').hidden) renderTools();
 }
 let lampMat = null;
+const dock = mountClockDock($('app'), { onChange: () => { ui.night = lightAt(clock.hour).isNight; refreshLight(); renderViews(); } });
+let lightEnv = null, lastLightHour = -1;
+function refreshLight() {
+  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app') };
+  lightEnv.lampMat = lampMat; lastLightHour = clock.hour;
+  const L = lightAt(clock.hour); applyLight(lightEnv, L); ui.night = L.isNight; sunDir.fromArray(L.dir);
+}
+const sunDir = new THREE.Vector3(0.5, 1, 0.4).normalize();
 function toggleView(k) {
   if (k === 'asbuilt') { ui.asbuilt = !ui.asbuilt; if (ui.asbuilt) ui.splitOn = false; $('asbTag').hidden = !ui.asbuilt; }
   else if (k === 'split') { ui.splitOn = !ui.splitOn; if (ui.splitOn) ui.asbuilt = false; $('asbTag').hidden = true; placeSplit(); }
   else if (k === 'color') { ui.color = (ui.color + 1) % 3; buildColor(); }
   else if (k === 'lines') { ui.lotsOn = !ui.lotsOn; if (ov.lines) ov.lines.visible = ui.lotsOn; renderTools(); }
-  else if (k === 'night') {
-    ui.night = !ui.night; $('app').classList.toggle('night', ui.night);
-    hemi.intensity = ui.night ? 0.35 : 1.15; sun.intensity = ui.night ? 0.45 : 2.1; sun.color.set(ui.night ? 0x9fb4e8 : 0xfff1d6);
-    MAT.glass.emissive.set(ui.night ? 0x9a7a40 : 0x000000); if (lampMat) lampMat.emissive.set(ui.night ? 0xffd27a : 0x000000);
-  }
+  else if (k === 'night') { ui.night = !ui.night; setHour(ui.night ? 22 : 14); dock.sync(); refreshLight(); }
   placeSplit(); renderViews();
 }
 const splitEl = $('split'), handle = $('splitHandle');
@@ -440,18 +448,19 @@ function search(q) {
   return out.sort((a, b) => (a.a.toLowerCase().startsWith(toks[0]) ? 0 : 1) - (b.a.toLowerCase().startsWith(toks[0]) ? 0 : 1) || parseInt(a.a) - parseInt(b.a)).slice(0, 6);
 }
 function renderResults() { const ul = $('results'); ul.innerHTML = hits.map((l, k) => `<li><button type="button" role="option" data-k="${k}" class="${k === hi ? 'active' : ''}">${esc(l.a)}<small>${LT[l.lt].name}</small></button></li>`).join(''); ul.querySelectorAll('button').forEach((b) => (b.onclick = () => choose(+b.dataset.k))); }
-function choose(k) { const l = hits[k]; if (!l) return; $('addr').value = l.a; hits = []; renderResults(); setTool('select'); setSel([l.id]); flyTo(l.c[0], l.c[1], Math.max(cam.zoom, 3.4)); }
+function choose(k) { const l = hits[k]; if (!l) return; $('addr').value = l.a; hits = []; renderResults(); setTool('select'); setSel([l.id]); flyTo(l.c[0], l.c[1], Math.max(camZoom(), 3.4)); }
 $('addr').addEventListener('input', (e) => { hits = search(e.target.value); hi = 0; renderResults(); });
 $('addr').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, hits.length - 1); renderResults(); e.preventDefault(); } if (e.key === 'ArrowUp') { hi = Math.max(hi - 1, 0); renderResults(); e.preventDefault(); } if (e.key === 'Escape') { hits = []; renderResults(); } });
 $('searchForm').addEventListener('submit', (e) => { e.preventDefault(); if (!hits.length) hits = search($('addr').value); if (hits.length) choose(hi); else toast('No address like that in this pack. Try Celes St or Don Pio Dr.'); });
 
 // ---------- camera ----------
+const camZoom = () => zoomForDist(cam.position.distanceTo(controls.target));
 let anim = null;
 function flyTo(x, z, zoom) {
-  const from = controls.target.clone(), to = new THREE.Vector3(x, elev(x, z), z).add(cardShift(zoom)), z0 = cam.zoom, off = cam.position.clone().sub(controls.target), t0 = performance.now(), dur = reduceMotion ? 1 : 900;
-  anim = (now) => { let k = Math.min((now - t0) / dur, 1); k = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; controls.target.lerpVectors(from, to, k); cam.position.copy(controls.target).add(off); cam.zoom = z0 + (zoom - z0) * k; cam.updateProjectionMatrix(); if (k >= 1) anim = null; };
+  const from = controls.target.clone(), to = new THREE.Vector3(x, elev(x, z), z).add(cardShift(zoom)), z0 = camZoom(), off = cam.position.clone().sub(controls.target), t0 = performance.now(), dur = reduceMotion ? 1 : 900;
+  anim = (now) => { let k = Math.min((now - t0) / dur, 1); k = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; controls.target.lerpVectors(from, to, k); off.setLength(distForZoom(z0 + (zoom - z0) * k)); cam.position.copy(controls.target).add(off); if (k >= 1) anim = null; };
 }
-function cardShift(zoom) { if (canvas.clientWidth < 760) return new THREE.Vector3(); const viewW = (cam.right - cam.left) / zoom, right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0); right.y = 0; right.normalize(); return right.multiplyScalar(viewW * 0.12); }
+function cardShift(zoom) { if (canvas.clientWidth < 760) return new THREE.Vector3(); const viewW = viewHeightAt(distForZoom(zoom)) * cam.aspect, right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0); right.y = 0; right.normalize(); return right.multiplyScalar(viewW * 0.12); }
 
 // ---------- street labels ----------
 let labels = [];
@@ -469,10 +478,10 @@ function buildLabels() {
 }
 function placeLabels() {
   const w = canvas.clientWidth, h = canvas.clientHeight, v = new THREE.Vector3();
-  for (const l of labels) { v.copy(l.v).project(cam); const show = Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (l.major || cam.zoom > 0.8); l.el.style.display = show ? '' : 'none'; if (show) l.el.style.transform = `translate(${(v.x + 1) / 2 * w}px, ${(1 - v.y) / 2 * h}px) translate(-50%, -50%)`; }
+  for (const l of labels) { v.copy(l.v).project(cam); const show = Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (l.major || camZoom() > 0.8); l.el.style.display = show ? '' : 'none'; if (show) l.el.style.transform = `translate(${(v.x + 1) / 2 * w}px, ${(1 - v.y) / 2 * h}px) translate(-50%, -50%)`; }
 }
 function updateScale() {
-  const per = (cam.right - cam.left) / cam.zoom / canvas.clientWidth, nice = [5, 10, 20, 25, 50, 100, 200, 250, 500];
+  const per = viewHeightAt(cam.position.distanceTo(controls.target)) * cam.aspect / canvas.clientWidth, nice = [5, 10, 20, 25, 50, 100, 200, 250, 500];
   let m = nice[0]; for (const n of nice) if (n / per <= 110) m = n;
   $('scaleBar').style.width = m / per + 'px'; $('scaleTxt').textContent = `${m} m · ${fmt(m * FT)} ft`;
   $('needle').style.transform = `rotate(${controls.getAzimuthalAngle()}rad)`;
@@ -482,7 +491,7 @@ function updateScale() {
 // Start
 // =====================================================================
 const [terrain, skirt] = buildTerrain();
-const walks = buildWalks(), props = buildProps(); lampMat = props.userData.lampMat;
+const walks = buildWalks(), props = buildProps(); lampMat = props.userData.lampMat; refreshLight();
 scene.add(terrain, skirt, walks, props, beforeW.group, world.group, overlays, helpers);
 beforeW.sync(BASE);
 const saved = load();
@@ -493,19 +502,25 @@ refresh();
 renderTools(); renderViews(); renderHint(); renderCard(); placeSplit();
 const start = (AREA.main && [...STATE.lots.values()].find((l) => (l.a || '').includes(AREA.main))) || STATE.lots.values().next().value;
 controls.target.set(start.c[0], start.e, start.c[1]); cam.position.copy(controls.target).add(CAM_OFF);
-resize(); cam.zoom = 1.5; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+resize(); cam.lookAt(controls.target); cam.updateMatrixWorld();
 $('loading').remove();
 if (!saved) openAreas();
 addEventListener('resize', resize);
 if (saved && saved.log && saved.log.length) toast(`Welcome back: ${saved.log.length} edits restored from this browser.`);
 
-let lastShadowZoom = 0;
+let lastShadowZoom = 0, lastNow = performance.now();
 function frame(now) {
   if (anim) anim(now);
   controls.update(); tickRise(now);
   const t = controls.target; t.x = clamp(t.x, X0, X1); t.z = clamp(t.z, Z0, Z1);
-  sun.position.copy(t).add(SUN_OFF); sun.target.position.copy(t);
-  if (Math.abs(cam.zoom - lastShadowZoom) > 0.05) { const half = Math.min(500, Math.max(70, 330 / cam.zoom)); Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 1600 }); sun.shadow.camera.updateProjectionMatrix(); lastShadowZoom = cam.zoom; }
+  const dist = cam.position.distanceTo(t), polar = controls.getPolarAngle();
+  const nf = nearFar(dist, polar); if (Math.abs(nf.near - cam.near) > 0.05 || Math.abs(nf.far - cam.far) > 5) { cam.near = nf.near; cam.far = nf.far; cam.updateProjectionMatrix(); }
+  const fr = fogRange(dist, polar); scene.fog.near = fr.near; scene.fog.far = fr.far;
+  if (tickClock((now - lastNow) / 1000 || 0)) { if (Math.abs(clock.hour - lastLightHour) > 0.02) { const was = ui.night; refreshLight(); if (was !== ui.night) renderViews(); dock.sync(); } }
+  lastNow = now;
+  sun.position.copy(t).addScaledVector(sunDir, SUN_DIST); sun.target.position.copy(t);
+  const zoom = zoomForDist(dist);
+  if (Math.abs(zoom - lastShadowZoom) / zoom > 0.04) { const half = Math.min(520, Math.max(70, 330 / zoom * 1.1)); Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 1600 }); sun.shadow.camera.updateProjectionMatrix(); lastShadowZoom = zoom; }
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (ui.splitOn) {
     const sx = Math.round(w * ui.split); renderer.setScissorTest(true);

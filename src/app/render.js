@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { $ } from '../engine/core.js';
+import { FOV, MAX_DIST, MAX_POLAR, MIN_DIST, MIN_POLAR, distForZoom } from './camera.js';
 // ---------- renderer, camera, controls ----------
 const canvas = $('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -8,21 +9,22 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 6000);
-const VIEW_H = 420;
+const cam = new THREE.PerspectiveCamera(FOV, 1, 5, 8000);
 const controls = new MapControls(cam, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.12;
-controls.maxPolarAngle = 1.2;
-controls.minPolarAngle = 0.15;
-controls.minZoom = 0.45;
-controls.maxZoom = 14;
+controls.maxPolarAngle = MAX_POLAR;
+controls.minPolarAngle = MIN_POLAR;
+controls.minDistance = MIN_DIST;
+controls.maxDistance = MAX_DIST;
 controls.zoomToCursor = true;
-const CAM_OFF = new THREE.Vector3().setFromSphericalCoords(1600, 0.88, -0.42);
+controls.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE; // middle-drag orbits and tilts, even with a tool on
+controls.screenSpacePanning = false; // pan along the ground so tilting never lifts the map
+const CAM_OFF = new THREE.Vector3().setFromSphericalCoords(distForZoom(1.5), 0.88, -0.42);
 function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight, a = w / h;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
   renderer.setSize(w, h, false);
-  cam.left = -VIEW_H * a / 2; cam.right = VIEW_H * a / 2; cam.top = VIEW_H / 2; cam.bottom = -VIEW_H / 2;
+  cam.aspect = w / h;
   cam.updateProjectionMatrix();
 }
 
