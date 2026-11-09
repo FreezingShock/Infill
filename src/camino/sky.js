@@ -31,7 +31,7 @@ void main(){
 const hex = (h) => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 // real-world sky colours (zenith, horizon) for day, golden hour and night
-const DAY = [hex(0x3a6fb0), hex(0xb7c8d3)], GOLD = [hex(0x34437a), hex(0xe39a68)], NIGHT = [hex(0x03050a), hex(0x0c1220)];
+const DAY = [hex(0x3a6fb0), hex(0xb7c8d3)], GOLD = [hex(0x34437a), hex(0xe39a68)], NIGHT = [hex(0x050a16), hex(0x16213a)];
 const SCAN_FOG = hex(0x05080a);
 
 export const skyState = { scan: 0, L: null };
@@ -63,11 +63,12 @@ export function createCaminoSky(scene) {
       U.scan.value = skyState.scan;
       // the rest of applyLight reads these: a real haze colour for fog and the page, warmer low sun, cooler shade
       L.skyTop = skyState.scan ? SCAN_FOG : z; L.skyBottom = skyState.scan ? SCAN_FOG : hz;
-      L.hemiGround = mix([0.3, 0.27, 0.22], [0.03, 0.035, 0.05], L.night);
-      L.hemiSky = mix(mix([0.6, 0.7, 0.86], [0.52, 0.47, 0.56], L.golden * 0.6), [0.1, 0.14, 0.26], L.night);
-      // day: softer, less blown-out light; night: moonlight is a faint cool wash, not a second sun
-      L.hemiI *= (skyState.scan ? 0.6 : 0.62) * (1 - 0.35 * L.night); L.sunI *= 0.92 * (1 - 0.72 * L.night); L.sunCol = mix(L.sunCol, [1, 0.7, 0.45], L.golden * 0.35);
+      L.hemiGround = mix([0.3, 0.27, 0.22], [0.12, 0.13, 0.18], L.night);
+      L.hemiSky = mix(mix([0.6, 0.7, 0.86], [0.52, 0.47, 0.56], L.golden * 0.6), [0.3, 0.38, 0.62], L.night);
+      // day: softer, less blown-out light; night: moonlight is a readable cool blue wash, not a second sun
+      L.hemiI *= (skyState.scan ? 0.6 : 0.62 + 1.2 * L.night); L.sunI *= 0.92 - 0.3 * L.night; L.sunCol = mix(L.sunCol, [1, 0.7, 0.45], L.golden * 0.35);
       applyGrade(L, !!skyState.scan);
+      L.pool = skyState.scan ? 0 : L.glow; // warm lamp pools on the road, only in street view
     },
     follow(target) { dome.position.copy(target); },
     /** Scan switched: repaint the dome and fog now instead of waiting for the clock to move. */

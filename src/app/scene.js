@@ -211,6 +211,23 @@ function buildTerrain() {
   edge(densify([[X0, Z0], [X1, Z0]], T.cell)); edge(densify([[X1, Z0], [X1, Z1]], T.cell)); edge(densify([[X1, Z1], [X0, Z1]], T.cell)); edge(densify([[X0, Z1], [X0, Z0]], T.cell));
   return [m, new THREE.Mesh(sk.geo(), toon({ vertexColors: true, side: THREE.DoubleSide }))];
 }
+function lampPools(lampMat) {
+  const lamps = PACK.props.filter((p) => p[0] === 'lamp'), SEG = 14, R = 13, pos = new Float32Array(lamps.length * (SEG + 1) * 3), col = new Float32Array(lamps.length * (SEG + 1) * 3), idx = [];
+  lamps.forEach(([, x, z], n) => {
+    const b = n * (SEG + 1), y = elev(x, z) + 0.5;
+    for (let k = 0; k <= SEG; k++) {
+      const a = k / SEG * Math.PI * 2, c = k === SEG ? 1 : 0; // vertex SEG is the bright centre, the ring is black (additive: nothing)
+      pos.set(c ? [x, y, z] : [x + Math.cos(a) * R, elev(x + Math.cos(a) * R, z + Math.sin(a) * R) + 0.5, z + Math.sin(a) * R], (b + k) * 3);
+      col.set(c ? [0.62, 0.42, 0.2] : [0, 0, 0], (b + k) * 3);
+      if (k < SEG) idx.push(b + SEG, b + k, b + (k + 1) % SEG);
+    }
+  });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -10, toneMapped: false });
+  lampMat.userData.pool = mat;
+  const m = new THREE.Mesh(geo, mat); m.userData.noScan = true; m.frustumCulled = false; m.renderOrder = 1;
+  return m;
+}
 function buildProps() {
   const acc = new Acc(), glow = new Acc(), R = (x, z, a = 0, hw = 0.12, hd = 0.12) => ({ x, z, ux: Math.cos(a), uz: Math.sin(a), vx: -Math.sin(a), vz: Math.cos(a), hw, hd });
   const POLE = C(0x5d5148), BOX = C(0x2b2420), LAMP = C(0xffe2a8), SHEL = C(0x9db7c9);
@@ -226,6 +243,7 @@ function buildProps() {
   }
   const g = new THREE.Group(), m = new THREE.Mesh(acc.geo(), MAT.solid); m.castShadow = true; g.add(m, new THREE.LineSegments(lineGeo(acc.l), INK));
   const lampMat = toon({ vertexColors: true, emissive: 0x000000 }); g.add(new THREE.Mesh(glow.geo(), lampMat)); g.userData.lampMat = lampMat;
+  g.add(lampPools(lampMat)); // warm pools of light under each lamp, faded in by the clock
   return g;
 }
 const STATIC_TREES = (() => { // forest and reserve land outside any lot: trees by rule, not from an inventory

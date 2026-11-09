@@ -53,7 +53,7 @@ export function applyLight(env, L) {
   hemi.intensity = L.hemiI; hemi.color.setRGB(...L.hemiSky); hemi.groundColor.setRGB(...L.hemiGround);
   const g = L.glow;
   glassMat.emissive.setRGB(0.6 * g, 0.48 * g, 0.25 * g);
-  if (lampMat) lampMat.emissive.setRGB(1 * g, 0.82 * g, 0.48 * g);
+  if (lampMat) { lampMat.emissive.setRGB(1 * g, 0.82 * g, 0.48 * g); if (lampMat.userData.pool) lampMat.userData.pool.opacity = L.pool ?? g; }
   if (app) {
     app.style.setProperty('--sky-top', css(L.skyTop)); app.style.setProperty('--sky-bottom', css(L.skyBottom));
     app.classList.toggle('night', L.isNight);
