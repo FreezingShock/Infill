@@ -8,6 +8,7 @@ import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
 import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
+import { createSky } from '../views/sky.js';
 import { applyLight, lightAt, mountClockDock, SUN_DIST } from '../views/light.js';
 import { clock, setHour, tickClock } from '../game/clock.js';
 import { tickTraffic } from '../views/traffic.js';
@@ -376,7 +377,7 @@ let lampMat = null;
 const dock = mountClockDock($('app'), { onChange: () => { ui.night = lightAt(clock.hour).isNight; refreshLight(); renderViews(); } });
 let lightEnv = null, lastLightHour = -1;
 function refreshLight() {
-  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app') };
+  lightEnv = lightEnv || { sun, hemi, scene, glassMat: MAT.glass, lampMat, app: $('app'), sky: createSky(scene) };
   lightEnv.lampMat = lampMat; lastLightHour = clock.hour;
   const L = lightAt(clock.hour); applyLight(lightEnv, L); ui.night = L.isNight; sunDir.fromArray(L.dir);
 }
@@ -540,6 +541,7 @@ function frame(now) {
   const t = controls.target; t.x = clamp(t.x, X0, X1); t.z = clamp(t.z, Z0, Z1);
   const dist = cam.position.distanceTo(t), polar = controls.getPolarAngle();
   const nf = nearFar(dist, polar); if (Math.abs(nf.near - cam.near) > 0.05 || Math.abs(nf.far - cam.far) > 5) { cam.near = nf.near; cam.far = nf.far; cam.updateProjectionMatrix(); }
+  if (lightEnv) lightEnv.sky.follow(t, polar, Math.min(0.1, (now - lastNow) / 1000 || 0));
   const fr = fogRange(dist, polar); scene.fog.near = fr.near; scene.fog.far = fr.far;
   if (tickClock((now - lastNow) / 1000 || 0)) { if (Math.abs(clock.hour - lastLightHour) > 0.02) { const was = ui.night; refreshLight(); if (was !== ui.night) renderViews(); dock.sync(); } }
   lastNow = now; tickTraffic(now);

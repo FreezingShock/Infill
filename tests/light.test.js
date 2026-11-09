@@ -32,3 +32,9 @@ test('camera zoom and distance round-trip, clip planes follow distance', () => {
   assert.ok(close.near < far.near && close.far < far.far);
   assert.ok(fogRange(400, 1.4).near < fogRange(400, 0.3).near);
 });
+
+test('sky has the sun up by day and the moon up by night', () => {
+  assert.ok(lightAt(13).skyDir[1] > 0.5);
+  assert.ok(lightAt(23).skyDir[1] < 0 && lightAt(23).moonDir[1] > 0.2);
+  assert.ok(lightAt(19.2).golden > 0.5 && lightAt(13).golden < 0.1);
+});
