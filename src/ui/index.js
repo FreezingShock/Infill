@@ -1,6 +1,7 @@
 // CS2-style HUD parts: clock and speed controls, the info-view bar with its legend, and the advisor.
 // Everything is built into the existing page; the only hooks into the app are the 'infill:state' event and main.js's import.
 import '../styles/hud.css';
+import '../styles/layout.css';
 import { SPEEDS, SPEED_NAMES, clock, clockLabel, minuteOfDay, setSpeed, speedIndex, togglePause } from '../game/clock.js';
 import { lightAt } from '../views/light.js';
 import { VIEWS, cycleView, current, legend, onChange, setView, stats } from '../views/index.js';
@@ -95,3 +96,10 @@ addEventListener('keydown', (e) => {
 });
 const keys = document.querySelector('#keysm .keys');
 if (keys) keys.insertAdjacentHTML('beforeend', '<div><kbd>Space</kbd> Pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> Speed</div><div><kbd>I</kbd> Cycle the info views</div>');
+
+// ---------- dock the loose parts into their homes: scrub slider joins the clock bar, traffic chip joins the corner cluster ----------
+function dockParts() {
+  const dock = document.querySelector('.clockdock'); if (dock && dock.parentNode !== clockEl) clockEl.append(dock);
+  const chip = document.querySelector('.trafficchip'), br = document.querySelector('.br'); if (chip && br && chip.parentNode !== br) br.prepend(chip);
+}
+dockParts(); setTimeout(dockParts, 0); addEventListener('load', dockParts);

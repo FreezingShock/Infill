@@ -180,9 +180,7 @@ function scores() {
 const money = (v) => (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(Math.abs(v) >= 1e8 ? 0 : 1) + 'M' : fmt(Math.abs(v) / 1e3) + 'k');
 function renderHud() {
   const s = scores();
-  $('hud').innerHTML = `<div class="stat"><b>${fmt(s.homes)}</b><small>Homes</small></div><div class="stat"><b>${fmt(s.trees)}</b><small>Trees</small></div>
-  <div class="stat"><b>${s.shade.toFixed(1)}%</b><small>Shade</small></div><div class="stat"><small>Walkability</small><div class="meter" title="${Math.round(s.walk)} of 100"><i style="width:${s.walk}%"></i></div></div>
-  <div class="stat"><b>${s.park.toFixed(1)} ac</b><small>Parking</small></div><div class="stat"><b>${money(s.budget)}</b><small>Budget left</small></div>`;
+  $('hud').innerHTML = `<div class="stat"><b>${fmt(s.homes)}</b><small>Homes</small></div><div class="stat" title="Surface parking, in acres"><b>${s.park.toFixed(1)} ac</b><small>Parking</small></div><div class="stat"><b>${money(s.budget)}</b><small>Budget left</small></div>`;
 }
 let deltaT;
 function showDelta(a, b, label) {
