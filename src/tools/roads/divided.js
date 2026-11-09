@@ -27,8 +27,12 @@ function gapTo(e1, e2) {
     const q = nearestOnLine(e2.p, s.x, s.z); if (q.d < 3 || q.d > 45) continue;
     const t1 = tangentAt(e1.p, s.i), t2 = tangentAt(e2.p, q.i); if (t1[0] * t2[0] + t1[1] * t2[1] < -0.9) { against++; ds.push(q.d); }
   }
-  if (against < 3 || Math.max(...ds) - Math.min(...ds) > 7) return null;
-  return ds.reduce((a, b) => a + b, 0) / ds.length;
+  if (against < 3) return null;
+  const lo = Math.min(...ds), hi = Math.max(...ds), mean = ds.reduce((a, b) => a + b, 0) / ds.length;
+  // a short pair that closes up into one node is the taper where the divided road joins the undivided one
+  const shares = e1.a === e2.a || e1.a === e2.b || e1.b === e2.a || e1.b === e2.b;
+  if (shares && hi <= 30 && Math.max(polyLen(e1.p), polyLen(e2.p)) < 90) return { d: hi, taper: true };
+  return hi - lo <= 7 ? { d: mean, taper: false } : null;
 }
 function profileFor(e, d) {
   const park = d >= 14 && e.c !== 'trunk', outer = WALK + (park ? PARK : 0);
@@ -52,15 +56,22 @@ function markDivided(S) {
     let best = null, bd = 1e9;
     for (const e2 of cand) {
       if (e2 === e1 || e2.n !== e1.n || e2.bb[0] > e1.bb[2] + 45 || e2.bb[2] < e1.bb[0] - 45 || e2.bb[1] > e1.bb[3] + 45 || e2.bb[3] < e1.bb[1] - 45) continue;
-      const d = gapTo(e1, e2); if (d != null && d < bd) { bd = d; best = e2; }
+      const g = gapTo(e1, e2); if (g && g.d < bd) { bd = g.d; best = { e: e2, taper: g.taper }; }
     }
-    if (best && bd >= 7) found.set(e1.id, { e: e1, partner: best, d: bd });
+    if (best && bd >= 7) found.set(e1.id, { e: e1, partner: best.e, d: bd, taper: best.taper });
   }
   const done = new Set();
-  for (const { e, partner, d } of found.values()) {
+  for (const { e, partner, d, taper } of found.values()) {
     if (!found.has(partner.id)) continue; // both halves must agree
     const { els, n, lw } = profileFor(e, d);
+    if (taper) { e.prof = { k: 'asbuilt', els: Array.from({ length: n }, () => ['lane', lw]) }; e.oneway = 1; e.divided = 1; e.taper = 1; e.w = n * lw; done.add(e.id); continue; } // lanes only: no median, trees or kerbs across the V
     e.prof = { k: 'asbuilt', els: oriented(e, partner, els) }; e.oneway = 1; e.divided = 1; e.w = n * lw; done.add(e.id);
+  }
+  // a taper carries as many lanes as the carriageway it grows out of
+  for (const e of S.edges.values()) {
+    if (!e.taper) continue;
+    const nb = [...S.edges.values()].find((q) => q.divided && !q.taper && (q.a === e.a || q.a === e.b || q.b === e.a || q.b === e.b) && q.prof.els.some((x) => x[0] === 'lane'));
+    if (nb) { const ln = nb.prof.els.filter((x) => x[0] === 'lane'); e.prof = { k: 'asbuilt', els: ln.map((x) => ['lane', x[1]]) }; e.w = ln.reduce((a, x) => a + x[1], 0); }
   }
   // connectors: short pieces that join a divided pair back into the two-way road at one node
   const ends = (n) => [...S.edges.values()].filter((q) => q.g && (q.a === n || q.b === n));

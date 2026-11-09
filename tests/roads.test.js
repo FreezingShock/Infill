@@ -98,3 +98,9 @@ test('divided boulevards import as one-way carriageways with a median, never ove
   }
 });
 function nearestOnLineOf(p, m) { let b = 1e9; for (let i = 1; i < p.length; i++) { const [ax, az] = p[i - 1], [bx, bz] = p[i], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((m[0] - ax) * dx + (m[1] - az) * dz) / (dx * dx + dz * dz || 1))); b = Math.min(b, Math.hypot(m[0] - ax - dx * t, m[1] - az - dz * t)); } return b; }
+
+test('where a divided road meets the undivided one, the taper has lanes only (no median across the V)', () => {
+  const tapers = [...BASE.edges.values()].filter((e) => e.taper);
+  assert.ok(tapers.length >= 2);
+  for (const e of tapers) { assert.equal(e.oneway, 1); assert.ok(e.prof.els.every((x) => x[0] === 'lane'), `${e.id} lanes only`); }
+});
