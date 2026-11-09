@@ -34,14 +34,16 @@
 
   <div class="tl">
     <div class="plaque brand"><h1>sfvOS</h1><span>Camino</span></div>
-    <div class="plaque area-pl"><div><b id="areaName">Loading…</b><small id="areaSub"></small></div><button class="btn ghost small" id="areaBtn">Change area</button></div>
-    <form class="plaque search" id="searchForm" autocomplete="off">
-      <div class="search-row">
-        <input id="addr" type="search" placeholder="Find an address, e.g. 21900 Celes St" aria-label="Find an address" aria-controls="results">
-        <button class="btn small" type="submit">Go</button>
-      </div>
-      <ul class="results" id="results" role="listbox"></ul>
-    </form>
+    <div class="plaque area-pl">
+      <div class="area-top"><div><b id="areaName">Loading…</b><small id="areaSub"></small></div><button class="btn ghost small" id="areaBtn">Change area</button></div>
+      <form class="search" id="searchForm" autocomplete="off">
+        <div class="search-row">
+          <input id="addr" type="search" placeholder="Find an address, e.g. Celes St" aria-label="Find an address" aria-controls="results">
+          <button class="btn small" type="submit">Go</button>
+        </div>
+        <ul class="results" id="results" role="listbox"></ul>
+      </form>
+    </div>
   </div>
 
   <div class="tr">
