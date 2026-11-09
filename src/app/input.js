@@ -5,7 +5,7 @@ import { LT, PRESETS, ZONE_CODES, rowWidth, zfam } from '../engine/model.js';
 import { BASE, uid } from '../engine/commands.js';
 import { CAM_OFF, MAT, cam, canvas, controls, hemi, renderer, resize, scene, sun } from './render.js';
 import { buildProps, buildTerrain, buildWalks, genCached } from './scene.js';
-import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
+import { CUR, C_SEL, IDX, LOG, STATE, ZONE_COL, beforeW, buildColor, buildEdgeSel, buildSel, commit, describe, forgetSave, ghostLots, helpers, load, loadEdits, ov, overlays, redo, refresh, save, selIds, setBasePark, setHover, setOv, setSel, tickRise, toast, ui, undo, world } from './state.js';
 import { applyItem, areaPreview, clearProfDraft, deleteEdges, renderCard, renderDraw } from './inspector.js';
 import { distForZoom, fogRange, nearFar, viewHeightAt, zoomForDist } from './camera.js';
 import { createSky } from '../views/sky.js';
@@ -474,6 +474,16 @@ $('file').addEventListener('change', async (e) => {
 });
 $('logClear').onclick = () => { loadLog([], ui.groups); $('logm').hidden = true; toast('Back to the base pack. Your saved groups are kept.'); };
 function loadLog(log, groups) { loadEdits(log); ui.groups = groups; ui.sel.clear(); ui.edgeSel.clear(); refresh(); save(); renderCard(); renderViews(); }
+// Reset town (Camino's More popover and "/" bar, after its confirm step): the area goes back to its as-built pack.
+// Edits, zoning and growth all live in the edit log, so an empty log clears them and the undo history with them.
+// Budget is worked out from the city, so it goes back too. Groups, Dream mode and the saved copy are cleared as well.
+export function resetTown() {
+  forgetSave();
+  loadEdits([]); ui.groups = {}; ui.sel.clear(); ui.edgeSel.clear(); ui.skipped = null;
+  if (ui.dream) { ui.dream = false; $('mReal')?.classList.add('on'); $('mDream')?.classList.remove('on'); $('mReal')?.setAttribute('aria-checked', 'true'); $('mDream')?.setAttribute('aria-checked', 'false'); }
+  refresh(); renderCard(); renderViews();
+  toast('Town reset to as-built. Edits, zoning, growth and undo history are cleared.');
+}
 $('mReal').onclick = () => setMode(false); $('mDream').onclick = () => setMode(true);
 function setMode(d) { ui.dream = d; $('mReal').classList.toggle('on', !d); $('mDream').classList.toggle('on', d); $('mReal').setAttribute('aria-checked', !d); $('mDream').setAttribute('aria-checked', d); save(); renderCard(); toast(d ? 'Dream mode: no setbacks, up to 8 storeys, any template on any lot.' : 'Real rules: simplified LA zoning for setbacks, height and uses.'); }
 
