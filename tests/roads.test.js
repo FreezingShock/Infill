@@ -11,6 +11,7 @@ globalThis.__RENOVATED_PACK__ = JSON.parse(fs.readFileSync(new URL(`../public/ar
 const { BASE, replay } = await import('../src/engine/commands.js');
 const shapes = await import('../src/tools/roads/shapes.js');
 const graph = await import('../src/tools/roads/graph.js');
+const { polyLen } = await import('../src/engine/core.js');
 
 test('arc passes through its middle point and ends where asked', () => {
   const a = [0, 0], m = [10, 5], b = [20, 0], p = shapes.arc(a, m, b);
@@ -76,3 +77,24 @@ test('street.batch builds several streets and roundabout.new builds a ring', () 
   assert.ok(S.edges.size >= before + 3);
   assert.ok([...S.edges.values()].some((e) => e.ring));
 });
+
+test('divided boulevards import as one-way carriageways with a median, never overlapping', () => {
+  const div = [...BASE.edges.values()].filter((e) => e.divided);
+  assert.ok(div.length >= 2, 'Topanga has a divided section');
+  for (const e of div) {
+    assert.equal(e.oneway, 1);
+    assert.ok(e.prof.els.some((x) => x[0] === 'median') || e.prof.els.every((x) => x[0] === 'lane'));
+    const half = e.prof.els.reduce((s, x) => s + x[1], 0) / 2;
+    assert.ok(half < 22, 'row width stays sane');
+  }
+  // two carriageways of a pair must not overlap each other
+  const E = [...BASE.edges.values()].filter((e) => e.divided && e.prof.els.some((x) => x[0] === 'median'));
+  for (const e of E) for (const f of E) {
+    if (e === f || e.n !== f.n || e.prof.els.length < 4 || f.prof.els.length < 4 || e.p.length < 3 || polyLen(e.p) < 80 || polyLen(f.p) < 80) continue;
+    const d = (x) => [x.p.at(-1)[0] - x.p[0][0], x.p.at(-1)[1] - x.p[0][1]];
+    if (d(e)[0] * d(f)[0] + d(e)[1] * d(f)[1] >= 0) continue;
+    const m = e.p[Math.floor(e.p.length / 2)], q = nearestOnLineOf(f.p, m);
+    if (q < 30) assert.ok(q >= (e.prof.els.reduce((s, x) => s + x[1], 0) + f.prof.els.reduce((s, x) => s + x[1], 0)) / 2 - 1.5 || q < 3, `${e.id}/${f.id} overlap`);
+  }
+});
+function nearestOnLineOf(p, m) { let b = 1e9; for (let i = 1; i < p.length; i++) { const [ax, az] = p[i - 1], [bx, bz] = p[i], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((m[0] - ax) * dx + (m[1] - az) * dz) / (dx * dx + dz * dz || 1))); b = Math.min(b, Math.hypot(m[0] - ax - dx * t, m[1] - az - dz * t)); } return b; }
