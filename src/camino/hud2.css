@@ -50,7 +50,9 @@ html[data-theme=camino] #app .results:empty { display: none; }
 /* ---- top right: one status strip ---- */
 html[data-theme=camino] #app .tr { gap: 6px; }
 html[data-theme=camino] #app .tr > .plaque { min-height: 46px; }
-html[data-theme=camino] #app .clockbar { gap: 12px; padding: 5px 12px 5px 10px; }
+/* the panel keeps a clear inset on all four sides (scrub line included) and its children never shrink or wrap, so nothing gets cut at the edge */
+html[data-theme=camino] #app .clockbar { gap: 12px; padding: 6px 14px 14px 12px; max-width: 100%; white-space: nowrap; }
+html[data-theme=camino] #app .clockbar > * { flex: none; }
 html[data-theme=camino] #app .clockbar .sky { width: 18px; height: 18px; border: 1px solid var(--hair-hi); }
 html[data-theme=camino] #app .clockbar .sky::after { inset: 3px; }
 html[data-theme=camino] #app .clockbar .when { min-width: 72px; gap: 3px; }
@@ -67,7 +69,7 @@ html[data-theme=camino] #app .clockbar .gauges { gap: 10px; padding-left: 12px; 
 html[data-theme=camino] #app .clockbar .gauge small { font: 500 8.5px/1 var(--mono); letter-spacing: .16em; }
 html[data-theme=camino] #app .clockbar .gauge .meter { width: 44px; height: 3px; border: 0; background: rgba(233, 239, 241, .14); margin-top: 5px; }
 /* the scrub slider becomes a hairline along the bottom edge; it grows a handle when you reach for it */
-html[data-theme=camino] #app .clockbar .clockdock { position: absolute; left: 0; right: 0; bottom: -1px; top: auto; width: auto; height: 11px; padding: 0; border: 0; gap: 0; display: block; transform: none; }
+html[data-theme=camino] #app .clockbar .clockdock { position: absolute; left: 12px; right: 14px; bottom: 3px; top: auto; width: auto; height: 11px; padding: 0; border: 0; gap: 0; display: block; transform: none; }
 html[data-theme=camino] #app .clockbar .clockdock input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 11px; margin: 0; background: transparent; cursor: ew-resize; display: block; }
 html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--hair-hi); }
 html[data-theme=camino] #app .clockbar .clockdock input[type=range]::-moz-range-track { height: 1px; background: var(--hair-hi); }
