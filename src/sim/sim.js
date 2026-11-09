@@ -2,13 +2,13 @@
 // intersections with signals, stop signs and priority roads, curb parking that fills and empties.
 // Pure JS with no THREE and no DOM, so it runs in a Web Worker and in node tests.
 import { rng, sampleAt } from './geom.js';
+import { stateAt } from './signals.js';
 
 const CAR_LEN = 4.4, STRIDE = 7;
 // vehicle kinds: 0 sedan, 1 SUV, 2 pickup, 3 van, 4 bus. A look is colour (0..5) + 8 * kind.
 const LENS = [4.4, 4.7, 5.2, 5.0, 10.5];
 const kindOf = (look) => Math.floor(look / 8);
 const IDM = { a: 2.6, b: 3.4, T: 1.1, s0: 2.0 };
-const GREEN = 9, CYCLE = 12;
 const PARK_TIME = 1.4;
 // Junction behaviour (general rules, same at every junction in every area):
 const COMFORT = 2.2;      // m/s^2 used to plan slowing for a stop line or a turn
@@ -68,6 +68,7 @@ class Sim {
     if (atPortal && this.portals.length) { lane = this.portals[Math.floor(this.r() * this.portals.length)]; s = 1; }
     else { const x = this.r() * this.spawnW.at(-1); let i = this.spawnW.findIndex((w) => w >= x); if (i < 0) i = 0; lane = this.spawnLanes[i]; s = 6 + this.r() * (lane.len - 12); }
     if (!lane.conns.length && !atPortal) return false;
+    if (lane.leftOnly && this.r() < 0.75) return false; // a left-turn pocket is short and quiet
     for (const c of lane.cars) if (Math.abs(c.s - s) < 16) return false;
     const look = this.look(lane.rank >= 2), len = LENS[kindOf(look)];
     for (const c of lane.cars) if (Math.abs(c.s - s) < len + 9) return false;
@@ -87,10 +88,8 @@ class Sim {
   }
 
   // ---------- control ----------
-  green(node, group) {
-    const ph = Math.max(1, node.phases), t = (this.t + node.cycleOff) % (ph * CYCLE);
-    return Math.floor(t / CYCLE) === group % ph && (t % CYCLE) < GREEN;
-  }
+  // signal state of a movement: 0 red, 1 permissive green (yield), 2 protected green, 3 yellow (phasing lives in signals.js)
+  sig(conn) { const n = conn.node; return n.sig ? stateAt(n.sig, this.t + n.cycleOff, conn.leg, conn.mv) : 2; }
   yields(f, fd, car, d, k, conn) {
     if (k.pv !== conn.pv) return k.pv > conn.pv;
     const fa = f.arrive ?? Infinity, ca = car.arrive ?? Infinity;
@@ -118,12 +117,10 @@ class Sim {
     for (const k of conn.conflicts) if (k.reserved > 0) return false;
     const n = conn.node, need = GAP[conn.type] || GAP.S;
     if (n.control === 'signal') {
-      if (!this.green(n, conn.group)) return false;
-      // permissive turns on green give way to the oncoming flow that is also green
-      for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && this.green(n, k.group) && !this.gapClear(k, need)) return false;
+      const g = this.sig(conn); if (g !== 1 && g !== 2) return false;
+      // a permissive turn gives way to oncoming flow that is also green
+      if (g === 1) for (const k of conn.conflicts) if (k.from !== conn.from && (this.sig(k) === 1 || this.sig(k) === 2) && !this.gapClear(k, need)) return false;
     } else if (n.control !== 'none') {
-      // gap acceptance: give way to higher-priority traffic until it is far enough away in time, so the minor road
-      // moves as soon as a real gap opens and the major road does not have to brake for it
       for (const k of conn.conflicts) if (k.pv > conn.pv && k.from !== conn.from && !this.gapClear(k, need)) return false;
       for (const k of conn.conflicts) {
         const f = k.from.cars[0]; if (!f || f === car || f.granted || f.plan !== k || !this.roomFor(k, f)) continue;

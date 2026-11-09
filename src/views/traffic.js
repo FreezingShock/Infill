@@ -11,6 +11,8 @@ import { provide } from './providers.js';
 import { drivableEdges, keyOf } from '../sim/net.js';
 import { Sim, STRIDE } from '../sim/sim.js';
 import { advance, applyMessage } from '../sim/host.js';
+import { exportSignals } from '../sim/signals.js';
+import { setSignals, tickSignals } from './signals.js';
 
 const COLS = [0xc4613b, 0x3e9fdc, 0xf4f1ea, 0x4f4b48, 0xd6ad57, 0x8ea67a].map((h) => new THREE.Color(h));
 const MODES = [['Calm', 0.2], ['Normal', 0.4], ['Rush', 0.8]];
@@ -57,7 +59,7 @@ let backend = null;
 function startBackend() {
   try {
     const w = new Worker(new URL('../sim/worker.js', import.meta.url), { type: 'module' });
-    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); };
+    w.onmessage = (e) => { if (e.data.type === 'snap') onSnap(e.data.buf, e.data.stats, e.data.edges); else if (e.data.type === 'sigs') setSignals(e.data.list); };
     w.onerror = () => { backend = localBackend(); if (st.netMsg) backend.post(st.netMsg); sendCfg(true); }; // fall back, and hand the new backend the street network it missed
     return { post: (m) => w.postMessage(m) };
   } catch (err) { return localBackend(); }
@@ -68,9 +70,9 @@ function localBackend() {
     const now = performance.now(), el = Math.min(0.25, (now - last) / 1000); last = now;
     if (!sim.net) return;
     const t0 = performance.now(); advance(sim, el, 2);
-    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0 }, ++tick % 20 === 1 ? sim.edgeStats() : null);
+    const buf = sim.snapshot(); onSnap(buf, { ...sim.stats, ms: performance.now() - t0, t: sim.t }, ++tick % 20 === 1 ? sim.edgeStats() : null);
   }, 50);
-  return { post: (m) => applyMessage(sim, m) };
+  return { post: (m) => { applyMessage(sim, m); if (m.type === 'net') setSignals(exportSignals(sim.net)); } };
 }
 
 const live = { flow: null, curb: null };
@@ -143,6 +145,7 @@ function sendCfg(force) {
 function tickTraffic(now) {
   if (now - st.lastCfg > 1000) { st.lastCfg = now; sendCfg(false); }
   root.visible = st.on;
+  tickSignals(st.stats.t == null ? 0 : st.stats.t + Math.min(0.25, (now - st.snapT) / 1000));
   if (!st.on) return;
   const buf = st.snap, dt = Math.min(0.2, (now - st.snapT) / 1000);
   const nm = [0, 0, 0, 0, 0];
