@@ -562,9 +562,10 @@ if (saved && saved.log && saved.log.length) toast(rebaseNote(saved, AREA, ui.las
 
 let lastShadowZoom = 0, lastNow = performance.now();
 // Cinematic idle camera (src/app/orbit.js): bird's-eye turns around the area centre until the first input.
-const orbit = createOrbit({ cam, controls, canvas, elev, enabled: !reduceMotion, bounds: (() => { let cached = null; return () => cached || (cached = (() => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const l of STATE.lots.values()) { const [x, z] = l.c; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return a > c ? [X0, Z0, X1, Z1] : [a, b, c, d]; })()); })() });
+const orbit = createOrbit({ cam, controls, canvas, elev, enabled: true, bounds: (() => { let cached = null; return () => cached || (cached = (() => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const l of STATE.lots.values()) { const [x, z] = l.c; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return a > c ? [X0, Z0, X1, Z1] : [a, b, c, d]; })()); })() });
 // Starts when the boot screen lifts, so a mouse wiggle or key press during loading cannot cancel it before it is seen.
 { const root = document.documentElement, go = () => orbit.start(performance.now());
+  if (new URLSearchParams(location.search).has('orbitdebug')) console.log('[orbit] wired; reduceMotion =', reduceMotion, '; is-ready =', root.classList.contains('is-ready'));
   if (root.classList.contains('is-ready')) go();
   else { const mo = new MutationObserver(() => { if (root.classList.contains('is-ready')) { mo.disconnect(); go(); } }); mo.observe(root, { attributes: true, attributeFilter: ['class'] }); } }
 function frame(now) {
