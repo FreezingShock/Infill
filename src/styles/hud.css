@@ -31,9 +31,20 @@
 .legend .chipb { cursor: default; }
 @keyframes legendIn { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-.advisor { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
-.advisor .ai { font-size: 19px; line-height: 1; flex: none; }
-.advisor p { margin: 0; font-size: 12px; line-height: 1.4; flex: 1; min-width: 0; }
+/* advisor = system alert: severity tag + place on one row, one line of copy, one action. Colours come from the theme's --warn / --gold / --sage. */
+.advisor { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px; --sev: var(--sage); }
+.advisor[data-sev=alert] { --sev: var(--warn); }
+.advisor[data-sev=warn] { --sev: var(--gold); }
+.advisor[data-sev=ok] { --sev: var(--sage); }
+.adv-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.adv-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 3px 7px 3px 6px; background: var(--sev); color: #fff8ec; border: 2px solid var(--ink); border-radius: 6px; font: 700 10px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; }
+.advisor[data-sev=warn] .adv-tag, .advisor[data-sev=ok] .adv-tag { color: var(--ink); }
+.adv-tag svg { width: 11px; height: 11px; flex: none; }
+.adv-loc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--ink-soft); }
+.adv-loc b { font-weight: 700; color: var(--ink); }
+.advisor p { margin: 0; font-size: 12.5px; line-height: 1.4; }
+.adv-act { display: flex; justify-content: flex-end; }
+.adv-act .btn { font-size: 12px; padding: 5px 10px; }
 .advisor:empty { display: none; }
 
 .asbuilt-tag { top: 76px; }
