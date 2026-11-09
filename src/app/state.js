@@ -10,6 +10,7 @@ import { renderCard } from './inspector.js';
 import { syncTraffic } from '../views/traffic.js';
 import { buildLabels, renderViews } from './input.js';
 import { warmFor } from '../workers/warm.js';
+import { toast } from '../ui/toasts.js';
 
 // =====================================================================
 // Builder: state, undo, overlays, scores
@@ -196,9 +197,7 @@ function showDelta(a, b, label) {
   el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
   clearTimeout(deltaT); deltaT = setTimeout(() => (el.hidden = true), 4200);
 }
-let toastT;
 const busyToast = (n) => toast(`Building ${fmt(n)}+ lots…`);
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 4200); }
 
 // ---------- save / load ----------
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ log: LOG.slice(0, CUR), groups: ui.groups, dream: ui.dream, built: AREA.built })); } catch (e) { /* storage unavailable: edits last for this visit */ } }
