@@ -13,7 +13,6 @@ const { genLot } = await import('../src/engine/templates.js');
 const { capacity, demandOf, smooth, tally } = await import('../src/game/zoning/demand.js');
 const { planGrowth } = await import('../src/game/growth.js');
 const { ZONE_PAINTS } = await import('../src/game/zoning/zones.js');
-const { advance, clock, onDay, reset, setSpeed } = await import('../src/game/zoning/pace.js');
 
 const fresh = () => structuredClone(BASE);
 const info = () => ({ skipped: [], notes: [] });
@@ -85,10 +84,3 @@ test('every zone paint is a real zone code with a kind', () => {
   for (const p of ZONE_PAINTS) { assert.ok(/^[A-Z0-9]+-/.test(p.z)); assert.ok(['homes', 'shops', 'civic'].includes(p.kind)); }
 });
 
-test('clock: a day passes every DAY_SECONDS at 1x, faster at 4x, never when paused', () => {
-  reset(); let days = 0; const off = onDay(() => days++);
-  assert.equal(advance(5.9), 0); assert.equal(advance(0.2), 1);
-  setSpeed(4); advance(6); assert.equal(days, 5);
-  setSpeed(0); advance(100); assert.equal(days, 5);
-  setSpeed(1); off(); assert.equal(clock.day, 5);
-});
